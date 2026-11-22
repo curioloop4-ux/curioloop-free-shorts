@@ -1,6 +1,6 @@
 # CurioLoop Free Shorts Automation
 
-A low-cost starter pipeline that creates one English YouTube Short per scheduled run using Gemini (script), Pexels (stock footage), Edge TTS (voice), FFmpeg (render), and YouTube Data API (upload).
+A low-cost starter pipeline that creates one English YouTube Short per scheduled run using Gemini (script), Edge TTS (voice), FFmpeg (locally generated visual card), and YouTube Data API (upload).
 
 ## Important
 - This repository does not become operational until the required API keys and YouTube OAuth refresh token are added as GitHub Actions secrets.
@@ -11,7 +11,6 @@ A low-cost starter pipeline that creates one English YouTube Short per scheduled
 ## GitHub Actions secrets
 Add these under **Settings → Secrets and variables → Actions → New repository secret**:
 - `GEMINI_API_KEY`
-- `PEXELS_API_KEY`
 - `YOUTUBE_CLIENT_ID`
 - `YOUTUBE_CLIENT_SECRET`
 - `YOUTUBE_REFRESH_TOKEN`
@@ -24,14 +23,13 @@ Optional repository variable:
 GitHub Actions runs daily at 23:00 UTC (08:00 Korea time). You can also run it manually from **Actions → CurioLoop Daily Shorts → Run workflow**.
 
 ## Pipeline
-1. Gemini generates a short script and a stock-footage search phrase.
-2. Pexels supplies a vertical video clip.
-3. Edge TTS generates English narration.
-4. FFmpeg renders a 9:16 MP4 with captions.
-5. YouTube Data API uploads the Short using the configured privacy status.
+1. Gemini generates an original short script.
+2. Edge TTS generates English narration.
+3. FFmpeg creates a vertical abstract background, title, and captions locally.
+4. YouTube Data API uploads the Short using the configured privacy status.
 
 ## Limitations
-- This starter uses stock footage, not generative AI video.
+- Visuals are locally generated motion-card backgrounds, not stock footage or generative AI video.
 - It does not yet perform reliable live trend research or automatic performance-based optimization.
-- YouTube API quota, Gemini free limits, Pexels availability, and Edge TTS terms may limit use.
+- YouTube API quota, Gemini free limits, Edge TTS terms may limit use.
 - YouTube decides whether a video is classified as a Short.
