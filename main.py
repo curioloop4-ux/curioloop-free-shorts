@@ -29,7 +29,7 @@ def make_script():
     api_key = required("GEMINI_API_KEY")
     model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     prompt = """Create one original, fact-checkable English YouTube Shorts script for a global audience.
-Return ONLY valid JSON with keys: title, narration, visual_search.
+Return ONLY valid JSON with keys: title, narration, visual_theme.
 Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
 one surprising but accurate fact; no medical/financial advice, politics, or fabricated claims.
 visual_theme must be a concise visual direction for an abstract science-style background.
