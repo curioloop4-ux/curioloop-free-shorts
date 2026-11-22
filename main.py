@@ -32,7 +32,7 @@ def make_script():
 Return ONLY valid JSON with keys: title, narration, visual_search.
 Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
 one surprising but accurate fact; no medical/financial advice, politics, or fabricated claims.
-visual_search must be a concise Pexels stock-footage search phrase matching the story.
+visual_theme must be a concise visual direction for an abstract science-style background.
 Avoid repeating obvious topics such as tardigrades. Choose a fresh science, nature, history,
 technology, or everyday-curiosity topic. Do not include markdown."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -46,37 +46,11 @@ technology, or everyday-curiosity topic. Do not include markdown."""
     response.raise_for_status()
     raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
-    for key in ("title", "narration", "visual_search"):
+    for key in ("title", "narration", "visual_theme"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
     return data
 
-
-def download_pexels_video(query):
-    headers = {"Authorization": required("PEXELS_API_KEY")}
-    response = requests.get(
-        "https://api.pexels.com/videos/search",
-        headers=headers,
-        params={"query": query, "orientation": "portrait", "per_page": 8},
-        timeout=45,
-    )
-    response.raise_for_status()
-    videos = response.json().get("videos", [])
-    if not videos:
-        raise RuntimeError(f"No Pexels videos found for: {query}")
-    # Prefer a medium-sized downloadable file to reduce render time.
-    for video in videos:
-        files = sorted(video.get("video_files", []),
-                       key=lambda f: (f.get("width", 0) < 720, abs((f.get("height", 1) / max(f.get("width", 1), 1)) - 1.777)))
-        for item in files:
-            link = item.get("link")
-            if link and item.get("file_type") == "video/mp4":
-                r = requests.get(link, timeout=90)
-                r.raise_for_status()
-                path = WORK / "background.mp4"
-                path.write_bytes(r.content)
-                return path
-    raise RuntimeError("Pexels returned no downloadable MP4 file")
 
 
 async def make_voice(text):
@@ -117,12 +91,21 @@ def make_ass(narration):
     return path, duration
 
 
-def render(video, voice, captions, duration):
+def render(title, voice, captions, duration):
     output = WORK / "curioloop_short.mp4"
-    # Crop to vertical 9:16, loop stock clip if shorter than narration, and burn captions.
-    filter_value = "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,ass=captions.ass"
+    # Generate a vertical abstract motion-card background locally; no stock-video API is needed.
+    title_path = WORK / "title.txt"
+    title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
+    filter_value = (
+        "drawgrid=width=120:height=120:thickness=2:color=0x29415f@0.45,"
+        "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+        "textfile=title.txt:fontcolor=white:fontsize=68:"
+        "x=(w-text_w)/2:y=260:box=1:boxcolor=0x000000@0.25:boxborderw=28,"
+        "ass=captions.ass"
+    )
     subprocess.run([
-        "ffmpeg", "-y", "-stream_loop", "-1", "-i", str(video), "-i", str(voice),
+        "ffmpeg", "-y", "-f", "lavfi", "-i",
+        "color=c=0x101b35:s=1080x1920:r=30", "-i", str(voice),
         "-t", f"{duration:.2f}", "-vf", filter_value, "-map", "0:v:0", "-map", "1:a:0",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "24",
         "-c:a", "aac", "-b:a", "128k", "-shortest", "-movflags", "+faststart", str(output)
@@ -165,10 +148,9 @@ def upload(path, title, narration):
 def main():
     script = make_script()
     print("Selected:", script["title"])
-    video = download_pexels_video(script["visual_search"])
     voice = asyncio.run(make_voice(script["narration"]))
     captions, duration = make_ass(script["narration"])
-    rendered = render(video, voice, captions, duration)
+    rendered = render(script["title"], voice, captions, duration)
     upload(rendered, script["title"], script["narration"])
 
 
