@@ -250,12 +250,37 @@ def upload(path, title, narration, credits=None):
 
 
 def main():
-    script = make_script()
-    print("Selected:", script["title"])
-    voice = asyncio.run(make_voice(script["narration"]))
-    captions, duration = make_ass(script["narration"])
-    rendered, credits = render(script["title"], voice, captions, duration, script["visual_theme"], script["visual_queries"])
-    upload(rendered, script["title"], script["narration"], credits)
+    import time
+
+    try:
+        count = int(os.getenv("SHORTS_COUNT", "1"))
+    except ValueError:
+        count = 1
+    count = max(1, min(count, 10))
+    print(f"Starting batch: {count} Short(s).")
+    uploaded = 0
+
+    for index in range(1, count + 1):
+        print(f"\\n========== SHORT {index}/{count} ==========")
+        try:
+            script = make_script()
+            print("Selected:", script["title"])
+            voice = asyncio.run(make_voice(script["narration"]))
+            captions, duration = make_ass(script["narration"])
+            rendered, credits = render(
+                script["title"], voice, captions, duration,
+                script["visual_theme"], script["visual_queries"]
+            )
+            upload(rendered, script["title"], script["narration"], credits)
+            uploaded += 1
+        except Exception as exc:
+            print(f"Short {index} failed: {type(exc).__name__}: {exc}")
+        if index < count:
+            time.sleep(8)
+
+    print(f"\\nBatch finished: {uploaded}/{count} Short(s) uploaded.")
+    if uploaded == 0:
+        raise RuntimeError("No Shorts were uploaded successfully.")
 
 
 if __name__ == "__main__":
