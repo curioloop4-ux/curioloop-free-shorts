@@ -46,6 +46,9 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Validate Python scripts
+        run: python -m py_compile main.py discover_trending.py
+
       - name: Create and upload Short
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -64,6 +67,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: curioloop-shorts-mp4
-          path: work/*.mp4
+          path: |
+            work/*.mp4
+            work/visual_credits.txt
           if-no-files-found: warn
           retention-days: 7
