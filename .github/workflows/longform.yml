@@ -1,0 +1,75 @@
+name: CurioLoop Long-form Documentary
+
+on:
+  workflow_dispatch:
+    inputs:
+      output_only:
+        description: "Render MP4 only; skip YouTube upload"
+        required: true
+        type: boolean
+        default: false
+      privacy_status:
+        description: "Upload visibility (unlisted is recommended for first review)"
+        required: true
+        type: choice
+        options:
+          - unlisted
+          - private
+          - public
+        default: unlisted
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curioloop-longform
+  cancel-in-progress: false
+
+jobs:
+  create-documentary:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate long-form producer
+        run: python -m py_compile longform.py
+
+      - name: Create and upload documentary
+        env:
+          GEMINI_API_KEY: \${{ secrets.GEMINI_API_KEY }}
+          PIXABAY_API_KEY: \${{ secrets.PIXABAY_API_KEY }}
+          YOUTUBE_CLIENT_ID: \${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: \${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: \${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: \${{ inputs.privacy_status }}
+          OUTPUT_ONLY: \${{ inputs.output_only }}
+          GEMINI_MODEL: \${{ vars.GEMINI_MODEL }}
+        run: python longform.py
+
+      - name: Save documentary files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-longform-documentary
+          path: |
+            work_longform/*.mp4
+            work_longform/*.json
+            work_longform/*.txt
+          if-no-files-found: warn
+          retention-days: 7
