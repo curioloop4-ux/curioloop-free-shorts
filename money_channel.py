@@ -3,6 +3,7 @@ import json
 import os
 import re
 import subprocess
+import time
 from pathlib import Path
 
 import edge_tts
@@ -36,14 +37,34 @@ def generate_content(topic=None):
     else:
         topic = topic or "为什么有些人越来越有钱？"
         prompt = f"""请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：{topic}。解释一个具体、可信的经济或金钱心理观点，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries必须提供5个英文Pixabay视频搜索词：至少3个与脚本内容直接相关，另外2个分别用于自然融入身材健美的成年男性、形象时尚有魅力的成年女性镜头（例如健身、商务、品质生活、自我管理场景）；人物镜头必须与旁白主题有联系，不得使用性暗示、无关摆拍或未成年人。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
-    response = requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
-        params={"key": required("GEMINI_API_KEY")},
-        json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.55, "responseMimeType": "application/json"}},
-        timeout=150,
-    )
-    response.raise_for_status()
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.55, "responseMimeType": "application/json"},
+    }
+    response = None
+    for attempt in range(5):
+        try:
+            response = requests.post(
+                url, params={"key": required("GEMINI_API_KEY")},
+                json=payload, timeout=150,
+            )
+            if response.status_code not in {429, 500, 502, 503, 504}:
+                response.raise_for_status()
+                break
+            if attempt == 4:
+                response.raise_for_status()
+            wait = min(30, 5 * (2 ** attempt))
+            print(f"Gemini temporarily unavailable (HTTP {response.status_code}); retrying in {wait}s ({attempt + 1}/5).")
+            time.sleep(wait)
+        except requests.exceptions.RequestException as exc:
+            if attempt == 4:
+                raise
+            wait = min(30, 5 * (2 ** attempt))
+            print(f"Gemini request failed: {exc}; retrying in {wait}s ({attempt + 1}/5).")
+            time.sleep(wait)
+    if response is None:
+        raise RuntimeError("Gemini request failed without a response.")
     data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
     if not isinstance(data.get("title"), str) or not data["title"].strip():
         raise ValueError("Gemini did not return a title.")
@@ -263,22 +284,26 @@ def main():
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     for index, topic in enumerate(topics, start=1):
         print(f"\n========== SHORT {index}/3 ==========")
-        data = generate_content(topic)
-        print("Selected:", data["title"])
-        (WORK / f"script_{index}.json").write_text(
-            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-        voice = asyncio.run(make_voice(data["narration"]))
-        clips, credits = download_relevant_clips(data["visual_queries"])
-        rendered = render_video(data, voice, clips)
-        output = WORK / f"money_short_{index}.mp4"
-        rendered.replace(output)
-        (WORK / f"visual_credits_{index}.txt").write_text(
-            "\n".join(dict.fromkeys(credits)), encoding="utf-8")
-        print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
-        if output_only:
-            print("OUTPUT_ONLY enabled; upload skipped.")
-        else:
-            upload_video(output, data, credits)
+        try:
+            data = generate_content(topic)
+            print("Selected:", data["title"])
+            (WORK / f"script_{index}.json").write_text(
+                json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+            voice = asyncio.run(make_voice(data["narration"]))
+            clips, credits = download_relevant_clips(data["visual_queries"])
+            rendered = render_video(data, voice, clips)
+            output = WORK / f"money_short_{index}.mp4"
+            rendered.replace(output)
+            (WORK / f"visual_credits_{index}.txt").write_text(
+                "\n".join(dict.fromkeys(credits)), encoding="utf-8")
+            print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
+            if output_only:
+                print("OUTPUT_ONLY enabled; upload skipped.")
+            else:
+                upload_video(output, data, credits)
+        except Exception as exc:
+            print(f"SHORT {index}/3 FAILED; continuing with the next topic. Error: {exc}")
+            continue
 
 
 if __name__ == "__main__":
