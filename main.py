@@ -103,17 +103,26 @@ technology, everyday mysteries. No Korean entertainment news.
 Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 Choose one specific verified fact; never invent statistics or studies. Avoid medical/financial advice.
 20-35 seconds; narration 60-85 natural English words; title under 65 characters;
-hook_text 3-6 words; immediate accurate curiosity hook.
+hook_text 3-6 words; immediate curiosity hook that follows the casual opening.
+NARRATION OPENING RULES:
+Start with a relatable everyday-life observation, familiar habit, small frustration, or casual question.
+Do NOT begin by naming the scientific concept, stating the fact, or sounding like a lecture.
+Use a conversational bridge from the everyday situation into the surprising fact within the next sentence.
+Example style only: "Ever notice how you feel more awake after a quick walk?" Then explain the real reason.
+Keep the opening natural, specific to the topic, and accurate; do not use generic clickbait.
 VISUAL RULES:
-No fruit-eating opening. First shot must feature a fit-looking athletic adult man OR woman,
-fully clothed, non-sexualized, in a strong natural pose/action.
-Then prioritize real footage of the exact topic/action: actual animal for animal facts,
-actual exercise footage (actively use women exercising when relevant) for fitness facts,
-actual food/preparation for food facts, relevant objects/experiments for science.
-Do not force a woman into every shot. Do not fill with unrelated portraits or scenery.
-If relevant footage is unavailable, choose a different topic rather than mismatched footage.
-Return exactly 3 English stock-VIDEO search queries: first for the athletic male/female opening,
-second and third for the actual topic/action. featured_person must be "fit adult man" or "fit adult woman".
+The first shot must be a real licensed stock VIDEO of an adult woman wearing tasteful athletic/workout clothing,
+doing a natural fitness-related action (walking into a gym, stretching, tying running shoes, warming up,
+or exercising). Attractive, healthy, confident presentation is fine; fully clothed and non-sexualized.
+Use a medium or full-body shot with the woman clearly visible. Do not use a still image for the opening.
+Then transition to real footage of the exact topic/action: actual animal for animal facts,
+actual exercise footage for fitness facts, actual food/preparation for food facts,
+and relevant objects/experiments for science.
+Do not replace the opening woman with a man, portrait-only image, unrelated scenery, or abstract graphic.
+If suitable licensed opening footage or topic footage is unavailable, fail rather than use mismatched footage.
+Return exactly 3 English stock-VIDEO search queries: first must be
+"adult woman workout outfit gym stretching fitness full body video",
+second and third for the actual topic/action. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
     if previous_titles:
         prompt += "\nAvoid repeating these previous titles/topics: " + "; ".join(previous_titles[-30:])
@@ -127,11 +136,12 @@ Return valid JSON only."""
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
-    person=str(data.get("featured_person","")).lower()
-    data["featured_person"]="fit adult man" if "man" in person else "fit adult woman"
+    # DailyNibble signature opening: always use a licensed adult-woman workout video.
+    data["featured_person"] = "fit adult woman"
     if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
         raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
     data["visual_queries"]=[str(q).strip() for q in data["visual_queries"][:3]]
+    data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
     return data
 
 
