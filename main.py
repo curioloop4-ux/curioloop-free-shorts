@@ -143,35 +143,46 @@ async def make_voice(text):
 
 
 def make_ass(narration):
-    # Word-group captions, with simple timing across the narration.
+    # Readable short-form captions: 3-word phrases with word-synced yellow karaoke highlight.
     words = narration.split()
-    groups = [" ".join(words[i:i+5]) for i in range(0, len(words), 5)]
-    # The voice is usually ~145 wpm; total duration is refined from ffprobe below.
+    groups = [words[i:i+3] for i in range(0, len(words), 3)]
     probe = subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1", str(WORK / "voice.mp3")
     ], text=True).strip()
     duration = float(probe)
+
     def stamp(seconds):
         cs = int(seconds * 100)
         h, rem = divmod(cs, 360000)
         m, rem = divmod(rem, 6000)
         s, c = divmod(rem, 100)
         return f"{h}:{m:02d}:{s:02d}.{c:02d}"
+
     lines = [
         "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        "Style: Default,Arial,66,&H00FFFFFF,&H0000FFFF,&H00101010,&H80000000,1,0,1,4,1,2,90,90,250,1", "",
+        # Montserrat ExtraBold; yellow karaoke fill, white base, dark stroke, lower-middle safe zone.
+        "Style: Default,Montserrat ExtraBold,76,&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,105,105,390,1", "",
         "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
     step = duration / max(len(groups), 1)
     for i, group in enumerate(groups):
-        lines.append(f"Dialogue: 0,{stamp(i*step)},{stamp(min((i+1)*step, duration))},Default,,0,0,0,,{{\\an2}}{group}")
+        group_duration = step
+        weights = [max(1, len(re.sub(r"[^A-Za-z0-9']", "", word))) for word in group]
+        total_weight = sum(weights) or 1
+        karaoke = []
+        for word, weight in zip(group, weights):
+            centiseconds = max(1, round(group_duration * 100 * weight / total_weight))
+            karaoke.append(f"{{\\kf{centiseconds}}}{word}")
+        text = " ".join(karaoke)
+        lines.append(
+            f"Dialogue: 0,{stamp(i*step)},{stamp(min((i+1)*step, duration))},Default,,0,0,0,,{{\\an2}}{text}"
+        )
     path = WORK / "captions.ass"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, duration
-
 
 
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
