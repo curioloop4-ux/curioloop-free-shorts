@@ -349,7 +349,21 @@ def reserve_topics(count=3):
         available = [item for item in TOPIC_BANK if item[0] not in recent_ids[-max(0, len(TOPIC_BANK)-count):]]
     import random
     random.shuffle(available)
-    selected = available[:count]
+    selected = []
+    used_categories = set()
+    # Prefer a different content category for every Short in the same batch.
+    for item in available:
+        if item[1] not in used_categories:
+            selected.append(item)
+            used_categories.add(item[1])
+            if len(selected) == count:
+                break
+    if len(selected) < count:
+        for item in available:
+            if item not in selected:
+                selected.append(item)
+                if len(selected) == count:
+                    break
     if len(selected) < count:
         raise RuntimeError("Not enough unused topics in the topic bank.")
     history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(TOPIC_BANK):]
