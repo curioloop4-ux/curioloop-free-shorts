@@ -440,8 +440,12 @@ def main():
                 script["title"], voice, captions, duration,
                 script["visual_theme"], script["visual_queries"]
             )
-            upload(rendered, script["title"], script["narration"], credits)
-            uploaded += 1
+            if os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}:
+                print(f"VIDEO_ONLY: Rendered MP4 saved at {rendered}; YouTube upload skipped.")
+                uploaded += 1
+            else:
+                upload(rendered, script["title"], script["narration"], credits)
+                uploaded += 1
         except Exception as exc:
             print(f"Short {index} failed: {type(exc).__name__}: {exc}")
             # Stop immediately when YouTube's channel-level upload limit is reached.
