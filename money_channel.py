@@ -4,7 +4,6 @@ import os
 import re
 import subprocess
 from pathlib import Path
-from urllib.parse import urlparse
 
 import edge_tts
 import requests
@@ -208,7 +207,7 @@ def render_video(data, voice, clips):
     output = WORK / ("money_documentary.mp4" if IS_LONG else "money_short.mp4")
     subprocess.run([
         "ffmpeg", "-y", "-stream_loop", "-1", "-i", str(montage), "-i", str(voice),
-        "-vf", f"subtitles={subtitles}:fontsdir=/usr/share/fonts/truetype/noto",
+        "-vf", f"subtitles={subtitles}:fontsdir=/usr/share/fonts/opentype/noto",
         "-map", "0:v:0", "-map", "1:a:0", "-t", f"{duration:.3f}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
         "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(output)
