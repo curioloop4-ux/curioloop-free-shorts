@@ -29,9 +29,11 @@ def make_script():
     api_key = required("GEMINI_API_KEY")
     # GitHub Actions may define GEMINI_MODEL as an empty secret/variable.
     # Treat an empty value the same as an unset value.
-    model = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
-    if not model:
-        model = "gemini-2.5-flash"
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
+    # Gemini 2.5 generation access is restricted for newly created projects.
+    # Force the supported current lightweight model if the old value is configured.
+    if not model or model == "gemini-2.5-flash":
+        model = "gemini-3.5-flash-lite"
     prompt = """Create one original, fact-checkable English YouTube Shorts script for a global audience.
 Return ONLY valid JSON with keys: title, narration, visual_theme.
 Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
