@@ -27,7 +27,11 @@ def required(name):
 
 def make_script():
     api_key = required("GEMINI_API_KEY")
-    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+    # GitHub Actions may define GEMINI_MODEL as an empty secret/variable.
+    # Treat an empty value the same as an unset value.
+    model = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+    if not model:
+        model = "gemini-2.5-flash"
     prompt = """Create one original, fact-checkable English YouTube Shorts script for a global audience.
 Return ONLY valid JSON with keys: title, narration, visual_theme.
 Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
@@ -36,6 +40,7 @@ visual_theme must be a concise visual direction for an abstract science-style ba
 Avoid repeating obvious topics such as tardigrades. Choose a fresh science, nature, history,
 technology, or everyday-curiosity topic. Do not include markdown."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+    print(f"Generating script with Gemini model: {model}")
     response = requests.post(
         url,
         params={"key": api_key},
