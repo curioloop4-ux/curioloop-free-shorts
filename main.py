@@ -117,10 +117,10 @@ Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
 VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
-a clearly visible adult woman's FULL FACE, front-facing and centered, looking directly into the camera
-and smiling warmly/playfully. The face must be large and unmistakable in the frame, not a distant
-person, side profile, back view, silhouette, or body-only shot. Keep the shot friendly and non-sexual.
-The first visual query must always request: "adult woman front facing full face close up smiling directly at camera".
+a clearly visible adult woman in a FULL-BODY vertical shot, standing or moving naturally, facing the
+camera and smiling warmly/playfully. Show her from head to toe with her face still visible; do not
+crop to only the face or upper body. Keep the shot friendly, natural, and non-sexual.
+The first visual query must always request: "adult woman full body standing facing camera smiling head to toe vertical video".
 After this signature opening, show an adult woman actively interacting with the subject of the fact
 whenever a suitable licensed clip exists. Do not use random unrelated scenery. Examples: for a cat fact,
 show a woman cuddling or playing with a cat; for a dog fact, a woman petting a dog; for a food fact,
@@ -159,7 +159,7 @@ No Korean entertainment topic. No markdown. Return valid JSON only.
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 female stock-video visual queries")
     topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
-    signature_query = "adult woman front facing full face close up smiling directly at camera video"
+    signature_query = "adult woman full body standing facing camera smiling head to toe vertical video"
     data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
     if len(data["visual_queries"]) < 3:
         raise ValueError("Gemini returned fewer than 3 usable visual queries")
@@ -247,11 +247,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             query_lower = (query or "").lower()
             if "smiling playfully" in query_lower:
                 # The signature opening is independent of the video's topic.
-                # Require a woman, a smiling expression, and face/portrait close-up metadata.
+                # Require a woman, a smiling expression, and full-body/standing metadata.
                 signature_terms = {"smile", "smiling", "laugh", "laughing", "happy", "cheerful", "joy", "grin"}
-                face_terms = {"face", "portrait", "closeup", "close"}
+                body_terms = {"full", "body", "fullbody", "standing", "stand", "whole", "person"}
                 return (any(w in words for w in signature_terms)
-                        and any(w in words for w in face_terms))
+                        and any(w in words for w in body_terms))
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
