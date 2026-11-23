@@ -425,7 +425,31 @@ TOPIC_BANK = [
 ]
 
 
-def reserve_topics(count=3):
+APPEARANCE_TOPIC_BANK = [
+    ("style_01", "时尚穿搭", "为什么有些穿搭看起来更显贵？"),
+    ("style_02", "时尚穿搭", "普通衣服怎样穿出干净高级感？"),
+    ("style_03", "时尚穿搭", "为什么合身比昂贵更重要？"),
+    ("style_04", "时尚穿搭", "男生哪些穿衣细节最容易提升形象？"),
+    ("style_05", "时尚穿搭", "女生怎样用简单搭配突出个人风格？"),
+    ("beauty_01", "美容与形象", "为什么整洁感会影响第一印象？"),
+    ("beauty_02", "美容与形象", "发型真的会改变一个人的整体气质吗？"),
+    ("beauty_03", "美容与形象", "护肤时最容易被忽略的基础步骤是什么？"),
+    ("beauty_04", "美容与形象", "为什么自然妆容越来越受欢迎？"),
+    ("beauty_05", "美容与形象", "哪些日常习惯会让形象看起来更精神？"),
+    ("fitness_01", "健身与自我管理", "为什么力量训练会改变整体体态？"),
+    ("fitness_02", "健身与自我管理", "怎样改善久坐带来的不良体态？"),
+    ("fitness_03", "健身与自我管理", "为什么规律运动能提升精神状态？"),
+    ("fitness_04", "健身与自我管理", "健身新手最应该先建立什么习惯？"),
+    ("fitness_05", "健身与自我管理", "为什么睡眠也是身材管理的一部分？"),
+    ("attraction_01", "魅力与心理", "第一印象通常会受到哪些因素影响？"),
+    ("attraction_02", "魅力与心理", "为什么自信的人更容易吸引注意？"),
+    ("attraction_03", "魅力与心理", "一个人的肢体语言会传递什么信息？"),
+    ("attraction_04", "魅力与心理", "为什么微笑会让人显得更有亲和力？"),
+    ("attraction_05", "魅力与心理", "真正有吸引力的细节不只是外表吗？"),
+]
+
+
+def reserve_topics(count=10):
     """Select distinct topics and persist recent IDs in the repository between workflow runs."""
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY")
@@ -445,32 +469,24 @@ def reserve_topics(count=3):
     else:
         response.raise_for_status()
     recent_ids = history.get("recent_ids", [])
-    available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
-    if len(available) < count:
-        # Only rotate after the full topic bank has been used.
-        available = [item for item in TOPIC_BANK if item[0] not in recent_ids[-max(0, len(TOPIC_BANK)-count):]]
     import random
-    random.shuffle(available)
-    selected = []
-    used_categories = set()
-    # Prefer a different content category for every Short in the same batch.
-    for item in available:
-        if item[1] not in used_categories:
-            selected.append(item)
-            used_categories.add(item[1])
-            if len(selected) == count:
-                break
-    if len(selected) < count:
-        for item in available:
-            if item not in selected:
-                selected.append(item)
-                if len(selected) == count:
-                    break
-    if len(selected) < count:
-        raise RuntimeError("Not enough unused topics in the topic bank.")
-    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(TOPIC_BANK):]
+    appearance_count = int(count * 0.7)
+    economy_count = count - appearance_count
+    appearance_available = [item for item in APPEARANCE_TOPIC_BANK if item[0] not in recent_ids]
+    economy_available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
+    if len(appearance_available) < appearance_count:
+        appearance_available = APPEARANCE_TOPIC_BANK[:]
+    if len(economy_available) < economy_count:
+        economy_available = TOPIC_BANK[:]
+    random.shuffle(appearance_available)
+    random.shuffle(economy_available)
+    selected = appearance_available[:appearance_count] + economy_available[:economy_count]
+    random.shuffle(selected)
+    if len(selected) != count:
+        raise RuntimeError("Could not build the requested 70/30 Shorts batch.")
+    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
     history["recent_topics"] = (history.get("recent_topics", []) +
-                                [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-len(TOPIC_BANK):]
+                                [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
     encoded = __import__("base64").b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
     payload = {"message": "Track recently used Chinese channel topics",
@@ -482,7 +498,7 @@ def reserve_topics(count=3):
     print("Reserved distinct topics:")
     for item in selected:
         print(f" - [{item[1]}] {item[2]}")
-    return [item[2] for item in selected]
+    return [(item[1], item[2]) for item in selected]
 
 def main():
     if MODE not in {"shorts", "longform"}:
@@ -503,14 +519,15 @@ def main():
             upload_video(output, data, credits)
         return
 
-    topics = reserve_topics(3)
+    topics = reserve_topics(10)
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
-    start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
-    print(f"Starting Shorts batch at {start_short}/3.")
-    for index, topic in enumerate(topics[start_short - 1:], start=start_short):
-        print(f"\n========== SHORT {index}/3 ==========")
+    start_short = max(1, min(10, int(os.getenv("MONEY_START_SHORT", "1"))))
+    print(f"Starting Shorts batch at {start_short}/10 (7 appearance/style + 3 economics).")
+    for index, (topic_category, topic) in enumerate(topics[start_short - 1:], start=start_short):
+        print(f"\\n========== SHORT {index}/10 ==========")
         try:
-            data = generate_content(topic)
+            print("Content category:", topic_category)
+            data = generate_content(topic, topic_category)
             print("Selected:", data["title"])
             (WORK / f"script_{index}.json").write_text(
                 json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -520,14 +537,14 @@ def main():
             output = WORK / f"money_short_{index}.mp4"
             rendered.replace(output)
             (WORK / f"visual_credits_{index}.txt").write_text(
-                "\n".join(dict.fromkeys(credits)), encoding="utf-8")
+                "\\n".join(dict.fromkeys(credits)), encoding="utf-8")
             print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
             if output_only:
                 print("OUTPUT_ONLY enabled; upload skipped.")
             else:
                 upload_video(output, data, credits)
         except Exception as exc:
-            print(f"SHORT {index}/3 FAILED; continuing with the next topic. Error: {exc}")
+            print(f"SHORT {index}/10 FAILED; continuing with the next topic. Error: {exc}")
             continue
 
 
