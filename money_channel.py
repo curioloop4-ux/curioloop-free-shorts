@@ -31,12 +31,15 @@ def required(name):
     return value
 
 
-def generate_content(topic=None):
+def generate_content(topic=None, topic_category='经济'):
     if IS_LONG:
         prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Coverr或Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景。画面优先出现外形好看、身材匀称或健美、穿着合身时尚服装的成年女性或成年男性（仅限明确成年人），例如修身西装、合体衬衫、商务套装、运动服或简洁时尚日常服装。优先全身镜头或腰部以上中景，人物完整清晰、脸部可见、主体居中，至少一名完整成年人占据画面主要区域。明确避免手部特写、手指特写、只出现手、被裁掉的头部或半截身体、远处小人物、背影遮挡和模糊人物。禁止用硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形或无关风景充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
         topic = topic or "为什么有些人越来越有钱？"
-        prompt = f"""请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：{topic}。解释一个具体、可信的经济或金钱心理观点，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries必须提供5个英文Coverr或Pixabay视频搜索词，全部必须是与旁白内容直接对应的人物场景，并且每个搜索词都要明确加入 adult woman 或 adult man、full body 或 medium shot、well-dressed 或 fitted outfit 等人物与构图词。优先选择外形好看、身材匀称或健美的成年女性和成年男性，穿修身西装、合体衬衫、商务套装、运动服或简洁时尚服装，画面自然高级、非色情。人物必须是画面主体，优先全身镜头或腰部以上中景，脸部清楚可见、身体尽量完整、主体居中、动作和表情清晰；场景示例：穿合身西装的成年男性企业家在办公室讨论经营、穿时尚合体服装的成年女性消费者在商店比较商品、穿商务套装的成年男女讨论家庭预算。严禁手部特写、手指特写、只出现手、被裁掉的头部或半截身体、远处小人物、背影遮挡、模糊人物、硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形、纯文字动画、无关风景及无关人物摆拍；不得使用未成年人或性暗示画面。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
+        if topic_category == "经济":
+            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文搜索词，必须与经济主题对应，画面为穿着合体时尚服装、外形出众的成年男女进行工作、购物、创业或预算讨论；全身或腰部以上中景，脸部清楚，人物为主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
+        else:
+            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词，精准对应本条主题，优先呈现外形出众、身材匀称或健美的成年女性和成年男性，穿时尚合身服装；人物脸部清楚，优先全身或腰部以上中景，人物占画面主体。场景可为街拍穿搭、健身训练、护肤、发型整理、镜前准备或社交互动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -160,18 +163,8 @@ def download_relevant_clips(queries):
     if not coverr_key and not pixabay_key:
         raise RuntimeError("Set COVERR_API_KEY or PIXABAY_API_KEY in GitHub Actions secrets.")
 
-    # Visuals are selected for attractive, fit, clearly adult people—not for literal topic matching.
-    # The narration/captions carry the topic; stock footage provides engaging human visuals.
-    queries = [
-        "attractive adult woman full body stylish fitted outfit",
-        "beautiful adult woman medium shot fashionable elegant outfit",
-        "fit adult man full body stylish fitted clothes",
-        "attractive adult man medium shot smart casual outfit",
-        "beautiful fit adult woman fashion model walking",
-        "fit adult man business casual portrait",
-        "stylish adult woman smiling full body",
-        "handsome adult man elegant outfit full body",
-    ]
+    # Use topic-specific search phrases from the generated script.
+    queries = [str(query).strip() for query in queries if str(query).strip()]
     clips, credits, seen = [], [], set()
 
     def normalize_download(url, number):
