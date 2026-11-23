@@ -352,6 +352,11 @@ def main():
             uploaded += 1
         except Exception as exc:
             print(f"Short {index} failed: {type(exc).__name__}: {exc}")
+            # Stop immediately when YouTube's channel-level upload limit is reached.
+            # Continuing would waste Gemini and Pixabay requests on videos that cannot upload.
+            if "uploadLimitExceeded" in str(exc) or "exceeded the number of videos they may upload" in str(exc):
+                print("YouTube upload limit reached. Stopping this batch; retry after the channel limit resets.")
+                break
         if index < count:
             time.sleep(8)
 
