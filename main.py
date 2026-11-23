@@ -64,6 +64,9 @@ def fetch_korean_entertainment_news(limit=20, topic=None):
         })
         if len(stories) >= limit:
             break
+    if not stories and topic:
+        print(f"No matching news articles found for selected trend: {topic}. The script will be restricted to candidate metadata.")
+        return []
     if not stories:
         raise RuntimeError("Korean entertainment news feed returned no stories; refusing to generate an unrelated Short.")
     print("Korean entertainment headlines:")
@@ -105,7 +108,7 @@ def make_script(previous_titles=None):
         print("No trend candidate available; selecting from current Korean entertainment news.")
         stories = fetch_korean_entertainment_news()
     previous_titles = previous_titles or []
-    trend_text = "\\n".join(
+    trend_text = "\n".join(
         f"- Candidate: {item.get('title', '')} | Channel: {item.get('channel', '')} | "
         f"Views: {item.get('views', 0)} | Views/hour: {item.get('views_per_hour', 0)} | "
         f"Categories: {', '.join(item.get('categories', []))} | Link: {item.get('url', '')}"
@@ -119,17 +122,19 @@ def make_script(previous_titles=None):
         f"URL: {selected_trend.get('url', '')}"
         if selected_trend else "No selected trend; choose the strongest supported news story."
     )
-    story_text = "\\n".join(
+    story_text = "\n".join(
         f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
         for s in stories
     )
-    prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
+    prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, prioritizing the mandatory selected trend when supplied and using related news below only as corroboration.
 Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
 """ + story_text + """
 
 YOUTUBE TREND CANDIDATES (metadata only; use as topic signals, never as footage or verified reporting):
 """ + trend_text + """
+
+""" + selected_trend_text + """
 
 Channel identity: CurioLoop — Korean Entertainment Highlights for viewers worldwide. The channel covers the full Korean entertainment industry, not only K-pop.
 
