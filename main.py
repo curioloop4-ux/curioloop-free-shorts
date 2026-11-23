@@ -72,6 +72,23 @@ def fetch_korean_entertainment_news(limit=20):
     return stories
 
 
+def fetch_trending_candidates(limit=20):
+    """Run YouTube discovery and return metadata only; never download YouTube media."""
+    if not os.getenv("YOUTUBE_API_KEY"):
+        print("YOUTUBE_API_KEY not configured; using Korean entertainment news feed.")
+        return []
+    try:
+        subprocess.run(["python", str(ROOT / "discover_trending.py")],
+                       cwd=ROOT, check=True, timeout=180)
+        reports = sorted((ROOT / "discovery").glob("trending_candidates_*.json"), reverse=True)
+        if not reports:
+            return []
+        return json.loads(reports[0].read_text(encoding="utf-8"))[:limit]
+    except Exception as exc:
+        print(f"Trending discovery unavailable; continuing with news feed: {type(exc).__name__}: {exc}")
+        return []
+
+
 def make_script(previous_titles=None):
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
@@ -79,7 +96,14 @@ def make_script(previous_titles=None):
         model = "gemini-3.5-flash-lite"
 
     stories = fetch_korean_entertainment_news()
+    trending = fetch_trending_candidates()
     previous_titles = previous_titles or []
+    trend_text = "\\n".join(
+        f"- Candidate: {item.get('title', '')} | Channel: {item.get('channel', '')} | "
+        f"Views: {item.get('views', 0)} | Views/hour: {item.get('views_per_hour', 0)} | "
+        f"Categories: {', '.join(item.get('categories', []))} | Link: {item.get('url', '')}"
+        for item in trending
+    ) or "No YouTube trend candidates available."
     story_text = "\\n".join(
         f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
         for s in stories
@@ -89,6 +113,9 @@ Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries
 CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
 """ + story_text + """
 
+YOUTUBE TREND CANDIDATES (metadata only; use as topic signals, never as footage or verified reporting):
+""" + trend_text + """
+
 Channel identity: CurioLoop — Korean Entertainment Highlights for viewers worldwide. The channel covers the full Korean entertainment industry, not only K-pop.
 
 Editorial scope:
@@ -96,6 +123,7 @@ Editorial scope:
 - Prioritize stories with international relevance: global chart results, major performances, comebacks, awards, streaming success, casting announcements, notable interviews, and cultural impact.
 - Do not choose ordinary non-entertainment news.
 - Use the publisher, headline, snippet, and link as leads. Never pretend to have read the full article if only a snippet is available.
+- Use YouTube trend candidate titles and view velocity only to identify topics worth investigating. They are not evidence that claims are true and are not footage sources. Do not quote, translate, summarize, or imitate the candidate video itself.
 - Do not invent facts, quotes, chart positions, view counts, ratings, dates, causes, or announcements. If a detail is not present in the supplied source material or reliably established background knowledge, omit it.
 - Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
 - Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
@@ -196,6 +224,38 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
         raise RuntimeError(f"Pixabay video search failed: {type(exc).__name__}: {exc}") from exc
 
     clips, credits, seen = [], [], set()
+
+    # Only place source files here when editing and commercial-use permission is confirmed.
+    approved_dir = ROOT / "licensed_clips"
+    approved_files = sorted(
+        p for p in approved_dir.glob("*")
+        if p.suffix.lower() in {".mp4", ".mov", ".m4v", ".webm"}
+    ) if approved_dir.exists() else []
+    for source in approved_files[:count]:
+        try:
+            probe = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(source)],
+                check=True, capture_output=True, text=True, timeout=20,
+            )
+            if float(probe.stdout.strip() or 0) < 3:
+                continue
+            target = WORK / f"clip_{len(clips)+1}.mp4"
+            subprocess.run(
+                ["ffmpeg", "-y", "-i", str(source), "-an", "-c:v", "libx264",
+                 "-preset", "veryfast", "-crf", "23", "-movflags", "+faststart", str(target)],
+                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180,
+            )
+            clips.append(target)
+            credits.append(f"Authorized source file supplied to CurioLoop: {source.name}")
+            print(f"Using authorized source file: {source.name}")
+        except Exception as exc:
+            print(f"Skipping unusable authorized source {source.name}: {type(exc).__name__}: {exc}")
+
+    if len(clips) >= count:
+        print(f"Using {len(clips)} authorized source clip(s); skipping stock fallback.")
+        return clips, credits
+
     for item in results:
         if len(clips) >= count:
             break
