@@ -99,18 +99,14 @@ def make_script(previous_titles=None):
         model = "gemini-3.5-flash-lite"
 
     trending = fetch_trending_candidates()
-    selected_trend = trending[0] if trending else None
-    if selected_trend:
-        trend_title = selected_trend.get("title", "").strip()
-        print("Selected trend topic:", trend_title, "| Views/hour:", selected_trend.get("views_per_hour", 0), "| URL:", selected_trend.get("url", ""))
-        stories = fetch_korean_entertainment_news(topic=trend_title)
-        if not stories:
-            print("Selected trend has no corroborating news. Dropping this candidate and switching to verified current entertainment headlines.")
-            selected_trend = None
-            stories = fetch_korean_entertainment_news()
-    else:
-        print("No trend candidate available; selecting from current Korean entertainment news.")
-        stories = fetch_korean_entertainment_news()
+    selected_trend = None
+    stories = fetch_korean_entertainment_news()
+    # Do not force the top YouTube candidate: its title may have no matching reporting
+    # or usable visual assets. Gemini will choose from current, sourced headlines.
+    if trending:
+        print("Trend candidates available as secondary topic signals:", len(trending))
+        for candidate in trending[:5]:
+            print("-", candidate.get("title", ""), "|", candidate.get("views_per_hour", 0), "views/hour")
     previous_titles = previous_titles or []
     trend_text = "\n".join(
         f"- Candidate: {item.get('title', '')} | Channel: {item.get('channel', '')} | "
