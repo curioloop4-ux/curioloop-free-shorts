@@ -62,8 +62,8 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          MONEY_YOUTUBE_CLIENT_ID: ${{ secrets.MONEY_YOUTUBE_CLIENT_ID }}
+          MONEY_YOUTUBE_CLIENT_SECRET: ${{ secrets.MONEY_YOUTUBE_CLIENT_SECRET }}
           MONEY_YOUTUBE_REFRESH_TOKEN: ${{ secrets.MONEY_YOUTUBE_REFRESH_TOKEN }}
           MONEY_YOUTUBE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
           MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
