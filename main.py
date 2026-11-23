@@ -224,11 +224,9 @@ def make_ass(narration):
 
 
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
-    """Find topic-matched, openly licensed still images on Wikimedia Commons and animate them."""
+    """Search Commons files through its list=search API, verify reusable licenses, and animate images."""
     api_url = "https://commons.wikimedia.org/w/api.php"
     headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
-    # Never send the literal string "None" to image search. If Gemini omits a person,
-    # search using the actual story/topic instead of inventing an unrelated celebrity.
     featured_person = (featured_person or "").strip()
     subject = featured_person if featured_person and featured_person.lower() != "none" else title.strip()
     safe_queries = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
@@ -236,66 +234,74 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         subject,
         f"{subject} South Korea",
         f"{subject} Korean entertainment",
-        f"{subject} official event",
         title.strip(),
-        visual_theme.strip() if isinstance(visual_theme, str) else "",
         *safe_queries[:3],
     ]))
     queries = [q for q in queries if q and q.lower() != "none"]
-    found = {}
     session = requests.Session()
     session.headers.update(headers)
+    found = {}
 
     for query in queries:
         try:
-            response = session.get(api_url, params={
+            search_response = session.get(api_url, params={
                 "action": "query",
-                "generator": "search",
-                "gsrsearch": query,
-                "gsrnamespace": 6,
-                "gsrlimit": 30,
-                "prop": "imageinfo",
-                "iiprop": "url|extmetadata",
-                "iiurlwidth": 1400,
+                "list": "search",
+                "srsearch": query,
+                "srnamespace": 6,
+                "srlimit": 50,
+                "srwhat": "text",
                 "format": "json",
             }, timeout=30)
-            response.raise_for_status()
-            pages = response.json().get("query", {}).get("pages", {})
-            for page in pages.values():
-                page_id = str(page.get("pageid", ""))
-                if not page_id or page_id in found:
-                    continue
-                info = (page.get("imageinfo") or [{}])[0]
-                meta = info.get("extmetadata") or {}
-                license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
-                license_url = (meta.get("LicenseUrl", {}).get("value") or "").strip()
-                license_value = license_name.lower().strip()
-                allowed = license_value.startswith((
-                    "cc0", "cc by", "cc-by", "public domain", "pd-"
-                ))
-                if not allowed:
-                    continue
-                image_url = info.get("thumburl") or info.get("url")
-                if not image_url:
-                    continue
-                mime = info.get("mime", "")
-                if mime not in ("image/jpeg", "image/png", "image/webp"):
-                    continue
-                found[page_id] = {
-                    "title": page.get("title", "Wikimedia Commons image"),
-                    "url": image_url,
-                    "page_url": "https://commons.wikimedia.org/wiki/" + page.get("title", "").replace(" ", "_"),
-                    "license": license_name,
-                    "license_url": license_url,
-                    "artist": (meta.get("Artist", {}).get("value") or "Author not listed").strip(),
-                }
+            search_response.raise_for_status()
+            results = search_response.json().get("query", {}).get("search", [])
+            titles = [item.get("title", "") for item in results if item.get("title")]
+            for offset in range(0, len(titles), 40):
+                batch = titles[offset:offset + 40]
+                info_response = session.get(api_url, params={
+                    "action": "query",
+                    "titles": "|".join(batch),
+                    "prop": "imageinfo",
+                    "iiprop": "url|extmetadata",
+                    "iiurlwidth": 1400,
+                    "format": "json",
+                }, timeout=30)
+                info_response.raise_for_status()
+                pages = info_response.json().get("query", {}).get("pages", {})
+                for page in pages.values():
+                    page_id = str(page.get("pageid", ""))
+                    if not page_id or page_id in found:
+                        continue
+                    info = (page.get("imageinfo") or [{}])[0]
+                    meta = info.get("extmetadata") or {}
+                    license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
+                    license_url = (meta.get("LicenseUrl", {}).get("value") or "").strip()
+                    normalized = license_name.lower().replace("-", " ").strip()
+                    allowed = (
+                        normalized.startswith(("cc0", "cc by", "public domain", "pd "))
+                        or "public domain" in normalized
+                    )
+                    if not allowed:
+                        continue
+                    image_url = info.get("thumburl") or info.get("url")
+                    mime = info.get("mime", "")
+                    if not image_url or mime not in ("image/jpeg", "image/png", "image/webp"):
+                        continue
+                    found[page_id] = {
+                        "title": page.get("title", "Wikimedia Commons image"),
+                        "url": image_url,
+                        "page_url": "https://commons.wikimedia.org/wiki/" + page.get("title", "").replace(" ", "_"),
+                        "license": license_name,
+                        "license_url": license_url,
+                        "artist": (meta.get("Artist", {}).get("value") or "Author not listed").strip(),
+                    }
         except Exception as exc:
             print(f"Wikimedia Commons search failed for '{query}': {type(exc).__name__}: {exc}")
 
     if not found:
         raise RuntimeError(
-            f"No topic-matched openly licensed images found for '{featured_person}'. "
-            "No unrelated stock footage will be substituted."
+            f"No topic-matched openly licensed images found for '{subject}'. "
+            "Try a different sourced story or add authorized images to licensed_clips."
         )
 
     assets_dir = WORK / "visual_assets"
@@ -308,7 +314,6 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             image_path = assets_dir / f"commons_{index}.jpg"
             image_path.write_bytes(image_response.content)
             clip_path = WORK / f"clip_{index}.mp4"
-            # A slow Ken Burns move makes each still image a moving vertical video segment.
             subprocess.run([
                 "ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(image_path),
                 "-vf",
@@ -331,9 +336,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             print(f"Skipping image {asset.get('title', '')}: {type(exc).__name__}: {exc}")
 
     if not clips:
-        raise RuntimeError(
-            f"Could not turn any licensed images for '{featured_person}' into video segments."
-        )
+        raise RuntimeError(f"Could not turn any licensed images for '{subject}' into video segments.")
     (WORK / "visual_credits.txt").write_text("\n".join(credits), encoding="utf-8")
     return clips, credits
 
