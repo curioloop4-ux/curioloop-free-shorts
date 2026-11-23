@@ -160,9 +160,19 @@ def download_relevant_clips(queries):
     if not coverr_key and not pixabay_key:
         raise RuntimeError("Set COVERR_API_KEY or PIXABAY_API_KEY in GitHub Actions secrets.")
 
+    # Visuals are selected for attractive, fit, clearly adult people—not for literal topic matching.
+    # The narration/captions carry the topic; stock footage provides engaging human visuals.
+    queries = [
+        "attractive adult woman full body stylish fitted outfit",
+        "beautiful adult woman medium shot fashionable elegant outfit",
+        "fit adult man full body stylish fitted clothes",
+        "attractive adult man medium shot smart casual outfit",
+        "beautiful fit adult woman fashion model walking",
+        "fit adult man business casual portrait",
+        "stylish adult woman smiling full body",
+        "handsome adult man elegant outfit full body",
+    ]
     clips, credits, seen = [], [], set()
-    target = 10 if IS_LONG else 5
-    minimum = 6 if IS_LONG else 4
 
     def normalize_download(url, number):
         raw = WORK / f"raw_{number}.mp4"
@@ -250,29 +260,21 @@ def download_relevant_clips(queries):
                     tag_text = str(tags).lower()
                 title_desc = " ".join(str(item.get(k, "")) for k in ("title", "description")).lower()
                 searchable = f"{tag_text} {title_desc}"
-                # Require both a people signal and a topic-specific match; generic "business/person"
-                # tags alone must never qualify unrelated scenery such as deserts or mountains.
-                people_terms = ("person", "people", "woman", "women", "man", "men", "female", "male", "businesswoman", "businessman", "employee", "customer", "couple", "entrepreneur", "worker")
+                # Keep human-centered footage only. Topic matching is intentionally not required:
+                # the user prefers attractive, fit adult men/women as visual hooks across topics.
+                people_terms = (
+                    "person", "people", "woman", "women", "man", "men", "female", "male",
+                    "businesswoman", "businessman", "employee", "customer", "couple",
+                    "entrepreneur", "worker", "model", "portrait", "fashion", "fitness"
+                )
                 if not any(term in searchable for term in people_terms):
-                    continue
-                generic_query_terms = {
-                    "adult", "woman", "women", "man", "men", "person", "people", "full", "body",
-                    "medium", "shot", "well", "dressed", "fitted", "outfit", "fashionable",
-                    "attractive", "professional", "portrait", "camera", "smiling", "young",
-                    "business", "the", "and", "with", "for", "in", "on", "at"
-                }
-                query_terms = {
-                    word.lower().strip(".,!?;:'\"()[]{}")
-                    for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", query)
-                    if word.lower() not in generic_query_terms
-                }
-                if query_terms and not any(term in searchable for term in query_terms):
                     continue
                 bad_terms = (
                     "hand close up", "hands close up", "finger close up", "fingers close up",
                     "hand closeup", "finger closeup", "isolated hand", "desert", "sand dune",
                     "sand dunes", "arid", "wilderness", "mountain landscape", "empty landscape",
-                    "scenic landscape", "nature landscape", "ocean landscape"
+                    "scenic landscape", "nature landscape", "ocean landscape", "no people",
+                    "without people"
                 )
                 if any(term in searchable for term in bad_terms):
                     continue
