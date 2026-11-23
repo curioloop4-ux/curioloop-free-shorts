@@ -246,8 +246,10 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 return False
             query_lower = (query or "").lower()
             if "tongue out" in query_lower:
-                # The signature opening must explicitly depict a tongue-out expression.
-                return "tongue" in words
+                # The signature opening is independent of the video's topic.
+                # Require a woman and tongue-related metadata, with no cat/topic term required.
+                signature_terms = {"tongue", "tongueout", "sticking", "licking"}
+                return any(w in words for w in signature_terms)
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
