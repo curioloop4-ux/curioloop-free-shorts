@@ -117,10 +117,10 @@ Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
 VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
-an adult woman facing the camera directly, holding eye contact, then playfully sticking out her tongue
-("silly tongue-out / teasing face", non-sexual, friendly) for a brief opening beat. This is a consistent
-brand motif, not a prolonged or suggestive shot. The first visual query must always request this exact
-front-facing action: "adult woman facing camera making playful tongue out silly face close up video".
+a clearly visible adult woman's FULL FACE, front-facing and centered, looking directly into the camera
+and smiling warmly/playfully. The face must be large and unmistakable in the frame, not a distant
+person, side profile, back view, silhouette, or body-only shot. Keep the shot friendly and non-sexual.
+The first visual query must always request: "adult woman front facing full face close up smiling directly at camera".
 After this signature opening, show an adult woman actively interacting with the subject of the fact
 whenever a suitable licensed clip exists. Do not use random unrelated scenery. Examples: for a cat fact,
 show a woman cuddling or playing with a cat; for a dog fact, a woman petting a dog; for a food fact,
@@ -159,7 +159,7 @@ No Korean entertainment topic. No markdown. Return valid JSON only.
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 female stock-video visual queries")
     topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
-    signature_query = "adult woman facing camera smiling playfully cheerful expression close up video"
+    signature_query = "adult woman front facing full face close up smiling directly at camera video"
     data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
     if len(data["visual_queries"]) < 3:
         raise ValueError("Gemini returned fewer than 3 usable visual queries")
@@ -247,9 +247,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             query_lower = (query or "").lower()
             if "smiling playfully" in query_lower:
                 # The signature opening is independent of the video's topic.
-                # Require a woman and a clearly positive, smiling expression.
+                # Require a woman, a smiling expression, and face/portrait close-up metadata.
                 signature_terms = {"smile", "smiling", "laugh", "laughing", "happy", "cheerful", "joy", "grin"}
-                return any(w in words for w in signature_terms)
+                face_terms = {"face", "portrait", "closeup", "close"}
+                return (any(w in words for w in signature_terms)
+                        and any(w in words for w in face_terms))
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
@@ -297,7 +299,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
-    # The first clip must be the branded tongue-out opening, not merely any woman clip.
+    # The first clip must be a front-facing, clearly visible smiling woman's face, not merely any woman clip.
     signature_found = False
 
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
@@ -338,8 +340,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # Do not substitute a still image, generic portrait, or unrelated footage.
     if not signature_found:
         raise RuntimeError(
-            "Required CurioLoop signature opening not found: a licensed video of an adult woman "
-            "facing the camera with her tongue out is mandatory. No substitute footage was used."
+            "Required CurioLoop signature opening not found: a licensed close-up video showing an "
+            "adult woman's full face front-facing and smiling is mandatory. No substitute footage was used."
         )
 
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
