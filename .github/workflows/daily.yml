@@ -10,7 +10,12 @@ on:
         description: "Number of Shorts to create today (1-10)"
         required: true
         type: number
-        default: 10
+        default: 1
+      output_only:
+        description: "Create MP4 files only; skip YouTube upload"
+        required: true
+        type: boolean
+        default: true
 
 permissions:
   contents: read
@@ -49,6 +54,16 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
+          OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only || 'false' }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 2 }}
         run: python main.py
+
+      - name: Save generated MP4 files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-shorts-mp4
+          path: work/*.mp4
+          if-no-files-found: warn
+          retention-days: 7
