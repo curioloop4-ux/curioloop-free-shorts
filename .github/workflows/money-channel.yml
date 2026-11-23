@@ -12,19 +12,19 @@ on:
           - longform
         default: shorts
       output_only:
-        description: "Render MP4 only; skip YouTube upload (recommended for first test)"
+        description: "Render only when true; false uploads all three Shorts"
         required: true
         type: boolean
-        default: true
+        default: false
       privacy_status:
         description: "YouTube visibility when upload is enabled"
         required: true
         type: choice
         options:
+          - public
           - unlisted
           - private
-          - public
-        default: unlisted
+        default: public
 
 permissions:
   contents: read
