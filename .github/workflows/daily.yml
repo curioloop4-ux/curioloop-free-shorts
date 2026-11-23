@@ -2,8 +2,12 @@ name: CurioLoop Daily Shorts
 
 on:
   schedule:
+    # U.S. audience coverage: 9 AM, 12 PM, 3 PM, 6 PM, 9 PM Eastern (UTC schedule; shifts by DST)
+    - cron: "0 14 * * *"
+    - cron: "0 17 * * *"
+    - cron: "0 20 * * *"
     - cron: "0 23 * * *"
-    - cron: "0 11 * * *"
+    - cron: "0 2 * * *"
   workflow_dispatch:
     inputs:
       shorts_count:
@@ -61,9 +65,9 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
-          OUTPUT_ONLY: ${{ github.event_name == 'schedule' || inputs.output_only }}
+          OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 2 }}
+          SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 1 }}
         run: python main.py
 
       - name: Save generated MP4 files
