@@ -1,0 +1,42 @@
+name: CurioLoop Trending Discovery
+
+on:
+  schedule:
+    - cron: "30 0 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curioloop-trending-discovery
+  cancel-in-progress: false
+
+jobs:
+  discover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependency
+        run: pip install "requests>=2.32.0"
+
+      - name: Discover trending Korean entertainment videos
+        env:
+          YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+        run: python discover_trending.py
+
+      - name: Save candidate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-trending-candidates
+          path: discovery/
+          if-no-files-found: error
+          retention-days: 14
