@@ -6,6 +6,8 @@ import subprocess
 import textwrap
 from pathlib import Path
 
+from PIL import Image, ImageDraw
+
 import edge_tts
 import requests
 from google.oauth2.credentials import Credentials
@@ -176,6 +178,46 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
     return clips, credits
 
 
+def make_mascot():
+    """Draw the recurring CurioLoop mascot as a transparent PNG using Pillow."""
+    path = WORK / "loopy_mascot.png"
+    scale = 3
+    image = Image.new("RGBA", (260 * scale, 320 * scale), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(image)
+
+    def p(coords):
+        return tuple(int(v * scale) for v in coords)
+
+    # Soft drop shadow, antennae and round alien head.
+    draw.ellipse(p((40, 285, 226, 310)), fill=(0, 0, 0, 65))
+    draw.line([p((83, 86)), p((67, 34))], fill=(116, 190, 235, 255), width=7 * scale)
+    draw.line([p((177, 86)), p((195, 34))], fill=(116, 190, 235, 255), width=7 * scale)
+    draw.ellipse(p((51, 12, 82, 43)), fill=(145, 220, 255, 255), outline=(255, 255, 255, 255), width=3 * scale)
+    draw.ellipse(p((180, 12, 211, 43)), fill=(145, 220, 255, 255), outline=(255, 255, 255, 255), width=3 * scale)
+    draw.ellipse(p((25, 50, 235, 252)), fill=(120, 204, 250, 255), outline=(255, 255, 255, 255), width=7 * scale)
+    draw.ellipse(p((39, 62, 221, 239)), fill=(159, 224, 255, 255))
+
+    # Large friendly eyes, highlights and rosy cheeks.
+    draw.ellipse(p((66, 112, 119, 180)), fill=(18, 35, 66, 255))
+    draw.ellipse(p((143, 112, 196, 180)), fill=(18, 35, 66, 255))
+    draw.ellipse(p((78, 121, 94, 139)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((155, 121, 171, 139)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((47, 177, 91, 198)), fill=(255, 145, 165, 110))
+    draw.ellipse(p((171, 177, 215, 198)), fill=(255, 145, 165, 110))
+    draw.arc(p((105, 166, 157, 210)), start=10, end=170, fill=(25, 55, 85, 255), width=6 * scale)
+
+    # Small white hoodie and blue infinity-style chest mark.
+    draw.rounded_rectangle(p((45, 225, 215, 307)), radius=25 * scale,
+                           fill=(250, 252, 255, 255), outline=(90, 160, 210, 255), width=5 * scale)
+    draw.arc(p((87, 218, 173, 275)), start=180, end=360, fill=(120, 170, 205, 255), width=5 * scale)
+    draw.arc(p((105, 260, 137, 282)), start=190, end=530, fill=(25, 145, 225, 255), width=6 * scale)
+    draw.arc(p((125, 260, 157, 282)), start=10, end=350, fill=(25, 145, 225, 255), width=6 * scale)
+
+    image = image.resize((260, 320), Image.Resampling.LANCZOS)
+    image.save(path)
+    return path
+
+
 def render(title, voice, captions, duration, visual_theme, visual_queries):
     output = WORK / "curioloop_short.mp4"
     title_path = WORK / "title.txt"
@@ -189,6 +231,8 @@ def render(title, voice, captions, duration, visual_theme, visual_queries):
     for clip_path in clips:
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
     cmd += ["-i", str(voice)]
+    mascot = make_mascot()
+    cmd += ["-loop", "1", "-i", str(mascot)]
 
     filters = []
     labels = []
@@ -204,7 +248,8 @@ def render(title, voice, captions, duration, visual_theme, visual_queries):
         "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
         "textfile=title.txt:fontcolor=white:fontsize=62:"
         "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
-        "ass=captions.ass[vout]"
+        "ass=captions.ass[base];"
+        f"[base][{len(clips)+1}:v]overlay=W-w-34:H-h-265:format=auto[vout]"
     )
     cmd += [
         "-filter_complex", ";".join(filters),
