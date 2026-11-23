@@ -3,7 +3,14 @@ name: CurioLoop Daily Shorts
 on:
   schedule:
     - cron: "0 23 * * *"
+    - cron: "0 11 * * *"
   workflow_dispatch:
+    inputs:
+      shorts_count:
+        description: "Number of Shorts to create today (1-10)"
+        required: true
+        type: number
+        default: 10
 
 permissions:
   contents: read
@@ -15,7 +22,7 @@ concurrency:
 jobs:
   create-and-upload:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 60
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -43,4 +50,5 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
+          SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 2 }}
         run: python main.py
