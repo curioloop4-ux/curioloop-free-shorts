@@ -158,7 +158,9 @@ No Korean entertainment topic. No markdown. Return valid JSON only.
     data["featured_person"] = "adult woman stock visual"
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 female stock-video visual queries")
-    data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:3] if str(q).strip()]
+    topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
+    signature_query = "adult woman facing camera making playful tongue out silly face close up video"
+    data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
     if len(data["visual_queries"]) < 3:
         raise ValueError("Gemini returned fewer than 3 usable visual queries")
     return data
@@ -292,7 +294,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
     pixabay_key = os.getenv("PIXABAY_API_KEY")
     if pixabay_key and len(clips) < count:
-        for query in query_terms:
+        for query_index, query in enumerate(query_terms):
             if len(clips) >= count:
                 break
             try:
@@ -315,7 +317,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
-                    if len(clips) >= count:
+                    query_limit = 1 if query_index == 0 else count
+                    if len(clips) >= query_limit:
                         break
             except Exception as exc:
                 print(f"Pixabay search failed for '{query}': {type(exc).__name__}: {exc}")
