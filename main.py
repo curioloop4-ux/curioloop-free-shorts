@@ -257,11 +257,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 return False
             query_lower = (query or "").lower()
             if query in signature_queries:
-                # The opening is topic-independent: require woman + fruit + eating action.
-                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple", "kiwi"}
-                eating_terms = {"eat", "eating", "bite", "biting", "food", "snack", "tasting"}
-                return (any(w in words for w in fruit_terms)
-                        and any(w in words for w in eating_terms))
+                # Search queries request an eating/bite action, but stock tags often omit verbs.
+                # Require a woman and a concrete fruit tag; do not reject clips only because
+                # Pixabay omitted "eating" or "biting" from its metadata.
+                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple", "kiwi", "mango", "pear", "cherry"}
+                return any(w in words for w in fruit_terms)
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
@@ -353,8 +353,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # Do not substitute a still image, generic portrait, or unrelated footage.
     if not signature_found:
         raise RuntimeError(
-            "Required CurioLoop fruit-bite opening not found: a licensed video tagged with an adult woman, "
-            "fruit, and an eating/bite action is mandatory. No substitute footage was used."
+            "Required CurioLoop fruit opening not found: a licensed video tagged with an adult woman "
+            "and a specific fruit is mandatory. No substitute footage was used."
         )
 
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
