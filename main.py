@@ -249,7 +249,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 # The signature opening is independent of the video's topic.
                 # Require a woman and a clearly positive, smiling expression.
                 signature_terms = {"smile", "smiling", "laugh", "laughing", "happy", "cheerful", "joy", "grin"}
-                return any(w in words for w in signature_terms}
+                return any(w in words for w in signature_terms)
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
