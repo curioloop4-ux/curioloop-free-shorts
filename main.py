@@ -270,7 +270,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         for value in (asset_id, page_url, media_url):
             value = str(value or "").strip()
             if value:
-                keys.append(re.sub(r"\\/$", "", value.split("?")[0]).lower())
+                keys.append(re.sub(r"/$", "", value.split("?")[0]).lower())
         return keys
 
     def already_used(asset_id=None, page_url=None, media_url=None):
@@ -285,7 +285,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             __import__("datetime").timezone.utc
         ).isoformat()
         history_path.write_text(
-            json.dumps(history_data, ensure_ascii=False, indent=2) + "\\n",
+            json.dumps(history_data, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8"
         )
 
