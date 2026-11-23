@@ -4,20 +4,22 @@
 다음 GitHub Actions secrets는 기존 DailyNibble 설정을 재사용합니다.
 - GEMINI_API_KEY
 - PIXABAY_API_KEY
-- YOUTUBE_CLIENT_ID
-- YOUTUBE_CLIENT_SECRET
+- MONEY_YOUTUBE_CLIENT_ID: 새 웹 애플리케이션 OAuth 클라이언트 ID
+- MONEY_YOUTUBE_CLIENT_SECRET: 새 웹 애플리케이션 OAuth 클라이언트 보안 비밀번호
 
-별도 YouTube 채널에 업로드하기 위해 아래 Secret 하나를 추가해야 합니다.
+돈좀아는척 채널은 새 웹 애플리케이션 OAuth 클라이언트를 사용하므로 다음 3개 Secret을 별도로 등록해야 합니다.
+- MONEY_YOUTUBE_CLIENT_ID: 새 웹 애플리케이션 클라이언트 ID
+- MONEY_YOUTUBE_CLIENT_SECRET: 새 웹 애플리케이션 클라이언트 보안 비밀번호
 - MONEY_YOUTUBE_REFRESH_TOKEN: 돈좀아는척 채널을 선택해 발급한 OAuth refresh token
 
-기존 YOUTUBE_REFRESH_TOKEN은 DailyNibble용이므로 이 값으로 덮어쓰지 마세요.
+기존 YOUTUBE_CLIENT_ID, YOUTUBE_CLIENT_SECRET, YOUTUBE_REFRESH_TOKEN은 DailyNibble용이므로 덮어쓰지 마세요.
 
 ## 새 채널 OAuth 토큰 발급
-1. Google Cloud Console에서 기존 프로젝트와 OAuth 2.0 Client ID를 그대로 사용합니다.
+1. 기존 Google Cloud 프로젝트 안에서 만든 웹 애플리케이션 OAuth 클라이언트를 사용합니다.
 2. OAuth 인증을 진행할 때 돈좀아는척 채널에 접근 권한이 있는 Google 계정으로 로그인하고, 채널 선택 화면이 나오면 반드시 돈좀아는척 채널을 선택합니다.
 3. YouTube Data API 업로드 범위 `https://www.googleapis.com/auth/youtube.upload`를 승인합니다.
 4. 발급된 refresh token을 GitHub 저장소 Settings → Secrets and variables → Actions → New repository secret에서 `MONEY_YOUTUBE_REFRESH_TOKEN` 이름으로 저장합니다.
-5. 기존 `YOUTUBE_REFRESH_TOKEN`은 변경하지 않습니다.
+5. 새 웹 애플리케이션의 Client ID와 Client Secret도 각각 `MONEY_YOUTUBE_CLIENT_ID`, `MONEY_YOUTUBE_CLIENT_SECRET`으로 등록합니다. 기존 DailyNibble 인증 Secret은 변경하지 않습니다.
 
 OAuth Playground를 사용하는 경우 Settings에서 Use your own OAuth credentials를 켜고 기존 Client ID와 Client Secret을 입력한 뒤 위 scope로 승인합니다. refresh token은 비밀번호와 동일하게 취급하고 채팅이나 코드에 붙여넣지 마세요.
 
