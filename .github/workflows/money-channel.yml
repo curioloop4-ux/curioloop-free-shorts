@@ -36,7 +36,7 @@ on:
         default: public
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: money-channel-production
@@ -69,6 +69,7 @@ jobs:
 
       - name: Generate Chinese money video
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           MONEY_YOUTUBE_CLIENT_ID: ${{ secrets.MONEY_YOUTUBE_CLIENT_ID }}
