@@ -1,0 +1,24 @@
+{
+  "recent_ids": [
+    "science_01",
+    "money_psychology_05",
+    "work_01"
+  ],
+  "recent_topics": [
+    {
+      "id": "science_01",
+      "category": "과학과 일상",
+      "topic": "为什么时间感会随着年龄和经历发生变化？"
+    },
+    {
+      "id": "money_psychology_05",
+      "category": "돈의 심리",
+      "topic": "为什么分期付款会让消费感觉更轻松？"
+    },
+    {
+      "id": "work_01",
+      "category": "일과 생산성",
+      "topic": "为什么提高工作效率不一定意味着工作更久？"
+    }
+  ]
+}
