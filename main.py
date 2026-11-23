@@ -488,8 +488,8 @@ def upload(path, title, narration, credits=None):
     body = {
         "snippet": {
             "title": title[:100],
-            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\nCurioLoop | Korean Entertainment Highlights\nK-pop • K-dramas • Korean movies • Variety shows • Korean stars\n\n#Shorts #CurioLoop #KoreanEntertainment #Kpop #Kdrama #KoreanMovies",
-            "tags": ["Shorts", "CurioLoop", "Korean entertainment", "Kpop", "Kdrama", "Korean movies", "Korean variety shows", "Korean actors", "Korean celebrities"],
+            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\nCurioLoop | Curious facts, surprising science, psychology, history and everyday mysteries.\n\n#Shorts #CurioLoop #Facts #DidYouKnow #Psychology #Science #Knowledge",
+            "tags": ["Shorts", "CurioLoop", "Facts", "Did You Know", "General Knowledge", "Psychology", "Science", "History", "Interesting Facts"],
             "categoryId": "24",
         },
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
