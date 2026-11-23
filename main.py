@@ -28,11 +28,11 @@ def required(name):
     return value
 
 
-def fetch_korean_entertainment_news(limit=20):
-    """Fetch recent Korean entertainment headlines from Google News RSS."""
+def fetch_korean_entertainment_news(limit=20, topic=None):
+    """Fetch recent Korean entertainment headlines, optionally focused on one trend topic."""
     url = "https://news.google.com/rss/search"
     params = {
-        "q": '(K-pop OR 아이돌 OR 가수 OR 배우 OR 연예 OR 드라마 OR 영화 OR 예능 OR OTT OR 넷플릭스 OR 시상식 OR 콘서트) when:3d',
+        "q": (f'\"{topic}\" when:14d' if topic else '(K-pop OR 아이돌 OR 가수 OR 배우 OR 연예 OR 드라마 OR 영화 OR 예능 OR OTT OR 넷플릭스 OR 시상식 OR 콘서트) when:3d'),
         "hl": "ko",
         "gl": "KR",
         "ceid": "KR:ko",
@@ -95,8 +95,15 @@ def make_script(previous_titles=None):
     if not model or model == "gemini-2.5-flash":
         model = "gemini-3.5-flash-lite"
 
-    stories = fetch_korean_entertainment_news()
     trending = fetch_trending_candidates()
+    selected_trend = trending[0] if trending else None
+    if selected_trend:
+        trend_title = selected_trend.get("title", "").strip()
+        print("Selected trend topic:", trend_title, "| Views/hour:", selected_trend.get("views_per_hour", 0), "| URL:", selected_trend.get("url", ""))
+        stories = fetch_korean_entertainment_news(topic=trend_title)
+    else:
+        print("No trend candidate available; selecting from current Korean entertainment news.")
+        stories = fetch_korean_entertainment_news()
     previous_titles = previous_titles or []
     trend_text = "\\n".join(
         f"- Candidate: {item.get('title', '')} | Channel: {item.get('channel', '')} | "
@@ -104,6 +111,14 @@ def make_script(previous_titles=None):
         f"Categories: {', '.join(item.get('categories', []))} | Link: {item.get('url', '')}"
         for item in trending
     ) or "No YouTube trend candidates available."
+    selected_trend_text = (
+        f"MANDATORY SELECTED TREND: {selected_trend.get('title', '')} | "
+        f"Channel: {selected_trend.get('channel', '')} | "
+        f"Categories: {', '.join(selected_trend.get('categories', []))} | "
+        f"Views: {selected_trend.get('views', 0)} | Views/hour: {selected_trend.get('views_per_hour', 0)} | "
+        f"URL: {selected_trend.get('url', '')}"
+        if selected_trend else "No selected trend; choose the strongest supported news story."
+    )
     story_text = "\\n".join(
         f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
         for s in stories
@@ -123,7 +138,7 @@ Editorial scope:
 - Prioritize stories with international relevance: global chart results, major performances, comebacks, awards, streaming success, casting announcements, notable interviews, and cultural impact.
 - Do not choose ordinary non-entertainment news.
 - Use the publisher, headline, snippet, and link as leads. Never pretend to have read the full article if only a snippet is available.
-- Use YouTube trend candidate titles and view velocity only to identify topics worth investigating. They are not evidence that claims are true and are not footage sources. Do not quote, translate, summarize, or imitate the candidate video itself.
+- If a MANDATORY SELECTED TREND is supplied, it MUST be the central subject of this Short. Do not switch to an unrelated news headline. Use topic-focused news results only for corroborating context. If no corroborating article exists, limit claims to facts explicitly supported by the candidate metadata and established public background; do not invent what happened inside the video. Never imply that you watched the candidate video. The candidate title and view velocity are topic signals, not proof of claims and not footage sources. Do not copy, translate, summarize, or imitate its distinctive script or edit.
 - Do not invent facts, quotes, chart positions, view counts, ratings, dates, causes, or announcements. If a detail is not present in the supplied source material or reliably established background knowledge, omit it.
 - Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
 - Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
@@ -202,11 +217,13 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     """Find topic-matched, openly licensed still images on Wikimedia Commons and animate them."""
     api_url = "https://commons.wikimedia.org/w/api.php"
     headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
-    queries = [
+    queries = list(dict.fromkeys([
         featured_person,
-        f"{featured_person} Korean entertainer",
+        f"{featured_person} South Korean singer",
+        f"{featured_person} South Korean actor",
+        f"{featured_person} K-pop group",
         *visual_queries[:3],
-    ]
+    ]))
     found = {}
     session = requests.Session()
     session.headers.update(headers)
@@ -216,9 +233,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             response = session.get(api_url, params={
                 "action": "query",
                 "generator": "search",
-                "gsrsearch": f"{query} filetype:bitmap",
+                "gsrsearch": query,
                 "gsrnamespace": 6,
-                "gsrlimit": 12,
+                "gsrlimit": 30,
                 "prop": "imageinfo",
                 "iiprop": "url|extmetadata",
                 "iiurlwidth": 1400,
