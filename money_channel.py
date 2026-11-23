@@ -220,8 +220,8 @@ def upload_video(path, data, credits):
     creds = Credentials(
         None, refresh_token=required(token_name),
         token_uri="https://oauth2.googleapis.com/token",
-        client_id=required("YOUTUBE_CLIENT_ID"),
-        client_secret=required("YOUTUBE_CLIENT_SECRET"),
+        client_id=required("MONEY_YOUTUBE_CLIENT_ID"),
+        client_secret=required("MONEY_YOUTUBE_CLIENT_SECRET"),
         scopes=["https://www.googleapis.com/auth/youtube.upload"],
     )
     youtube = build("youtube", "v3", credentials=creds)
