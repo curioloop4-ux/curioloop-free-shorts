@@ -35,7 +35,7 @@ Choose one evergreen subject in science, psychology, history, human biology, nat
 Avoid medical advice, sensationalism, conspiracy claims and unsupported statistics.
 Return ONLY valid JSON with keys: title, description, sections, sources.
 sections must contain exactly 6 objects, each with heading, narration, visual_queries.
-Each narration must be 85-110 words, clear spoken English, with a distinct purpose and a logical progression.
+Each narration must be 90-110 words, clear spoken English, with a distinct purpose and a logical progression.
 Total narration must be 540-660 words. Structure: a compelling evidence-based hook; explain the central question;
 present mechanisms or historical context; examine a concrete example; discuss what evidence does and does not show;
 finish with a concise memorable conclusion.
@@ -63,8 +63,8 @@ Title under 75 characters. Description should be a concise factual summary. Retu
             if not isinstance(section.get(key), str) or not section[key].strip():
                 raise ValueError(f"Missing section field: {key}")
         words = len(section["narration"].split())
-        if not 85 <= words <= 110:
-            raise ValueError(f"Section '{section['heading']}' has {words} words; expected 85-110.")
+        if not 90 <= words <= 110:
+            raise ValueError(f"Section '{section['heading']}' has {words} words; expected 90-110.")
         total_words += words
         queries = section.get("visual_queries")
         if not isinstance(queries, list) or len(queries) != 2:
