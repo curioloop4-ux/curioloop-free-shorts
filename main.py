@@ -198,7 +198,7 @@ def make_ass(narration):
 
 
 
-def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3):
+def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
     """Find topic-matched, openly licensed still images on Wikimedia Commons and animate them."""
     api_url = "https://commons.wikimedia.org/w/api.php"
     headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
@@ -216,7 +216,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             response = session.get(api_url, params={
                 "action": "query",
                 "generator": "search",
-                "gsrsearch": f'"{query}" filetype:bitmap',
+                "gsrsearch": f"{query} filetype:bitmap",
                 "gsrnamespace": 6,
                 "gsrlimit": 12,
                 "prop": "imageinfo",
@@ -234,8 +234,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 meta = info.get("extmetadata") or {}
                 license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
                 license_url = (meta.get("LicenseUrl", {}).get("value") or "").strip()
-                allowed = any(term in license_name.lower() for term in (
-                    "cc0", "cc by", "cc-by", "public domain", "pd"
+                license_value = license_name.lower().strip()
+                allowed = license_value.startswith((
+                    "cc0", "cc by", "cc-by", "public domain", "pd-"
                 ))
                 if not allowed:
                     continue
