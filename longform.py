@@ -29,7 +29,10 @@ def required(name):
 
 
 def generate_documentary():
-    model = os.getenv("GEMINI_MODEL", "gemini-3.5-flash-lite").strip()
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
+    if not model:
+        model = "gemini-3.5-flash-lite"
+    print("Using Gemini model:", model)
     prompt = """Create a rigorous, engaging 4-6 minute English-language mini-documentary for a global YouTube audience.
 Choose one evergreen subject in science, psychology, history, human biology, nature or technology.
 Avoid medical advice, sensationalism, conspiracy claims and unsupported statistics.
