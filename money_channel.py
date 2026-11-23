@@ -250,10 +250,30 @@ def download_relevant_clips(queries):
                     tag_text = str(tags).lower()
                 title_desc = " ".join(str(item.get(k, "")) for k in ("title", "description")).lower()
                 searchable = f"{tag_text} {title_desc}"
-                people_terms = ("person", "people", "woman", "women", "man", "men", "female", "male", "business", "model", "portrait", "professional", "office", "worker", "employee", "customer", "couple")
+                # Require both a people signal and a topic-specific match; generic "business/person"
+                # tags alone must never qualify unrelated scenery such as deserts or mountains.
+                people_terms = ("person", "people", "woman", "women", "man", "men", "female", "male", "businesswoman", "businessman", "employee", "customer", "couple", "entrepreneur", "worker")
                 if not any(term in searchable for term in people_terms):
                     continue
-                bad_terms = ("hand close up", "hands close up", "finger close up", "fingers close up", "hand closeup", "finger closeup", "isolated hand")
+                generic_query_terms = {
+                    "adult", "woman", "women", "man", "men", "person", "people", "full", "body",
+                    "medium", "shot", "well", "dressed", "fitted", "outfit", "fashionable",
+                    "attractive", "professional", "portrait", "camera", "smiling", "young",
+                    "business", "the", "and", "with", "for", "in", "on", "at"
+                }
+                query_terms = {
+                    word.lower().strip(".,!?;:'\"()[]{}")
+                    for word in re.findall(r"[A-Za-z][A-Za-z'-]{2,}", query)
+                    if word.lower() not in generic_query_terms
+                }
+                if query_terms and not any(term in searchable for term in query_terms):
+                    continue
+                bad_terms = (
+                    "hand close up", "hands close up", "finger close up", "fingers close up",
+                    "hand closeup", "finger closeup", "isolated hand", "desert", "sand dune",
+                    "sand dunes", "arid", "wilderness", "mountain landscape", "empty landscape",
+                    "scenic landscape", "nature landscape", "ocean landscape"
+                )
                 if any(term in searchable for term in bad_terms):
                     continue
 
