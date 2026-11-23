@@ -282,7 +282,9 @@ def main():
         "普通人怎样建立自己的第一份资产？解释储蓄率、持续投入和时间的作用",
     ]
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
-    for index, topic in enumerate(topics, start=1):
+    start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
+    print(f"Starting Shorts batch at {start_short}/3.")
+    for index, topic in enumerate(topics[start_short - 1:], start=start_short):
         print(f"\n========== SHORT {index}/3 ==========")
         try:
             data = generate_content(topic)
