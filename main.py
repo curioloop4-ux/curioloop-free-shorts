@@ -104,6 +104,10 @@ def make_script(previous_titles=None):
         trend_title = selected_trend.get("title", "").strip()
         print("Selected trend topic:", trend_title, "| Views/hour:", selected_trend.get("views_per_hour", 0), "| URL:", selected_trend.get("url", ""))
         stories = fetch_korean_entertainment_news(topic=trend_title)
+        if not stories:
+            print("Selected trend has no corroborating news. Dropping this candidate and switching to verified current entertainment headlines.")
+            selected_trend = None
+            stories = fetch_korean_entertainment_news()
     else:
         print("No trend candidate available; selecting from current Korean entertainment news.")
         stories = fetch_korean_entertainment_news()
@@ -170,6 +174,11 @@ Editorial scope:
     for key in ("title", "hook_text", "narration", "visual_theme", "featured_person"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
+    # Gemini sometimes returns null/"None" for an event or film with no single celebrity.
+    # Keep the actual story as the visual subject rather than failing or fabricating a person.
+    person = data.get("featured_person")
+    if not isinstance(person, str) or not person.strip() or person.strip().lower() == "none":
+        data["featured_person"] = data["title"].strip()
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 concrete visual_queries")
     data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:3] if str(q).strip()]
@@ -222,13 +231,21 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     """Find topic-matched, openly licensed still images on Wikimedia Commons and animate them."""
     api_url = "https://commons.wikimedia.org/w/api.php"
     headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
+    # Never send the literal string "None" to image search. If Gemini omits a person,
+    # search using the actual story/topic instead of inventing an unrelated celebrity.
+    featured_person = (featured_person or "").strip()
+    subject = featured_person if featured_person and featured_person.lower() != "none" else title.strip()
+    safe_queries = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
     queries = list(dict.fromkeys([
-        featured_person,
-        f"{featured_person} South Korean singer",
-        f"{featured_person} South Korean actor",
-        f"{featured_person} K-pop group",
-        *visual_queries[:3],
+        subject,
+        f"{subject} South Korea",
+        f"{subject} Korean entertainment",
+        f"{subject} official event",
+        title.strip(),
+        visual_theme.strip() if isinstance(visual_theme, str) else "",
+        *safe_queries[:3],
     ]))
+    queries = [q for q in queries if q and q.lower() != "none"]
     found = {}
     session = requests.Session()
     session.headers.update(headers)
@@ -485,7 +502,7 @@ def main():
         except Exception as exc:
             print(f"Short {index} failed: {type(exc).__name__}: {exc}")
             # Stop immediately when YouTube's channel-level upload limit is reached.
-            # Continuing would waste Gemini and Pixabay requests on videos that cannot upload.
+            # Continuing would waste generation requests on videos that cannot upload.
             if "uploadLimitExceeded" in str(exc) or "exceeded the number of videos they may upload" in str(exc):
                 print("YouTube upload limit reached. Stopping this batch; retry after the channel limit resets.")
                 break
