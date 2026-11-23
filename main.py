@@ -93,75 +93,48 @@ def fetch_trending_candidates(limit=20):
 
 
 def make_script(previous_titles=None):
+    """Generate evergreen general-knowledge Shorts with adult women as recurring visuals."""
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
     if not model or model == "gemini-2.5-flash":
         model = "gemini-3.5-flash-lite"
-
-    trending = fetch_trending_candidates()
-    selected_trend = None
-    stories = fetch_korean_entertainment_news()
-    # Do not force the top YouTube candidate: its title may have no matching reporting
-    # or usable visual assets. Gemini will choose from current, sourced headlines.
-    if trending:
-        print("Trend candidates available as secondary topic signals:", len(trending))
-        for candidate in trending[:5]:
-            print("-", candidate.get("title", ""), "|", candidate.get("views_per_hour", 0), "views/hour")
     previous_titles = previous_titles or []
-    trend_text = "\n".join(
-        f"- Candidate: {item.get('title', '')} | Channel: {item.get('channel', '')} | "
-        f"Views: {item.get('views', 0)} | Views/hour: {item.get('views_per_hour', 0)} | "
-        f"Categories: {', '.join(item.get('categories', []))} | Link: {item.get('url', '')}"
-        for item in trending
-    ) or "No YouTube trend candidates available."
-    selected_trend_text = (
-        f"MANDATORY SELECTED TREND: {selected_trend.get('title', '')} | "
-        f"Channel: {selected_trend.get('channel', '')} | "
-        f"Categories: {', '.join(selected_trend.get('categories', []))} | "
-        f"Views: {selected_trend.get('views', 0)} | Views/hour: {selected_trend.get('views_per_hour', 0)} | "
-        f"URL: {selected_trend.get('url', '')}"
-        if selected_trend else "No selected trend; choose the strongest supported news story."
-    )
-    story_text = "\n".join(
-        f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
-        for s in stories
-    )
-    prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, prioritizing the mandatory selected trend when supplied and using related news below only as corroboration.
+    prompt = """Create one original English YouTube Short for a GLOBAL audience for CurioLoop.
+Return to the channel's original format: surprising general knowledge, psychology, science,
+history, nature, everyday mysteries, technology, and useful life knowledge.
+Do NOT make Korean entertainment news or celebrity gossip the topic.
+
 Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
-CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
-""" + story_text + """
 
-YOUTUBE TREND CANDIDATES (metadata only; use as topic signals, never as footage or verified reporting):
-""" + trend_text + """
+Choose one specific, accurate, genuinely interesting fact that can be explained in 20-35 seconds.
+Prefer well-established facts about human psychology, animals, space, science, history,
+everyday objects, technology, geography, and misunderstood facts.
+Never invent statistics, studies, quotations, experiments, dates, or scientific claims.
+Avoid medical/financial advice, conspiracy theories, and sensational misinformation.
+The first 2 seconds must create immediate curiosity with a concrete, accurate hook.
+Title under 65 characters. hook_text must be 3-6 punchy words.
+Narration must be 60-85 words in natural spoken English: hook, surprising fact,
+short explanation, memorable payoff. No greetings or filler.
 
-""" + selected_trend_text + """
-
-Channel identity: CurioLoop — Korean Entertainment Highlights for viewers worldwide. The channel covers the full Korean entertainment industry, not only K-pop.
-
-Editorial scope:
-- Cover the full Korean entertainment spectrum: K-pop artists and groups, music releases and charts, concerts, award shows, Korean actors, K-dramas, Korean films, streaming/OTT releases, variety shows, celebrity interviews, and the entertainment business.\n- Do not let K-pop dominate every video. Choose the strongest current story across categories; when suitable, rotate among music, drama, film, variety, and actors across a batch.
-- Prioritize stories with international relevance: global chart results, major performances, comebacks, awards, streaming success, casting announcements, notable interviews, and cultural impact.
-- Do not choose ordinary non-entertainment news.
-- Use the publisher, headline, snippet, and link as leads. Never pretend to have read the full article if only a snippet is available.
-- If a MANDATORY SELECTED TREND is supplied, it MUST be the central subject of this Short. Do not switch to an unrelated news headline. Use topic-focused news results only for corroborating context. If no corroborating article exists, limit claims to facts explicitly supported by the candidate metadata and established public background; do not invent what happened inside the video. Never imply that you watched the candidate video. The candidate title and view velocity are topic signals, not proof of claims and not footage sources. Do not copy, translate, summarize, or imitate its distinctive script or edit.
-- Do not invent facts, quotes, chart positions, view counts, ratings, dates, causes, or announcements. If a detail is not present in the supplied source material or reliably established background knowledge, omit it.
-- Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
-- Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
-- Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
-- Title under 65 characters; hook_text must be a punchy, curiosity-driving on-screen hook of 3-6 words for the first 2.5 seconds. It must accurately reflect the supplied story and must not invent shock, controversy, or reactions. Prefer a concrete question, unexpected contrast, surprising verified moment, or fan-relevant stakes over vague phrases such as "You Won’t Believe This".
-- Narration must be 65-90 words, designed for a 25-35 second Short. Its first sentence must immediately deliver the strongest verified moment or an intriguing question; no greetings, channel introduction, or slow setup. Use a tight story arc: hook → specific verified detail → why fans care → memorable payoff. Avoid generic biography, empty praise, repeated facts, and list-like filler. Every sentence must add new information.
-- featured_person must be the exact public name of the Korean entertainer who is central to the supplied story. Prefer a woman only when she is genuinely relevant; never invent an association or force an unrelated celebrity into the video. If no female entertainer is genuinely relevant, use the main Korean entertainer actually covered by the story.\n- visual_theme describes the mood. visual_queries must be exactly 3 specific English search phrases for images of featured_person that match the actual story (for example, the named event, stage outfit, drama character, press conference, or interview setting). Do not request generic portraits if the story is about a specific performance or appearance. These are search guidance only.
-- No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
+VISUAL RULE: Every video must prominently feature an adult woman as the main visual subject.
+Use tasteful, fully clothed, non-sexualized licensed stock footage of adult women:
+close-up reactions, thinking, curiosity, expressive faces, daily activities, or presenter-like shots.
+The woman is an illustrative visual presenter only; do not claim she is the person in the story,
+a scientist, historical figure, or the source of the fact.
+Set featured_person exactly to "adult woman stock visual".
+visual_queries must contain exactly 3 specific English stock-video searches featuring an adult woman,
+matched to the mood of the fact. Prefer close-up or medium shots of the woman, not scenery.
+Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds as the main visual.
+No Korean entertainment topic. No markdown. Return valid JSON only.
 """
     if previous_titles:
-        prompt += "\\n\\nDo not repeat these topics or angles already used in this batch: " + "; ".join(previous_titles[-20:])
+        prompt += "\n\nDo not repeat these topics, facts, hooks, or angles already used: " + "; ".join(previous_titles[-30:])
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    print(f"Generating Korean entertainment Short with Gemini model: {model}")
+    print(f"Generating general-knowledge CurioLoop Short with Gemini model: {model}")
     response = requests.post(
-        url,
-        params={"key": api_key},
+        url, params={"key": api_key},
         json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.75, "responseMimeType": "application/json"}},
+              "generationConfig": {"temperature": 0.85, "responseMimeType": "application/json"}},
         timeout=90,
     )
     response.raise_for_status()
@@ -170,18 +143,13 @@ Editorial scope:
     for key in ("title", "hook_text", "narration", "visual_theme"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
-    # Gemini sometimes returns null/"None" for an event or film with no single celebrity.
-    # Keep the actual story as the visual subject rather than failing or fabricating a person.
-    person = data.get("featured_person")
-    if not isinstance(person, str) or not person.strip() or person.strip().lower() == "none":
-        data["featured_person"] = data["title"].strip()
+    data["featured_person"] = "adult woman stock visual"
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
-        raise ValueError("Gemini response must include 3 concrete visual_queries")
+        raise ValueError("Gemini response must include 3 female stock-video visual queries")
     data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:3] if str(q).strip()]
     if len(data["visual_queries"]) < 3:
-        raise ValueError("Gemini returned fewer than 3 usable visual_queries")
+        raise ValueError("Gemini returned fewer than 3 usable visual queries")
     return data
-
 
 
 async def make_voice(text):
@@ -226,10 +194,12 @@ def make_ass(narration):
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
     """Use only tightly topic-matched licensed assets; never fill with unrelated stock footage."""
     featured_person = (featured_person or "").strip()
-    subject = featured_person if featured_person and featured_person.lower() != "none" else title.strip()
+    stock_woman_mode = featured_person.lower() == "adult woman stock visual"
+    subject = "adult woman" if stock_woman_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
+    visual_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3]
     query_terms = list(dict.fromkeys([
-        subject, f"{subject} Korean entertainment", title.strip(),
-        *[str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3],
+        *visual_terms, "adult woman close up portrait vertical video",
+        "woman expressive face reaction video", subject, title.strip(),
     ]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
@@ -245,7 +215,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         "skyline", "architecture", "downtown", "travel", "landscape", "nature",
         "mountain", "beach", "sunset", "drone", "aerial", "urban", "night"
     }
-    named_person = bool(featured_person and featured_person.lower() != "none" and featured_person.lower() != title.strip().lower())
+    named_person = bool(featured_person and featured_person.lower() not in {"none", "adult woman stock visual"} and featured_person.lower() != title.strip().lower())
     def relevant_metadata(text, query):
         words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", text or "") if len(w) >= 2]
         if not words:
@@ -254,8 +224,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         query_words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", query or "") if len(w) >= 2]
         meaningful = [w for w in query_words if w not in generic_visual_terms]
         if named_person:
-            # A celebrity-name query must be reflected in the provider's own tags/title.
             return bool(meaningful) and any(w in words for w in meaningful)
+        if stock_woman_mode:
+            # For the general-knowledge format, validate that the stock asset is actually a woman.
+            woman_terms = {"woman", "women", "female", "girl", "lady", "portrait", "model"}
+            return any(w in words for w in woman_terms)
         return bool(meaningful) and sum(1 for w in meaningful if w in words) >= min(2, len(meaningful))
 
     def render_still(url, index, source, license_name, credit_url, creator="Not provided"):
