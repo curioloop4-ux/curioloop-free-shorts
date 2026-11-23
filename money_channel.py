@@ -156,6 +156,8 @@ def make_subtitles(text, duration):
 
 def download_relevant_clips(queries):
     """Prefer Coverr's official API; fall back to Pixabay when Coverr has no suitable results."""
+    target = 10 if IS_LONG else 5
+    minimum = 6 if IS_LONG else 3
     session = requests.Session()
     session.headers.update({"User-Agent": "MoneyKnowHow/1.0"})
     coverr_key = os.getenv("COVERR_API_KEY", "").strip()
@@ -524,7 +526,7 @@ def main():
     start_short = max(1, min(10, int(os.getenv("MONEY_START_SHORT", "1"))))
     print(f"Starting Shorts batch at {start_short}/10 (7 appearance/style + 3 economics).")
     for index, (topic_category, topic) in enumerate(topics[start_short - 1:], start=start_short):
-        print(f"\\n========== SHORT {index}/10 ==========")
+        print(f"\n========== SHORT {index}/10 ==========")
         try:
             print("Content category:", topic_category)
             data = generate_content(topic, topic_category)
@@ -537,7 +539,7 @@ def main():
             output = WORK / f"money_short_{index}.mp4"
             rendered.replace(output)
             (WORK / f"visual_credits_{index}.txt").write_text(
-                "\\n".join(dict.fromkeys(credits)), encoding="utf-8")
+                "\n".join(dict.fromkeys(credits)), encoding="utf-8")
             print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
             if output_only:
                 print("OUTPUT_ONLY enabled; upload skipped.")
