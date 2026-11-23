@@ -54,7 +54,7 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_PRIVACY_STATUS: public
-          OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only || 'false' }}
+          OUTPUT_ONLY: ${{ github.event_name == 'schedule' || inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
           SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 2 }}
         run: python main.py
