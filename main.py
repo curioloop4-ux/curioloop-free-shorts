@@ -117,12 +117,12 @@ Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
 VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
-a clearly visible adult woman in a FULL-BODY vertical shot, standing or moving naturally, facing the
-camera and smiling warmly/playfully. Show her from head to toe with her face still visible; do not
-crop to only the face or upper body. Keep the shot friendly, natural, and non-sexual.
+OPENING ONLY: a clearly visible adult woman in a FULL-BODY vertical shot, standing and facing the
+camera directly with a warm, playful smile. Show her from head to toe; do not crop to only the face
+or upper body. Keep the shot friendly, natural, and non-sexual.
 The first visual query must always request: "adult woman full body standing facing camera smiling head to toe vertical video".
-After this signature opening, show an adult woman actively interacting with the subject of the fact
-whenever a suitable licensed clip exists. Do not use random unrelated scenery. Examples: for a cat fact,
+AFTER THE OPENING: the woman does NOT need to face the camera. Show natural side views, three-quarter
+angles, candid movement, and action shots while she interacts with the subject of the fact. Do not use random unrelated scenery. Examples: for a cat fact,
 show a woman cuddling or playing with a cat; for a dog fact, a woman petting a dog; for a food fact,
 a woman tasting or preparing that food; for a science fact, a woman doing or observing a safe relevant
 demonstration; for a space fact, a woman looking through a telescope or at a star display.
@@ -130,8 +130,9 @@ Keep her fully clothed and non-sexualized. She is an illustrative presenter, not
 to have discovered or experienced the fact.
 Set featured_person exactly to "adult woman stock visual".
 visual_queries must contain exactly 3 specific English stock-VIDEO searches. Query 1 must be exactly
-the front-facing playful tongue-out signature shot described above. Queries 2 and 3 must show an adult
-woman interacting with the concrete topic or object, not just a generic portrait. Each query must include
+the full-body, front-facing smiling opening shot described above. Queries 2 and 3 must show an adult
+woman interacting with the concrete topic or object; these later shots may use natural side, three-quarter,
+or candid angles and do NOT need to face the camera. Each query must include
 "woman" and a specific action/topic. Cat examples: "woman cuddling a cat close up video", "woman playing
 with pet cat at home video". For dogs, woman with dog; for food, woman tasting or cooking that food;
 for nature, woman observing the relevant animal or plant. If the exact interaction is unavailable,
