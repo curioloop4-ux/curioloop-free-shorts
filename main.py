@@ -224,120 +224,190 @@ def make_ass(narration):
 
 
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
-    """Search Commons files through its list=search API, verify reusable licenses, and animate images."""
-    api_url = "https://commons.wikimedia.org/w/api.php"
-    headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
+    """Find commercially reusable videos/photos from licensed media APIs, then Commons."""
     featured_person = (featured_person or "").strip()
     subject = featured_person if featured_person and featured_person.lower() != "none" else title.strip()
-    safe_queries = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
     queries = list(dict.fromkeys([
-        subject,
-        f"{subject} South Korea",
-        f"{subject} Korean entertainment",
-        title.strip(),
-        *safe_queries[:3],
+        subject, f"{subject} South Korea", title.strip(),
+        *[str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3],
     ]))
     queries = [q for q in queries if q and q.lower() != "none"]
     session = requests.Session()
-    session.headers.update(headers)
-    found = {}
-
-    for query in queries:
-        try:
-            search_response = session.get(api_url, params={
-                "action": "query",
-                "list": "search",
-                "srsearch": query,
-                "srnamespace": 6,
-                "srlimit": 50,
-                "srwhat": "text",
-                "format": "json",
-            }, timeout=30)
-            search_response.raise_for_status()
-            results = search_response.json().get("query", {}).get("search", [])
-            titles = [item.get("title", "") for item in results if item.get("title")]
-            for offset in range(0, len(titles), 40):
-                batch = titles[offset:offset + 40]
-                info_response = session.get(api_url, params={
-                    "action": "query",
-                    "titles": "|".join(batch),
-                    "prop": "imageinfo",
-                    "iiprop": "url|extmetadata",
-                    "iiurlwidth": 1400,
-                    "format": "json",
-                }, timeout=30)
-                info_response.raise_for_status()
-                pages = info_response.json().get("query", {}).get("pages", {})
-                for page in pages.values():
-                    page_id = str(page.get("pageid", ""))
-                    if not page_id or page_id in found:
-                        continue
-                    info = (page.get("imageinfo") or [{}])[0]
-                    meta = info.get("extmetadata") or {}
-                    license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
-                    license_url = (meta.get("LicenseUrl", {}).get("value") or "").strip()
-                    normalized = license_name.lower().replace("-", " ").strip()
-                    allowed = (
-                        normalized.startswith(("cc0", "cc by", "public domain", "pd "))
-                        or "public domain" in normalized
-                    )
-                    if not allowed:
-                        continue
-                    image_url = info.get("thumburl") or info.get("url")
-                    mime = info.get("mime", "")
-                    if not image_url or mime not in ("image/jpeg", "image/png", "image/webp"):
-                        continue
-                    found[page_id] = {
-                        "title": page.get("title", "Wikimedia Commons image"),
-                        "url": image_url,
-                        "page_url": "https://commons.wikimedia.org/wiki/" + page.get("title", "").replace(" ", "_"),
-                        "license": license_name,
-                        "license_url": license_url,
-                        "artist": (meta.get("Artist", {}).get("value") or "Author not listed").strip(),
-                    }
-        except Exception as exc:
-            print(f"Wikimedia Commons search failed for '{query}': {type(exc).__name__}: {exc}")
-
-    if not found:
-        raise RuntimeError(
-            f"No topic-matched openly licensed images found for '{subject}'. "
-            "Try a different sourced story or add authorized images to licensed_clips."
-        )
-
+    session.headers.update({"User-Agent": "CurioLoop/1.0"})
     assets_dir = WORK / "visual_assets"
     assets_dir.mkdir(exist_ok=True)
     clips, credits = [], []
-    for index, asset in enumerate(list(found.values())[:count], 1):
-        try:
-            image_response = session.get(asset["url"], timeout=45)
-            image_response.raise_for_status()
-            image_path = assets_dir / f"commons_{index}.jpg"
-            image_path.write_bytes(image_response.content)
-            clip_path = WORK / f"clip_{index}.mp4"
-            subprocess.run([
-                "ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(image_path),
-                "-vf",
-                "scale=1080:1920:force_original_aspect_ratio=increase,"
-                "crop=1080:1920,"
-                "zoompan=z='min(zoom+0.0012,1.12)':"
-                "x='iw/2-(iw/zoom/2)+sin(on/40)*18':"
-                "y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,"
-                "format=yuv420p",
-                "-t", "8", "-an", "-c:v", "libx264", "-preset", "veryfast",
-                "-crf", "23", "-movflags", "+faststart", str(clip_path)
-            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180)
-            clips.append(clip_path)
-            credits.append(
-                f"{asset['title']} — {asset['artist']} — {asset['license']} "
-                f"{asset['license_url']} — {asset['page_url']}"
-            )
-            print(f"Using openly licensed image: {asset['title']} ({asset['license']})")
-        except Exception as exc:
-            print(f"Skipping image {asset.get('title', '')}: {type(exc).__name__}: {exc}")
+
+    def render_still(url, index, source, license_name, credit_url, creator="Not provided"):
+        response = session.get(url, timeout=45)
+        response.raise_for_status()
+        image_path = assets_dir / f"licensed_image_{index}.jpg"
+        image_path.write_bytes(response.content)
+        clip_path = WORK / f"clip_{index}.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(image_path),
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,"
+                   "zoompan=z='min(zoom+0.0012,1.12)':x='iw/2-(iw/zoom/2)+sin(on/40)*18':"
+                   "y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,format=yuv420p",
+            "-t", "8", "-an", "-c:v", "libx264", "-preset", "veryfast",
+            "-crf", "23", "-movflags", "+faststart", str(clip_path)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180)
+        clips.append(clip_path)
+        credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
+
+    def render_video(url, index, source, license_name, credit_url, creator="Not provided"):
+        response = session.get(url, timeout=90, stream=True)
+        response.raise_for_status()
+        video_path = assets_dir / f"licensed_video_{index}.mp4"
+        with video_path.open("wb") as output_file:
+            for chunk in response.iter_content(chunk_size=1024 * 1024):
+                if chunk:
+                    output_file.write(chunk)
+        clip_path = WORK / f"clip_{index}.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-i", str(video_path), "-t", "8",
+            "-vf", "scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,fps=30,format=yuv420p",
+            "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+            "-movflags", "+faststart", str(clip_path)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=240)
+        clips.append(clip_path)
+        credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
+
+    # Pexels API: videos and photos are available under the Pexels license.
+    pexels_key = os.getenv("PEXELS_API_KEY")
+    if pexels_key and len(clips) < count:
+        for query in queries:
+            if len(clips) >= count:
+                break
+            try:
+                response = session.get("https://api.pexels.com/videos/search",
+                    headers={"Authorization": pexels_key},
+                    params={"query": query, "per_page": 8, "orientation": "portrait"}, timeout=30)
+                response.raise_for_status()
+                for item in response.json().get("videos", []):
+                    files = sorted(item.get("video_files", []),
+                                   key=lambda x: (x.get("height", 0) >= 1280, x.get("width", 0)), reverse=True)
+                    chosen = next((x for x in files if x.get("link") and x.get("file_type") == "video/mp4"), None)
+                    if not chosen:
+                        continue
+                    try:
+                        render_video(chosen["link"], len(clips)+1, "Pexels",
+                                     "Pexels License (verify current terms)", item.get("url", ""),
+                                     item.get("user", {}).get("name", "Pexels contributor"))
+                    except Exception as exc:
+                        print(f"Skipping Pexels video: {type(exc).__name__}: {exc}")
+                    if len(clips) >= count:
+                        break
+            except Exception as exc:
+                print(f"Pexels search failed for '{query}': {type(exc).__name__}: {exc}")
+
+    # Pixabay API: only request video results and retain the source page for attribution/audit.
+    pixabay_key = os.getenv("PIXABAY_API_KEY")
+    if pixabay_key and len(clips) < count:
+        for query in queries:
+            if len(clips) >= count:
+                break
+            try:
+                response = session.get("https://pixabay.com/api/videos/",
+                    params={"key": pixabay_key, "q": query, "per_page": 12, "safesearch": "true"},
+                    timeout=30)
+                response.raise_for_status()
+                for item in response.json().get("hits", []):
+                    variants = item.get("videos", {})
+                    chosen = variants.get("large") or variants.get("medium") or variants.get("small")
+                    if not chosen or not chosen.get("url"):
+                        continue
+                    try:
+                        render_video(chosen["url"], len(clips)+1, "Pixabay",
+                                     "Pixabay Content License (verify current terms)",
+                                     item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
+                    except Exception as exc:
+                        print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
+                    if len(clips) >= count:
+                        break
+            except Exception as exc:
+                print(f"Pixabay search failed for '{query}': {type(exc).__name__}: {exc}")
+
+    # Google Custom Search can discover image candidates with explicit reuse rights.
+    # It is optional and requires both a Programmable Search API key and Search Engine ID.
+    google_key, google_cx = os.getenv("GOOGLE_CSE_API_KEY"), os.getenv("GOOGLE_CSE_ID")
+    if google_key and google_cx and len(clips) < count:
+        for query in queries:
+            if len(clips) >= count:
+                break
+            try:
+                response = session.get("https://www.googleapis.com/customsearch/v1",
+                    params={"key": google_key, "cx": google_cx, "q": query,
+                            "searchType": "image", "rights": "cc_publicdomain,cc_attribute,cc_sharealike",
+                            "num": min(10, count-len(clips))}, timeout=30)
+                response.raise_for_status()
+                for item in response.json().get("items", []):
+                    image_url = item.get("link")
+                    page_url = item.get("image", {}).get("contextLink") or item.get("displayLink", "")
+                    if not image_url:
+                        continue
+                    try:
+                        render_still(image_url, len(clips)+1, "Google Custom Search result",
+                                     "Reuse-rights filter applied; verify original page license",
+                                     page_url, item.get("title", "Creator not supplied"))
+                    except Exception as exc:
+                        print(f"Skipping Google image result: {type(exc).__name__}: {exc}")
+                    if len(clips) >= count:
+                        break
+            except Exception as exc:
+                print(f"Google image search failed for '{query}': {type(exc).__name__}: {exc}")
+
+    # Wikimedia Commons fallback: only CC0, CC BY, and public-domain files.
+    if len(clips) < count:
+        api_url = "https://commons.wikimedia.org/w/api.php"
+        session.headers.update({"User-Agent": "CurioLoop/1.0 (licensed media discovery)"})
+        for query in queries:
+            if len(clips) >= count:
+                break
+            try:
+                search_response = session.get(api_url, params={
+                    "action": "query", "list": "search", "srsearch": query,
+                    "srnamespace": 6, "srlimit": 40, "format": "json"
+                }, timeout=30)
+                search_response.raise_for_status()
+                titles = [x.get("title", "") for x in search_response.json().get("query", {}).get("search", [])]
+                for offset in range(0, len(titles), 40):
+                    info_response = session.get(api_url, params={
+                        "action": "query", "titles": "|".join(titles[offset:offset+40]),
+                        "prop": "imageinfo", "iiprop": "url|extmetadata",
+                        "iiurlwidth": 1400, "format": "json"
+                    }, timeout=30)
+                    info_response.raise_for_status()
+                    for page in info_response.json().get("query", {}).get("pages", {}).values():
+                        info = (page.get("imageinfo") or [{}])[0]
+                        meta = info.get("extmetadata") or {}
+                        license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
+                        normalized = license_name.lower().replace("-", " ").strip()
+                        allowed = normalized.startswith(("cc0", "cc by", "public domain", "pd ")) or "public domain" in normalized
+                        image_url = info.get("thumburl") or info.get("url")
+                        if not allowed or not image_url or info.get("mime") not in ("image/jpeg", "image/png", "image/webp"):
+                            continue
+                        page_title = page.get("title", "Wikimedia Commons image")
+                        try:
+                            render_still(image_url, len(clips)+1, "Wikimedia Commons", license_name,
+                                         "https://commons.wikimedia.org/wiki/" + page_title.replace(" ", "_"),
+                                         (meta.get("Artist", {}).get("value") or "Author not listed").strip())
+                        except Exception as exc:
+                            print(f"Skipping Commons image: {type(exc).__name__}: {exc}")
+                        if len(clips) >= count:
+                            break
+                    if len(clips) >= count:
+                        break
+            except Exception as exc:
+                print(f"Wikimedia Commons search failed for '{query}': {type(exc).__name__}: {exc}")
 
     if not clips:
-        raise RuntimeError(f"Could not turn any licensed images for '{subject}' into video segments.")
+        raise RuntimeError(
+            f"No usable licensed media found for '{subject}'. Add API keys for Pexels/Pixabay "
+            "or Google Custom Search, or add authorized assets to licensed_clips."
+        )
     (WORK / "visual_credits.txt").write_text("\n".join(credits), encoding="utf-8")
+    print(f"Collected {len(clips)} licensed visual asset(s) for topic: {subject}")
     return clips, credits
 
 def make_mascot():
