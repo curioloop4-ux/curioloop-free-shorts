@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import textwrap
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -27,40 +28,59 @@ def required(name):
     return value
 
 
+def fetch_korean_trends(limit=15):
+    """Read currently trending Korean search topics from Google Trends RSS."""
+    url = "https://trends.google.com/trending/rss?geo=KR"
+    headers = {"User-Agent": "Mozilla/5.0 (compatible; CurioLoop/1.0)"}
+    response = requests.get(url, headers=headers, timeout=25)
+    response.raise_for_status()
+    root = ET.fromstring(response.content)
+    items = []
+    for item in root.findall(".//item"):
+        title = (item.findtext("title") or "").strip()
+        if title and title not in items:
+            items.append(title)
+        if len(items) >= limit:
+            break
+    if not items:
+        raise RuntimeError("Korean trend feed returned no topics; refusing to generate an unverified trend Short.")
+    print("Korean trending topics:", " | ".join(items))
+    return items
+
+
 def make_script(previous_titles=None):
     api_key = required("GEMINI_API_KEY")
-    # GitHub Actions may define GEMINI_MODEL as an empty secret/variable.
-    # Treat an empty value the same as an unset value.
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
-    # Gemini 2.5 generation access is restricted for newly created projects.
-    # Force the supported current lightweight model if the old value is configured.
     if not model or model == "gemini-2.5-flash":
         model = "gemini-3.5-flash-lite"
-    prompt = """Create one original, fact-checkable English YouTube Shorts script for a global audience.
-Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
-Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
-one surprising but accurate fact; no medical/financial advice, politics, or fabricated claims.
-visual_theme must describe the visual mood. visual_queries must be an array of exactly 3
-short, concrete English search phrases for real photographs that directly illustrate the
-narration (people, places, objects, animals, scientific equipment, or real-world scenes).
-Never use abstract backgrounds, book titles, metaphors, or generic color/style phrases as
-visual_queries. For a topic about waiting in lines, use phrases like "people waiting in queue",
-"supermarket checkout line", and "airport security queue".
-Avoid repeating obvious topics such as tardigrades. Choose a fresh science, nature, history,
-technology, or everyday-curiosity topic. Each script must focus on a clearly distinct subject and
-a different surprising fact, not merely reword a previous script. Do not include markdown."""
+
+    trends = fetch_korean_trends()
     previous_titles = previous_titles or []
+    prompt = """Create one original English YouTube Shorts script for a global audience based on ONE of the current Korean trending search topics listed below.
+Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
+KOREAN TRENDING TOPICS (Google Trends Korea RSS, current feed):
+""" + "\n".join(f"- {topic}" for topic in trends) + """
+
+Editorial rules:
+- Select a topic with clear international interest and enough reliable, verifiable context.
+- Explain the Korean context briefly so viewers outside Korea understand why it is trending.
+- Do NOT translate or reproduce a Korean creator's video, script, footage, thumbnail, or distinctive presentation.
+- Create a genuinely original explainer/commentary from facts; do not invent quotes, numbers, causes, or breaking-news details.
+- If the topic is developing and facts are uncertain, distinguish confirmed facts from speculation.
+- Prefer entertainment, culture, technology, lifestyle, food, sports, and unusual public-interest topics; avoid partisan political persuasion.
+- Title under 65 characters; narration 75-105 words; compelling first sentence and clear payoff.
+- visual_theme describes the visual mood. visual_queries must be exactly 3 short, concrete English search phrases for relevant real-world video footage.
+- No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
+"""
     if previous_titles:
-        prompt += "\\n\\nIMPORTANT — topics already used in this batch; do NOT repeat these subjects or facts: "
-        prompt += "; ".join(previous_titles[-20:])
-        prompt += ". Choose a completely different subject area and factual angle."
+        prompt += "\n\nDo not repeat these topics or angles already used in this batch: " + "; ".join(previous_titles[-20:])
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    print(f"Generating script with Gemini model: {model}")
+    print(f"Generating Korea-trend adaptation with Gemini model: {model}")
     response = requests.post(
         url,
         params={"key": api_key},
         json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.85, "responseMimeType": "application/json"}},
+              "generationConfig": {"temperature": 0.8, "responseMimeType": "application/json"}},
         timeout=90,
     )
     response.raise_for_status()
