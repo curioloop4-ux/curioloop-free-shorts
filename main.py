@@ -145,9 +145,18 @@ def fetch_visuals(title, visual_theme, visual_queries, count=3):
             print(f"Wikimedia search failed for '{query}': {exc}")
             continue
 
+        mime_counts = {}
+        with_info = 0
+        with_url = 0
         for page in pages.values():
-            info = (page.get("imageinfo") or [{}])[0]
-            mime = (info.get("mime") or "").lower()
+            infos = page.get("imageinfo") or []
+            if infos:
+                with_info += 1
+            info = infos[0] if infos else {}
+            mime = (info.get("mime") or "MISSING").lower()
+            mime_counts[mime] = mime_counts.get(mime, 0) + 1
+            if info.get("thumburl") or info.get("url"):
+                with_url += 1
             if mime not in ("image/jpeg", "image/png", "image/webp", "image/svg+xml"):
                 continue
             candidates = []
@@ -194,6 +203,7 @@ def fetch_visuals(title, visual_theme, visual_queries, count=3):
             print(f"Using visual: {page.get('title', 'Wikimedia image')} ({len(valid_data)} bytes)")
             if len(images) >= count:
                 break
+        print(f"Image diagnostics for '{query}': imageinfo={with_info}/{len(pages)}, urls={with_url}/{len(pages)}, mime_types={mime_counts}")
         if len(images) >= count:
             break
 
