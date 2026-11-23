@@ -84,15 +84,15 @@ def make_script(previous_titles=None):
         f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
         for s in stories
     )
-    prompt = """Create one original English YouTube Shorts entertainment-news explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
+    prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
 Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
 CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
 """ + story_text + """
 
-Channel identity: CurioLoop — an entertaining, curious guide to Korean pop culture for viewers worldwide.
+Channel identity: CurioLoop — Korean Entertainment Highlights for viewers worldwide. The channel covers the full Korean entertainment industry, not only K-pop.
 
 Editorial scope:
-- ONLY Korean entertainment: K-pop artists and groups, music releases and charts, concerts, award shows, Korean actors, dramas, films, variety shows, and the entertainment business.
+- Cover the full Korean entertainment spectrum: K-pop artists and groups, music releases and charts, concerts, award shows, Korean actors, K-dramas, Korean films, streaming/OTT releases, variety shows, celebrity interviews, and the entertainment business.\n- Do not let K-pop dominate every video. Choose the strongest current story across categories; when suitable, rotate among music, drama, film, variety, and actors across a batch.
 - Prioritize stories with international relevance: global chart results, major performances, comebacks, awards, streaming success, casting announcements, notable interviews, and cultural impact.
 - Do not choose ordinary non-entertainment news.
 - Use the publisher, headline, snippet, and link as leads. Never pretend to have read the full article if only a snippet is available.
@@ -101,7 +101,7 @@ Editorial scope:
 - Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
 - Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
 - Title under 65 characters; narration 75-105 words; first sentence must hook viewers and final sentence should deliver a clear takeaway.
-- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage (for example: K-pop concert crowd, award show stage lights, Korean drama filming set). Do not imply generic stock footage depicts the named celebrity.
+- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage matching the selected category (for example: Korean drama filming set, cinema audience reaction, Korean variety show studio, K-pop concert crowd). Do not imply generic stock footage depicts the named celebrity or a specific copyrighted production.
 - No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
 """
     if previous_titles:
@@ -337,8 +337,8 @@ def upload(path, title, narration, credits=None):
     body = {
         "snippet": {
             "title": title[:100],
-            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\n#Shorts #CurioLoop #InterestingFacts",
-            "tags": ["Shorts", "CurioLoop", "Kpop", "Korean entertainment", "Kdrama", "Korean celebrities"],
+            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\nCurioLoop | Korean Entertainment Highlights\nK-pop • K-dramas • Korean movies • Variety shows • Korean stars\n\n#Shorts #CurioLoop #KoreanEntertainment #Kpop #Kdrama #KoreanMovies",
+            "tags": ["Shorts", "CurioLoop", "Korean entertainment", "Kpop", "Kdrama", "Korean movies", "Korean variety shows", "Korean actors", "Korean celebrities"],
             "categoryId": "24",
         },
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
