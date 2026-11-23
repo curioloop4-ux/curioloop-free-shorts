@@ -204,25 +204,48 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
     api = "https://pixabay.com/api/videos/"
     headers = {"User-Agent": "CurioLoopShorts/2.0"}
     queries = list(visual_queries or [])
-    query = next((" ".join(str(q).split()[:7]) for q in queries if str(q).strip()), "")
-    if not query:
-        query = " ".join(title.split()[:6])
-    query = query[:100]
+    base_query = next((" ".join(str(q).split()[:7]) for q in queries if str(q).strip()), "")
+    if not base_query:
+        base_query = " ".join(title.split()[:6])
+    base_query = base_query[:80]
 
-    params = {
-        "key": api_key,
-        "q": query,
-        "video_type": "film",
-        "per_page": 20,
-        "safesearch": "true",
-    }
+    # Search for Korean context and reject geographically unrelated stock footage.
+    search_queries = list(dict.fromkeys([
+        f"Korean {base_query}",
+        f"South Korea {base_query}",
+        f"Seoul {base_query}",
+    ]))
+    results, result_ids = [], set()
     try:
-        response = requests.get(api, params=params, headers=headers, timeout=30)
-        response.raise_for_status()
-        results = response.json().get("hits", [])
-        print(f"Pixabay video search '{query}' returned {len(results)} result(s).")
+        for query in search_queries:
+            params = {
+                "key": api_key,
+                "q": query[:100],
+                "video_type": "film",
+                "per_page": 50,
+                "safesearch": "true",
+            }
+            response = requests.get(api, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            hits = response.json().get("hits", [])
+            print(f"Pixabay Korean-context search '{query}' returned {len(hits)} result(s).")
+            for item in hits:
+                item_id = item.get("id") or item.get("pageURL")
+                if item_id not in result_ids:
+                    result_ids.add(item_id)
+                    results.append(item)
     except Exception as exc:
         raise RuntimeError(f"Pixabay video search failed: {type(exc).__name__}: {exc}") from exc
+
+    korea_terms = ("korean", "south korea", "seoul", "k-pop", "kpop", "k drama", "k-drama", "hangul")
+    filtered_results = []
+    for item in filtered_results:
+        tags = str(item.get("tags") or "").lower()
+        if any(term in tags for term in korea_terms):
+            filtered_results.append(item)
+        else:
+            print(f"Rejected non-Korean/unclear Pixabay footage: {item.get('tags', 'no tags')}")
+    print(f"Pixabay returned {len(results)} candidate(s); {len(filtered_results)} passed Korean-context tag checks.")
 
     clips, credits, seen = [], [], set()
 
@@ -293,7 +316,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
         except Exception as exc:
             print(f"Pixabay video download failed: {type(exc).__name__}: {exc}")
 
-    print(f"Downloaded {len(clips)} real video clip(s) from Pixabay.")
+    print(f"Downloaded {len(clips)} Korean-context video clip(s) from Pixabay.")
+    if len(clips) < count:
+        raise RuntimeError(f"Only {len(clips)}/{count} relevant Korean-context clips found. Refusing to fill the Short with unrelated footage. Add licensed Korean footage to licensed_clips/ or retry later.")
     return clips, credits
 
 
