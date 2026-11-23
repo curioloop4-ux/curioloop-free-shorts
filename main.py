@@ -171,7 +171,7 @@ Editorial scope:
     response.raise_for_status()
     raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
-    for key in ("title", "hook_text", "narration", "visual_theme", "featured_person"):
+    for key in ("title", "hook_text", "narration", "visual_theme"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
     # Gemini sometimes returns null/"None" for an event or film with no single celebrity.
