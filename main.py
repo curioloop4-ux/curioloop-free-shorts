@@ -295,6 +295,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
+    # The first clip must be the branded tongue-out opening, not merely any woman clip.
+    signature_found = False
+
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
     pixabay_key = os.getenv("PIXABAY_API_KEY")
     if pixabay_key and len(clips) < count:
@@ -319,6 +322,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         render_video(chosen["url"], len(clips)+1, "Pixabay",
                                      "Pixabay Content License (check current terms)",
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
+                        if query_index == 0 and len(clips) == 1:
+                            signature_found = True
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
                     query_limit = 1 if query_index == 0 else count
@@ -329,7 +334,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
 
     # The signature opening is mandatory and must be a real licensed video clip.
     # Do not substitute a still image, generic portrait, or unrelated footage.
-    if not clips:
+    if not signature_found:
         raise RuntimeError(
             "Required CurioLoop signature opening not found: a licensed video of an adult woman "
             "facing the camera with her tongue out is mandatory. No substitute footage was used."
