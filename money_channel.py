@@ -33,10 +33,10 @@ def required(name):
 
 def generate_content(topic=None):
     if IS_LONG:
-        prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Pixabay视频搜索词，画面与旁白直接相关，并可适当使用漂亮女性、健身男性、商务人士和高品质生活方式镜头。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
+        prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景，突出成年人的表情、动作、互动和生活情境。禁止用硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形或无关风景充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
         topic = topic or "为什么有些人越来越有钱？"
-        prompt = f"""请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：{topic}。解释一个具体、可信的经济或金钱心理观点，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries必须提供5个英文Pixabay视频搜索词：至少3个与脚本内容直接相关，另外2个分别用于自然融入身材健美的成年男性、形象时尚有魅力的成年女性镜头（例如健身、商务、品质生活、自我管理场景）；人物镜头必须与旁白主题有联系，不得使用性暗示、无关摆拍或未成年人。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
+        prompt = f"""请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：{topic}。解释一个具体、可信的经济或金钱心理观点，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries必须提供5个英文Pixabay视频搜索词，全部必须是与旁白内容直接对应的人物场景，明确描述成年人的身份、动作和环境（例如上班族加班、情侣讨论家庭预算、创业者经营店铺、消费者在商店比较商品、成年人学习技能或规划生活）。每个搜索词都要能找到以人物为主体、看得见动作或表情的实拍视频。严禁硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形、纯文字动画、无关风景及无关美女/帅哥摆拍；不得使用未成年人或性暗示画面。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -159,6 +159,7 @@ def download_relevant_clips(queries):
     for query in queries:
         if len(clips) >= (10 if IS_LONG else 5):
             break
+        clips_before_query = len(clips)
         response = session.get("https://pixabay.com/api/videos/",
             params={"key": key, "q": query, "per_page": 30, "safesearch": "true"},
             timeout=35)
@@ -193,9 +194,10 @@ def download_relevant_clips(queries):
             clips.append(normalized)
             seen.add(item.get("id"))
             credits.append(f"Pixabay: {item.get('user','creator')} | {item.get('pageURL','')} | Check current Pixabay Content License")
-            if len(clips) >= (10 if IS_LONG else 5):
+            # Keep visual variety: at most one selected clip per query.
+            if len(clips) > clips_before_query:
                 break
-    minimum = 6 if IS_LONG else 3
+    minimum = 6 if IS_LONG else 4
     if len(clips) < minimum:
         raise RuntimeError(f"Only {len(clips)} relevant licensed clips found; need at least {minimum}. No unrelated filler will be used.")
     return clips, credits
