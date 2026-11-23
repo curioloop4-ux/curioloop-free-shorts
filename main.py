@@ -444,7 +444,8 @@ def main():
             if title_key in {re.sub(r"[^a-z0-9 ]", "", t.lower()).strip() for t in used_titles}:
                 raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
             used_titles.append(script["title"])
-            print("Selected:", script["title"])\n            print("Featured person:", script["featured_person"])
+            print("Selected:", script["title"])
+            print("Featured person:", script["featured_person"])
             print("Opening hook:", script["hook_text"])
             voice = asyncio.run(make_voice(script["narration"]))
             captions, duration = make_ass(script["narration"])
