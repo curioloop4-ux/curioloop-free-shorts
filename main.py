@@ -246,8 +246,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 return False
             query_lower = (query or "").lower()
             if "tongue out" in query_lower:
-                signature_terms = {"tongue", "funny", "silly", "face", "expression", "mouth", "playful"}
-                return any(w in words for w in signature_terms)
+                # The signature opening must explicitly depict a tongue-out expression.
+                return "tongue" in words
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
@@ -327,7 +327,16 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             except Exception as exc:
                 print(f"Pixabay search failed for '{query}': {type(exc).__name__}: {exc}")
 
+    # The signature opening is mandatory and must be a real licensed video clip.
+    # Do not substitute a still image, generic portrait, or unrelated footage.
+    if not clips:
+        raise RuntimeError(
+            "Required CurioLoop signature opening not found: a licensed video of an adult woman "
+            "facing the camera with her tongue out is mandatory. No substitute footage was used."
+        )
+
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
+    # Google image results are intentionally not allowed to satisfy the mandatory video opening.
     google_key, google_cx = os.getenv("GOOGLE_CSE_API_KEY"), os.getenv("GOOGLE_CSE_ID")
     if google_key and google_cx and len(clips) < count:
         for query in query_terms:
@@ -461,7 +470,14 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     if not clips:
         raise RuntimeError("No usable topic-matched visual assets found; stopping video generation.")
 
-    segment = duration / len(clips)
+    if len(clips) < 2:
+        raise RuntimeError("The mandatory tongue-out opening was found, but no topic-related follow-up visual was found.")
+
+    # Reserve the first 2.5 seconds for the signature shot; divide the remaining runtime
+    # evenly across the topic-related clips.
+    opening_duration = min(2.5, max(1.5, duration * 0.12))
+    topic_segment = (duration - opening_duration) / (len(clips) - 1)
+    segment_durations = [opening_duration] + [topic_segment] * (len(clips) - 1)
     cmd = ["ffmpeg", "-y"]
     for clip_path in clips:
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
@@ -472,9 +488,10 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     filters = []
     labels = []
     for i in range(len(clips)):
+        clip_duration = segment_durations[i]
         filters.append(
             f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
-            f"crop=1080:1920,trim=duration={segment:.3f},"
+            f"crop=1080:1920,trim=duration={clip_duration:.3f},"
             f"setpts=PTS-STARTPTS,setsar=1[v{i}]"
         )
         labels.append(f"[v{i}]")
