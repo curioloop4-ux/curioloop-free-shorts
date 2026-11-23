@@ -109,7 +109,7 @@ def make_script(previous_titles=None):
         for s in stories
     )
     prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
-Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, visual_queries.
+Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
 """ + story_text + """
 
@@ -130,7 +130,7 @@ Editorial scope:
 - Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
 - Title under 65 characters; hook_text must be a punchy, curiosity-driving on-screen hook of 3-6 words for the first 2.5 seconds. It must accurately reflect the supplied story and must not invent shock, controversy, or reactions.
 - Narration must be 75-105 words. Its first sentence must immediately deliver the strongest verified moment or question; no greetings, channel introduction, or slow setup. Put the most compelling verified detail first, then explain the context, and finish with a clear payoff.
-- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage. Prefer visually active, close-up, expressive, high-energy moments (for example: energetic K-pop stage performance close up, dramatic Korean drama reaction close up, Korean variety show surprised reaction). Use licensed illustrative stock footage only; do not imply generic stock footage depicts the named celebrity or a specific copyrighted production.
+- featured_person must be the exact public name of the Korean entertainer who is central to the supplied story. Prefer a woman only when she is genuinely relevant; never invent an association or force an unrelated celebrity into the video. If no female entertainer is genuinely relevant, use the main Korean entertainer actually covered by the story.\n- visual_theme describes the mood. visual_queries must be exactly 3 short English scene descriptions for selecting relevant footage of featured_person (for example: stage close-up, live performance, expressive reaction). These are editing guidance only, not permission to use footage.
 - No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
 """
     if previous_titles:
@@ -147,7 +147,7 @@ Editorial scope:
     response.raise_for_status()
     raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
-    for key in ("title", "hook_text", "narration", "visual_theme"):
+    for key in ("title", "hook_text", "narration", "visual_theme", "featured_person"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
@@ -198,63 +198,43 @@ def make_ass(narration):
 
 
 
-def fetch_video_clips(title, visual_theme, visual_queries, count=3):
-    """Fetch a small number of real video clips from Pixabay's official video API."""
-    api_key = required("PIXABAY_API_KEY")
-    api = "https://pixabay.com/api/videos/"
-    headers = {"User-Agent": "CurioLoopShorts/2.0"}
-    queries = list(visual_queries or [])
-    base_query = next((" ".join(str(q).split()[:7]) for q in queries if str(q).strip()), "")
-    if not base_query:
-        base_query = " ".join(title.split()[:6])
-    base_query = base_query[:80]
+def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3):
+    """Use only user-supplied footage with confirmed editing/commercial-use rights."""
+    approved_root = ROOT / "licensed_clips"
+    if not approved_root.exists():
+        raise RuntimeError(
+            "No rights-cleared footage folder found. Add authorized clips under "
+            f"licensed_clips/{featured_person}/; CurioLoop will not substitute unrelated stock footage."
+        )
 
-    # Search for Korean context and reject geographically unrelated stock footage.
-    search_queries = list(dict.fromkeys([
-        f"Korean {base_query}",
-        f"South Korea {base_query}",
-        f"Seoul {base_query}",
-    ]))
-    results, result_ids = [], set()
-    try:
-        for query in search_queries:
-            params = {
-                "key": api_key,
-                "q": query[:100],
-                "video_type": "film",
-                "per_page": 50,
-                "safesearch": "true",
-            }
-            response = requests.get(api, params=params, headers=headers, timeout=30)
-            response.raise_for_status()
-            hits = response.json().get("hits", [])
-            print(f"Pixabay Korean-context search '{query}' returned {len(hits)} result(s).")
-            for item in hits:
-                item_id = item.get("id") or item.get("pageURL")
-                if item_id not in result_ids:
-                    result_ids.add(item_id)
-                    results.append(item)
-    except Exception as exc:
-        raise RuntimeError(f"Pixabay video search failed: {type(exc).__name__}: {exc}") from exc
+    def normalize(value):
+        return re.sub(r"[^a-z0-9]", "", str(value).lower())
 
-    korea_terms = ("korean", "south korea", "seoul", "k-pop", "kpop", "k drama", "k-drama", "hangul")
-    filtered_results = []
-    for item in filtered_results:
-        tags = str(item.get("tags") or "").lower()
-        if any(term in tags for term in korea_terms):
-            filtered_results.append(item)
-        else:
-            print(f"Rejected non-Korean/unclear Pixabay footage: {item.get('tags', 'no tags')}")
-    print(f"Pixabay returned {len(results)} candidate(s); {len(filtered_results)} passed Korean-context tag checks.")
+    target_name = normalize(featured_person)
+    person_dirs = [
+        path for path in approved_root.iterdir()
+        if path.is_dir() and normalize(path.name) == target_name
+    ]
+    if not person_dirs:
+        raise RuntimeError(
+            f"No footage folder matches featured person '{featured_person}'. "
+            f"Add authorized MP4/MOV clips to licensed_clips/{featured_person}/. "
+            "Only use footage you have permission to edit and use commercially."
+        )
 
-    clips, credits, seen = [], [], set()
-
-    # Only place source files here when editing and commercial-use permission is confirmed.
-    approved_dir = ROOT / "licensed_clips"
+    extensions = {".mp4", ".mov", ".m4v", ".webm"}
     approved_files = sorted(
-        p for p in approved_dir.glob("*")
-        if p.suffix.lower() in {".mp4", ".mov", ".m4v", ".webm"}
-    ) if approved_dir.exists() else []
+        path for directory in person_dirs
+        for path in directory.iterdir()
+        if path.is_file() and path.suffix.lower() in extensions
+    )
+    if not approved_files:
+        raise RuntimeError(
+            f"No video files found for '{featured_person}'. Add authorized MP4/MOV clips to "
+            f"licensed_clips/{featured_person}/."
+        )
+
+    clips, credits = [], []
     for source in approved_files[:count]:
         try:
             probe = subprocess.run(
@@ -263,6 +243,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
                 check=True, capture_output=True, text=True, timeout=20,
             )
             if float(probe.stdout.strip() or 0) < 3:
+                print(f"Skipping source shorter than 3 seconds: {source.name}")
                 continue
             target = WORK / f"clip_{len(clips)+1}.mp4"
             subprocess.run(
@@ -272,53 +253,15 @@ def fetch_video_clips(title, visual_theme, visual_queries, count=3):
             )
             clips.append(target)
             credits.append(f"Authorized source file supplied to CurioLoop: {source.name}")
-            print(f"Using authorized source file: {source.name}")
+            print(f"Using authorized footage for {featured_person}: {source.name}")
         except Exception as exc:
             print(f"Skipping unusable authorized source {source.name}: {type(exc).__name__}: {exc}")
 
-    if len(clips) >= count:
-        print(f"Using {len(clips)} authorized source clip(s); skipping stock fallback.")
-        return clips, credits
-
-    for item in results:
-        if len(clips) >= count:
-            break
-        if int(item.get("duration") or 0) < 3:
-            continue
-        files = item.get("videos") or {}
-        choices = [files.get(k) for k in ("medium", "large", "small", "tiny") if files.get(k)]
-        choices = [v for v in choices if v.get("url")]
-        if not choices:
-            continue
-        # Prefer medium resolution; use the largest available if medium is absent.
-        selected = next((v for v in choices if v.get("width", 0) >= 720), choices[0])
-        url = selected["url"]
-        if url in seen:
-            continue
-        seen.add(url)
-        try:
-            r = requests.get(url, headers=headers, timeout=60)
-            r.raise_for_status()
-            data = r.content
-            if len(data) < 50000 or len(data) > 60 * 1024 * 1024:
-                print(f"Skipped Pixabay clip with unsuitable size: {len(data)} bytes.")
-                continue
-            if len(data) < 12 or data[4:8] != b"ftyp":
-                print("Skipped Pixabay result: downloaded file is not an MP4 video.")
-                continue
-            path = WORK / f"clip_{len(clips)+1}.mp4"
-            path.write_bytes(data)
-            clips.append(path)
-            creator = item.get("user", "Pixabay contributor")
-            page_url = item.get("pageURL", "https://pixabay.com/videos/")
-            credits.append(f"Video by {creator} on Pixabay: {page_url}")
-            print(f"Using video clip {len(clips)}: {creator}, {len(data)} bytes.")
-        except Exception as exc:
-            print(f"Pixabay video download failed: {type(exc).__name__}: {exc}")
-
-    print(f"Downloaded {len(clips)} Korean-context video clip(s) from Pixabay.")
-    if len(clips) < count:
-        raise RuntimeError(f"Only {len(clips)}/{count} relevant Korean-context clips found. Refusing to fill the Short with unrelated footage. Add licensed Korean footage to licensed_clips/ or retry later.")
+    if not clips:
+        raise RuntimeError(
+            f"No usable authorized video clips were found for '{featured_person}'. "
+            "Add at least one valid video file to the matching licensed_clips folder."
+        )
     return clips, credits
 
 
@@ -362,13 +305,13 @@ def make_mascot():
     return path
 
 
-def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries):
+def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries, featured_person):
     output = WORK / "curioloop_short.mp4"
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
     hook_path = WORK / "hook.txt"
     hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
-    clips, credits = fetch_video_clips(title, visual_theme, visual_queries, count=3)
+    clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3)
     if not clips:
         raise RuntimeError("No usable stock video clips found; stopping to prevent a still-image or blank upload.")
 
@@ -471,7 +414,7 @@ def main():
             captions, duration = make_ass(script["narration"])
             rendered, credits = render(
                 script["title"], script["hook_text"], voice, captions, duration,
-                script["visual_theme"], script["visual_queries"]
+                script["visual_theme"], script["visual_queries"], script["featured_person"]
             )
             if os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}:
                 print(f"VIDEO_ONLY: Rendered MP4 saved at {rendered}; YouTube upload skipped.")
