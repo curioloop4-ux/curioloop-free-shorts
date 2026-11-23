@@ -135,7 +135,7 @@ def download_relevant_clips(queries):
     session.headers.update({"User-Agent": "MoneyKnowHow/1.0"})
     clips, credits, seen = [], [], set()
     for query in queries:
-        if len(clips) >= (10 if IS_LONG else 3):
+        if len(clips) >= (10 if IS_LONG else 5):
             break
         response = session.get("https://pixabay.com/api/videos/",
             params={"key": key, "q": query, "per_page": 30, "safesearch": "true"},
@@ -173,7 +173,7 @@ def download_relevant_clips(queries):
             credits.append(f"Pixabay: {item.get('user','creator')} | {item.get('pageURL','')} | Check current Pixabay Content License")
             if len(clips) >= (10 if IS_LONG else 3):
                 break
-    minimum = 6 if IS_LONG else 2
+    minimum = 6 if IS_LONG else 3
     if len(clips) < minimum:
         raise RuntimeError(f"Only {len(clips)} relevant licensed clips found; need at least {minimum}. No unrelated filler will be used.")
     return clips, credits
