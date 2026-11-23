@@ -28,24 +28,48 @@ def required(name):
     return value
 
 
-def fetch_korean_trends(limit=15):
-    """Read currently trending Korean search topics from Google Trends RSS."""
-    url = "https://trends.google.com/trending/rss?geo=KR"
+def fetch_korean_entertainment_news(limit=20):
+    """Fetch recent Korean entertainment headlines from Google News RSS."""
+    url = "https://news.google.com/rss/search"
+    params = {
+        "q": '(K-pop OR 아이돌 OR 배우 OR 연예 OR 드라마 OR 영화 OR 가수 OR 예능) when:3d',
+        "hl": "ko",
+        "gl": "KR",
+        "ceid": "KR:ko",
+    }
     headers = {"User-Agent": "Mozilla/5.0 (compatible; CurioLoop/1.0)"}
-    response = requests.get(url, headers=headers, timeout=25)
+    response = requests.get(url, params=params, headers=headers, timeout=25)
     response.raise_for_status()
     root = ET.fromstring(response.content)
-    items = []
+    stories = []
+    seen = set()
     for item in root.findall(".//item"):
         title = (item.findtext("title") or "").strip()
-        if title and title not in items:
-            items.append(title)
-        if len(items) >= limit:
+        description = re.sub(r"<[^>]+>", " ", item.findtext("description") or "")
+        description = re.sub(r"\\s+", " ", description).strip()
+        source_node = item.find("source")
+        source = (source_node.text or "").strip() if source_node is not None else "Google News"
+        link = (item.findtext("link") or "").strip()
+        published = (item.findtext("pubDate") or "").strip()
+        key = re.sub(r"\\W+", "", title.lower())
+        if not title or key in seen:
+            continue
+        seen.add(key)
+        stories.append({
+            "title": title,
+            "description": description[:700],
+            "source": source,
+            "published": published,
+            "url": link,
+        })
+        if len(stories) >= limit:
             break
-    if not items:
-        raise RuntimeError("Korean trend feed returned no topics; refusing to generate an unverified trend Short.")
-    print("Korean trending topics:", " | ".join(items))
-    return items
+    if not stories:
+        raise RuntimeError("Korean entertainment news feed returned no stories; refusing to generate an unrelated Short.")
+    print("Korean entertainment headlines:")
+    for story in stories[:10]:
+        print(f"- [{story['source']}] {story['title']}")
+    return stories
 
 
 def make_script(previous_titles=None):
@@ -54,33 +78,41 @@ def make_script(previous_titles=None):
     if not model or model == "gemini-2.5-flash":
         model = "gemini-3.5-flash-lite"
 
-    trends = fetch_korean_trends()
+    stories = fetch_korean_entertainment_news()
     previous_titles = previous_titles or []
-    prompt = """Create one original English YouTube Shorts script for a global audience based on ONE of the current Korean trending search topics listed below.
+    story_text = "\\n".join(
+        f"- Headline: {s['title']}\\n  Publisher: {s['source']}\\n  Published: {s['published']}\\n  Available snippet: {s['description']}\\n  Source link: {s['url']}"
+        for s in stories
+    )
+    prompt = """Create one original English YouTube Shorts entertainment-news explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
 Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
-KOREAN TRENDING TOPICS (Google Trends Korea RSS, current feed):
-""" + "\n".join(f"- {topic}" for topic in trends) + """
+CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
+""" + story_text + """
 
-Editorial rules:
-- Select a topic with clear international interest and enough reliable, verifiable context.
-- Explain the Korean context briefly so viewers outside Korea understand why it is trending.
-- Do NOT translate or reproduce a Korean creator's video, script, footage, thumbnail, or distinctive presentation.
-- Create a genuinely original explainer/commentary from facts; do not invent quotes, numbers, causes, or breaking-news details.
-- If the topic is developing and facts are uncertain, distinguish confirmed facts from speculation.
-- Prefer entertainment, culture, technology, lifestyle, food, sports, and unusual public-interest topics; avoid partisan political persuasion.
-- Title under 65 characters; narration 75-105 words; compelling first sentence and clear payoff.
-- visual_theme describes the visual mood. visual_queries must be exactly 3 short, concrete English search phrases for relevant real-world video footage.
+Channel identity: CurioLoop — an entertaining, curious guide to Korean pop culture for viewers worldwide.
+
+Editorial scope:
+- ONLY Korean entertainment: K-pop artists and groups, music releases and charts, concerts, award shows, Korean actors, dramas, films, variety shows, and the entertainment business.
+- Prioritize stories with international relevance: global chart results, major performances, comebacks, awards, streaming success, casting announcements, notable interviews, and cultural impact.
+- Do not choose ordinary non-entertainment news.
+- Use the publisher, headline, snippet, and link as leads. Never pretend to have read the full article if only a snippet is available.
+- Do not invent facts, quotes, chart positions, view counts, ratings, dates, causes, or announcements. If a detail is not present in the supplied source material or reliably established background knowledge, omit it.
+- Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
+- Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
+- Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
+- Title under 65 characters; narration 75-105 words; first sentence must hook viewers and final sentence should deliver a clear takeaway.
+- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage (for example: K-pop concert crowd, award show stage lights, Korean drama filming set). Do not imply generic stock footage depicts the named celebrity.
 - No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
 """
     if previous_titles:
-        prompt += "\n\nDo not repeat these topics or angles already used in this batch: " + "; ".join(previous_titles[-20:])
+        prompt += "\\n\\nDo not repeat these topics or angles already used in this batch: " + "; ".join(previous_titles[-20:])
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    print(f"Generating Korea-trend adaptation with Gemini model: {model}")
+    print(f"Generating Korean entertainment Short with Gemini model: {model}")
     response = requests.post(
         url,
         params={"key": api_key},
         json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.8, "responseMimeType": "application/json"}},
+              "generationConfig": {"temperature": 0.75, "responseMimeType": "application/json"}},
         timeout=90,
     )
     response.raise_for_status()
@@ -306,8 +338,8 @@ def upload(path, title, narration, credits=None):
         "snippet": {
             "title": title[:100],
             "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\n#Shorts #CurioLoop #InterestingFacts",
-            "tags": ["Shorts", "CurioLoop", "facts", "curiosity"],
-            "categoryId": "27",
+            "tags": ["Shorts", "CurioLoop", "Kpop", "Korean entertainment", "Kdrama", "Korean celebrities"],
+            "categoryId": "24",
         },
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
     }
