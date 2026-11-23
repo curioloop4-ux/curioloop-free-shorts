@@ -121,9 +121,9 @@ def fetch_visuals(title, visual_theme, visual_queries, count=3):
             queries.append(query)
 
     def detect_image(data):
-        if data.startswith(b"\\xff\\xd8\\xff"):
+        if data.startswith(b"\xff\xd8\xff"):
             return ".jpg"
-        if data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
             return ".png"
         if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
             return ".webp"
