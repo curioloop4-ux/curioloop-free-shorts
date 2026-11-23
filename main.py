@@ -224,19 +224,39 @@ def make_ass(narration):
 
 
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
-    """Find commercially reusable videos/photos from licensed media APIs, then Commons."""
+    """Use only tightly topic-matched licensed assets; never fill with unrelated stock footage."""
     featured_person = (featured_person or "").strip()
     subject = featured_person if featured_person and featured_person.lower() != "none" else title.strip()
-    queries = list(dict.fromkeys([
-        subject, f"{subject} South Korea", title.strip(),
+    query_terms = list(dict.fromkeys([
+        subject, f"{subject} Korean entertainment", title.strip(),
         *[str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3],
     ]))
-    queries = [q for q in queries if q and q.lower() != "none"]
+    query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
     session.headers.update({"User-Agent": "CurioLoop/1.0"})
     assets_dir = WORK / "visual_assets"
     assets_dir.mkdir(exist_ok=True)
     clips, credits = [], []
+
+    # For named people, generic stock footage is not a valid substitute.
+    subject_words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", subject) if len(w) >= 2]
+    generic_visual_terms = {
+        "city", "cityscape", "street", "building", "buildings", "traffic", "road",
+        "skyline", "architecture", "downtown", "travel", "landscape", "nature",
+        "mountain", "beach", "sunset", "drone", "aerial", "urban", "night"
+    }
+    named_person = bool(featured_person and featured_person.lower() != "none" and featured_person.lower() != title.strip().lower())
+    def relevant_metadata(text, query):
+        words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", text or "") if len(w) >= 2]
+        if not words:
+            return False
+        normalized = " ".join(words)
+        query_words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", query or "") if len(w) >= 2]
+        meaningful = [w for w in query_words if w not in generic_visual_terms]
+        if named_person:
+            # A celebrity-name query must be reflected in the provider's own tags/title.
+            return bool(meaningful) and any(w in words for w in meaningful)
+        return bool(meaningful) and sum(1 for w in meaningful if w in words) >= min(2, len(meaningful))
 
     def render_still(url, index, source, license_name, credit_url, creator="Not provided"):
         response = session.get(url, timeout=45)
@@ -273,53 +293,29 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
-    # Pexels API: videos and photos are available under the Pexels license.
-    pexels_key = os.getenv("PEXELS_API_KEY")
-    if pexels_key and len(clips) < count:
-        for query in queries:
-            if len(clips) >= count:
-                break
-            try:
-                response = session.get("https://api.pexels.com/videos/search",
-                    headers={"Authorization": pexels_key},
-                    params={"query": query, "per_page": 8, "orientation": "portrait"}, timeout=30)
-                response.raise_for_status()
-                for item in response.json().get("videos", []):
-                    files = sorted(item.get("video_files", []),
-                                   key=lambda x: (x.get("height", 0) >= 1280, x.get("width", 0)), reverse=True)
-                    chosen = next((x for x in files if x.get("link") and x.get("file_type") == "video/mp4"), None)
-                    if not chosen:
-                        continue
-                    try:
-                        render_video(chosen["link"], len(clips)+1, "Pexels",
-                                     "Pexels License (verify current terms)", item.get("url", ""),
-                                     item.get("user", {}).get("name", "Pexels contributor"))
-                    except Exception as exc:
-                        print(f"Skipping Pexels video: {type(exc).__name__}: {exc}")
-                    if len(clips) >= count:
-                        break
-            except Exception as exc:
-                print(f"Pexels search failed for '{query}': {type(exc).__name__}: {exc}")
-
-    # Pixabay API: only request video results and retain the source page for attribution/audit.
+    # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
     pixabay_key = os.getenv("PIXABAY_API_KEY")
     if pixabay_key and len(clips) < count:
-        for query in queries:
+        for query in query_terms:
             if len(clips) >= count:
                 break
             try:
                 response = session.get("https://pixabay.com/api/videos/",
-                    params={"key": pixabay_key, "q": query, "per_page": 12, "safesearch": "true"},
+                    params={"key": pixabay_key, "q": query, "per_page": 30, "safesearch": "true"},
                     timeout=30)
                 response.raise_for_status()
                 for item in response.json().get("hits", []):
+                    tags = item.get("tags", "")
+                    if not relevant_metadata(tags, query):
+                        print(f"Rejecting unrelated Pixabay result: {tags}")
+                        continue
                     variants = item.get("videos", {})
                     chosen = variants.get("large") or variants.get("medium") or variants.get("small")
                     if not chosen or not chosen.get("url"):
                         continue
                     try:
                         render_video(chosen["url"], len(clips)+1, "Pixabay",
-                                     "Pixabay Content License (verify current terms)",
+                                     "Pixabay Content License (check current terms)",
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
@@ -328,11 +324,10 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             except Exception as exc:
                 print(f"Pixabay search failed for '{query}': {type(exc).__name__}: {exc}")
 
-    # Google Custom Search can discover image candidates with explicit reuse rights.
-    # It is optional and requires both a Programmable Search API key and Search Engine ID.
+    # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
     google_key, google_cx = os.getenv("GOOGLE_CSE_API_KEY"), os.getenv("GOOGLE_CSE_ID")
     if google_key and google_cx and len(clips) < count:
-        for query in queries:
+        for query in query_terms:
             if len(clips) >= count:
                 break
             try:
@@ -343,9 +338,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 response.raise_for_status()
                 for item in response.json().get("items", []):
                     image_url = item.get("link")
-                    page_url = item.get("image", {}).get("contextLink") or item.get("displayLink", "")
-                    if not image_url:
+                    context = item.get("title", "") + " " + item.get("snippet", "")
+                    if not image_url or not relevant_metadata(context, query):
+                        print(f"Rejecting unrelated Google image result: {context[:120]}")
                         continue
+                    page_url = item.get("image", {}).get("contextLink") or item.get("displayLink", "")
                     try:
                         render_still(image_url, len(clips)+1, "Google Custom Search result",
                                      "Reuse-rights filter applied; verify original page license",
@@ -357,11 +354,10 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             except Exception as exc:
                 print(f"Google image search failed for '{query}': {type(exc).__name__}: {exc}")
 
-    # Wikimedia Commons fallback: only CC0, CC BY, and public-domain files.
+    # Wikimedia Commons fallback, also requiring title metadata to match the topic.
     if len(clips) < count:
         api_url = "https://commons.wikimedia.org/w/api.php"
-        session.headers.update({"User-Agent": "CurioLoop/1.0 (licensed media discovery)"})
-        for query in queries:
+        for query in query_terms:
             if len(clips) >= count:
                 break
             try:
@@ -370,7 +366,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                     "srnamespace": 6, "srlimit": 40, "format": "json"
                 }, timeout=30)
                 search_response.raise_for_status()
-                titles = [x.get("title", "") for x in search_response.json().get("query", {}).get("search", [])]
+                results = search_response.json().get("query", {}).get("search", [])
+                titles = [x.get("title", "") for x in results if relevant_metadata(x.get("title", ""), query)]
                 for offset in range(0, len(titles), 40):
                     info_response = session.get(api_url, params={
                         "action": "query", "titles": "|".join(titles[offset:offset+40]),
@@ -403,11 +400,12 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
 
     if not clips:
         raise RuntimeError(
-            f"No usable licensed media found for '{subject}'. Add API keys for Pexels/Pixabay "
-            "or Google Custom Search, or add authorized assets to licensed_clips."
+            f"No topic-matched licensed visuals found for '{subject}'. "
+            "The workflow stopped rather than using unrelated stock footage. "
+            "A licensed source containing the actual subject is required."
         )
     (WORK / "visual_credits.txt").write_text("\n".join(credits), encoding="utf-8")
-    print(f"Collected {len(clips)} licensed visual asset(s) for topic: {subject}")
+    print(f"Collected {len(clips)} topic-matched licensed visual asset(s) for: {subject}")
     return clips, credits
 
 def make_mascot():
