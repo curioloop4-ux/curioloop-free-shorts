@@ -116,15 +116,24 @@ Title under 65 characters. hook_text must be 3-6 punchy words.
 Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
-VISUAL RULE: Every video must prominently feature an adult woman as the main visual subject.
-Use tasteful, fully clothed, non-sexualized licensed stock footage of adult women:
-close-up reactions, thinking, curiosity, expressive faces, daily activities, or presenter-like shots.
-The woman is an illustrative visual presenter only; do not claim she is the person in the story,
-a scientist, historical figure, or the source of the fact.
+VISUAL RULE: Every video must open with a topic-specific visual hook featuring an adult woman
+actively interacting with the subject of the fact whenever a suitable licensed clip exists.
+Do not use a random woman portrait unrelated to the topic. Show her holding, touching, observing,
+demonstrating, or reacting to the actual topic. Examples: for a cat fact, open with a woman cuddling
+or playing with a cat; for a dog fact, a woman petting a dog; for a food fact, a woman tasting or
+preparing that food; for a science fact, a woman doing or observing a safe relevant demonstration;
+for a space fact, a woman looking through a telescope or at a star display.
+Keep her fully clothed and non-sexualized. She is an illustrative presenter, not someone claimed
+to have discovered or experienced the fact.
 Set featured_person exactly to "adult woman stock visual".
-visual_queries must contain exactly 3 specific English stock-video searches featuring an adult woman,
-matched to the mood of the fact. Prefer close-up or medium shots of the woman, not scenery.
-Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds as the main visual.
+visual_queries must contain exactly 3 specific English stock-VIDEO searches showing an adult woman
+interacting with the concrete topic or object, not just a generic portrait. Each query must include
+"woman" and the topic/action. Cat example: "woman cuddling a cat close up video", "woman playing
+with pet cat at home video", "woman holding a purring cat portrait video". For dogs, woman with dog;
+for food, woman tasting or cooking that food; for nature, woman observing the relevant animal or plant.
+If the exact interaction is unavailable, use a woman visibly reacting to a closely related topic visual,
+not unrelated scenery. Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds
+as the main visual.
 No Korean entertainment topic. No markdown. Return valid JSON only.
 """
     if previous_titles:
