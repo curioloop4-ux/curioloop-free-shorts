@@ -117,10 +117,11 @@ Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
 VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
-OPENING ONLY: show a clearly visible adult woman's FACE from the front, looking directly into the
-camera and smiling warmly/playfully. Use a face close-up or head-and-shoulders framing so her facial
-expression is unmistakable. Keep it friendly, natural, and non-sexual.
-The first visual query must always request: "adult woman front facing face close up smiling directly at camera vertical video".
+OPENING ONLY: show a clearly visible adult woman's FACE from the front in a close-up, looking toward
+the camera as she takes one natural bite of a piece of fruit (such as an apple, strawberry, or peach).
+The fruit and the bite must be clearly visible, and her face must remain visible. Make the moment
+cheerful, appetizing, friendly, and non-sexual.
+The first visual query must always request: "adult woman front facing close up taking a bite of fresh fruit smiling at camera vertical video".
 AFTER THE OPENING: prioritize FULL-BODY vertical shots of the woman, ideally head to toe, interacting
 naturally with the subject of the fact. Use side views, three-quarter angles, or candid movement;
 the woman does NOT need to face the camera in these later shots. Do not use random unrelated scenery. Examples: for a cat fact,
@@ -131,7 +132,7 @@ Keep her fully clothed and non-sexualized. She is an illustrative presenter, not
 to have discovered or experienced the fact.
 Set featured_person exactly to "adult woman stock visual".
 visual_queries must contain exactly 3 specific English stock-VIDEO searches. Query 1 must be exactly
-the front-facing face close-up smiling opening shot described above. Queries 2 and 3 must show an adult
+the front-facing close-up of a woman taking one bite of fruit described above. Queries 2 and 3 must show an adult
 woman in FULL-BODY or head-to-toe framing interacting with the concrete topic or object; these later
 shots may use natural side, three-quarter, or candid angles and do NOT need to face the camera. Each query must include
 "woman" and a specific action/topic. Cat examples: "woman cuddling a cat close up video", "woman playing
@@ -161,7 +162,7 @@ No Korean entertainment topic. No markdown. Return valid JSON only.
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 female stock-video visual queries")
     topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
-    signature_query = "adult woman front facing face close up smiling directly at camera vertical video"
+    signature_query = "adult woman front facing close up taking a bite of fresh fruit smiling at camera vertical video"
     data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
     if len(data["visual_queries"]) < 3:
         raise ValueError("Gemini returned fewer than 3 usable visual queries")
@@ -247,13 +248,13 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             if not any(w in words for w in woman_terms):
                 return False
             query_lower = (query or "").lower()
-            if "front facing face close up" in query_lower:
+            if "taking a bite of fresh fruit" in query_lower:
                 # The signature opening is independent of the video's topic.
-                # Require a woman, a smiling expression, and face/close-up metadata.
-                signature_terms = {"smile", "smiling", "laugh", "laughing", "happy", "cheerful", "joy", "grin"}
-                face_terms = {"face", "portrait", "closeup", "close"}
-                return (any(w in words for w in signature_terms)
-                        and any(w in words for w in face_terms))
+                # Require a woman plus fruit and eating/bite metadata.
+                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple"}
+                eating_terms = {"eat", "eating", "bite", "biting", "food", "snack", "tasting"}
+                return (any(w in words for w in fruit_terms)
+                        and any(w in words for w in eating_terms))
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
