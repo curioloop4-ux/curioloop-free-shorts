@@ -348,7 +348,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
     hook_path = WORK / "hook.txt"
     hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
-    clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3)
+    clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5)
     if not clips:
         raise RuntimeError("No usable topic-matched visual assets found; stopping video generation.")
 
