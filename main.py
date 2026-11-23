@@ -128,7 +128,7 @@ def upload(path, title, narration):
         scopes=SCOPES,
     )
     youtube = build("youtube", "v3", credentials=creds)
-    privacy = os.getenv("YOUTUBE_PRIVACY_STATUS", "private").lower()
+    privacy = os.getenv("YOUTUBE_PRIVACY_STATUS", "public").lower()
     if privacy not in {"private", "unlisted", "public"}:
         raise ValueError("YOUTUBE_PRIVACY_STATUS must be private, unlisted, or public")
     body = {
