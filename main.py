@@ -27,7 +27,7 @@ def required(name):
     return value
 
 
-def make_script():
+def make_script(previous_titles=None):
     api_key = required("GEMINI_API_KEY")
     # GitHub Actions may define GEMINI_MODEL as an empty secret/variable.
     # Treat an empty value the same as an unset value.
@@ -47,7 +47,13 @@ Never use abstract backgrounds, book titles, metaphors, or generic color/style p
 visual_queries. For a topic about waiting in lines, use phrases like "people waiting in queue",
 "supermarket checkout line", and "airport security queue".
 Avoid repeating obvious topics such as tardigrades. Choose a fresh science, nature, history,
-technology, or everyday-curiosity topic. Do not include markdown."""
+technology, or everyday-curiosity topic. Each script must focus on a clearly distinct subject and
+a different surprising fact, not merely reword a previous script. Do not include markdown."""
+    previous_titles = previous_titles or []
+    if previous_titles:
+        prompt += "\\n\\nIMPORTANT — topics already used in this batch; do NOT repeat these subjects or facts: "
+        prompt += "; ".join(previous_titles[-20:])
+        prompt += ". Choose a completely different subject area and factual angle."
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     print(f"Generating script with Gemini model: {model}")
     response = requests.post(
@@ -249,7 +255,8 @@ def render(title, voice, captions, duration, visual_theme, visual_queries):
         "textfile=title.txt:fontcolor=white:fontsize=62:"
         "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
         "ass=captions.ass[base];"
-        f"[base][{len(clips)+1}:v]overlay=W-w-34:H-h-265:format=auto[vout]"
+        f"[{len(clips)+1}:v]scale=150:185[mascot];"
+        "[base][mascot]overlay=W-w-34:340:format=auto[vout]"
     )
     cmd += [
         "-filter_complex", ";".join(filters),
@@ -304,11 +311,16 @@ def main():
     count = max(1, min(count, 10))
     print(f"Starting batch: {count} Short(s).")
     uploaded = 0
+    used_titles = []
 
     for index in range(1, count + 1):
         print(f"\\n========== SHORT {index}/{count} ==========")
         try:
-            script = make_script()
+            script = make_script(used_titles)
+            title_key = re.sub(r"[^a-z0-9 ]", "", script["title"].lower()).strip()
+            if title_key in {re.sub(r"[^a-z0-9 ]", "", t.lower()).strip() for t in used_titles}:
+                raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
+            used_titles.append(script["title"])
             print("Selected:", script["title"])
             voice = asyncio.run(make_voice(script["narration"]))
             captions, duration = make_ass(script["narration"])
