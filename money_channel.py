@@ -259,6 +259,115 @@ def upload_video(path, data, credits):
     print("Uploaded to the channel authorized by MONEY_YOUTUBE_REFRESH_TOKEN. Video ID:", result.get("id"))
 
 
+
+TOPIC_BANK = [
+    ("money_psychology_01", "돈의 심리", "为什么人们总会冲动购买并后悔？"),
+    ("money_psychology_02", "돈의 심리", "为什么越焦虑的人越容易乱花钱？"),
+    ("money_psychology_03", "돈의 심리", "为什么打折会让人买下原本不需要的东西？"),
+    ("money_psychology_04", "돈의 심리", "为什么人们更容易记住损失而不是收益？"),
+    ("money_psychology_05", "돈의 심리", "为什么分期付款会让消费感觉更轻松？"),
+    ("business_01", "기업과 비즈니스", "星巴克真正卖给顾客的只是咖啡吗？"),
+    ("business_02", "기업과 비즈니스", "宜家为什么让顾客走过那么长的购物路线？"),
+    ("business_03", "기업과 비즈니스", "Costco低利润模式为什么能够成功？"),
+    ("business_04", "기업과 비즈니스", "麦当劳如何把标准化变成竞争优势？"),
+    ("business_05", "기업과 비즈니스", "奢侈品牌为什么会主动控制商品供应？"),
+    ("business_06", "기업과 비즈니스", "订阅制商业模式为什么越来越常见？"),
+    ("business_07", "기업과 비즈니스", "免费应用通常通过什么方式赚钱？"),
+    ("business_08", "기업과 비즈니스", "品牌联名为什么能提高消费者的购买欲？"),
+    ("economy_01", "경제 상식", "通货膨胀为什么会悄悄降低现金的购买力？"),
+    ("economy_02", "경제 상식", "为什么央行调整利率会影响普通人的生活？"),
+    ("economy_03", "경제 상식", "汇率上涨为什么会影响进口商品价格？"),
+    ("economy_04", "경제 상식", "供需关系如何决定商品价格？"),
+    ("economy_05", "경제 상식", "经济衰退通常会怎样影响就业和消费？"),
+    ("economy_06", "경제 상식", "为什么有些国家会出现住房负担过重的问题？"),
+    ("economy_07", "경제 상식", "GDP增长为什么不代表每个人都更富有？"),
+    ("economy_08", "경제 상식", "为什么同样的钱在不同国家购买力不同？"),
+    ("wealth_01", "부의 격차와 자산", "为什么收入相同的人多年后资产差距会很大？"),
+    ("wealth_02", "부의 격차와 자산", "资产和收入有什么关键区别？"),
+    ("wealth_03", "부의 격차와 자산", "复利为什么需要时间才能发挥作用？"),
+    ("wealth_04", "부의 격차와 자산", "紧急备用金为什么是家庭财务的第一道防线？"),
+    ("wealth_05", "부의 격차와 자산", "储蓄率为什么有时比工资增长更重要？"),
+    ("wealth_06", "부의 격차와 자산", "负债什么时候会成为家庭财务的压力？"),
+    ("consumer_01", "소비와 트렌드", "为什么奢侈品涨价后仍然有人愿意购买？"),
+    ("consumer_02", "소비와 트렌드", "网红推荐为什么会影响消费者的选择？"),
+    ("consumer_03", "소비와 트렌드", "便利店如何通过商品摆放影响购买决定？"),
+    ("consumer_04", "소비와 트렌드", "为什么限时优惠会让人产生紧迫感？"),
+    ("consumer_05", "소비와 트렌드", "二手商品市场为什么越来越受关注？"),
+    ("consumer_06", "소비와 트렌드", "消费者为什么愿意为便利支付更高价格？"),
+    ("consumer_07", "소비와 트렌드", "外卖平台的低价优惠背后有哪些商业逻辑？"),
+    ("technology_01", "기술과 미래산업", "人工智能会改变哪些行业的工作方式？"),
+    ("technology_02", "기술과 미래산업", "为什么芯片会影响全球科技产业竞争？"),
+    ("technology_03", "기술과 미래산업", "电动汽车产业链包含哪些关键环节？"),
+    ("technology_04", "기술과 미래산업", "数据为什么会成为企业的重要资产？"),
+    ("technology_05", "기술과 미래산업", "机器人普及可能怎样改变服务业？"),
+    ("technology_06", "기술과 미래산업", "云计算如何帮助小企业降低技术门槛？"),
+    ("history_01", "경제와 역사", "历史上的郁金香狂热为何成为泡沫案例？"),
+    ("history_02", "경제와 역사", "工业革命如何改变普通人的工作和生活？"),
+    ("history_03", "경제와 역사", "信用货币是如何逐渐成为现代经济基础的？"),
+    ("history_04", "경제와 역사", "集装箱运输如何改变全球贸易？"),
+    ("history_05", "경제와 역사", "为什么一些曾经繁荣的商业城市会衰落？"),
+    ("work_01", "일과 생산성", "为什么提高工作效率不一定意味着工作更久？"),
+    ("work_02", "일과 생산성", "技能积累如何影响一个人的长期收入能力？"),
+    ("work_03", "일과 생산성", "远程办公给企业管理带来了哪些变化？"),
+    ("work_04", "일과 생산성", "为什么沟通成本会影响团队生产力？"),
+    ("world_01", "세계와 산업", "全球供应链中断为什么会影响日常商品？"),
+    ("world_02", "세계와 산업", "为什么港口是全球贸易的重要节点？"),
+    ("world_03", "세계와 산업", "旅游业如何带动一个城市的其他产业？"),
+    ("world_04", "세계와 산업", "人口老龄化会给消费市场带来哪些变化？"),
+    ("environment_01", "환경과 산업전환", "能源转型为什么需要巨额基础设施投资？"),
+    ("environment_02", "환경과 산업전환", "电池回收为什么会成为重要的新产业？"),
+    ("environment_03", "환경과 산업전환", "循环经济如何减少资源浪费并创造商业机会？"),
+    ("science_01", "과학과 일상", "为什么时间感会随着年龄和经历发生变化？"),
+    ("science_02", "과학과 일상", "睡眠不足会怎样影响判断和决策？"),
+    ("science_03", "과학과 일상", "为什么人类大脑容易受到锚定效应影响？"),
+]
+
+
+def reserve_topics(count=3):
+    """Select distinct topics and persist recent IDs in the repository between workflow runs."""
+    token = os.getenv("GITHUB_TOKEN")
+    repo = os.getenv("GITHUB_REPOSITORY")
+    branch = os.getenv("GITHUB_REF_NAME", "main")
+    if not token or not repo:
+        raise RuntimeError("Persistent topic history requires the workflow GITHUB_TOKEN and repository context.")
+    api = f"https://api.github.com/repos/{repo}/contents/topic_history.json"
+    headers = {"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json",
+               "X-GitHub-Api-Version": "2022-11-28"}
+    response = requests.get(api, headers=headers, params={"ref": branch}, timeout=30)
+    if response.status_code == 200:
+        saved = response.json()
+        history = json.loads(__import__("base64").b64decode(saved["content"]).decode("utf-8"))
+        file_sha = saved["sha"]
+    elif response.status_code == 404:
+        history, file_sha = {"recent_ids": [], "recent_topics": []}, None
+    else:
+        response.raise_for_status()
+    recent_ids = history.get("recent_ids", [])
+    available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
+    if len(available) < count:
+        # Only rotate after the full topic bank has been used.
+        available = [item for item in TOPIC_BANK if item[0] not in recent_ids[-max(0, len(TOPIC_BANK)-count):]]
+    import random
+    random.shuffle(available)
+    selected = available[:count]
+    if len(selected) < count:
+        raise RuntimeError("Not enough unused topics in the topic bank.")
+    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(TOPIC_BANK):]
+    history["recent_topics"] = (history.get("recent_topics", []) +
+                                [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-len(TOPIC_BANK):]
+    encoded = __import__("base64").b64encode(
+        json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
+    payload = {"message": "Track recently used Chinese channel topics",
+               "content": encoded, "branch": branch}
+    if file_sha:
+        payload["sha"] = file_sha
+    saved_response = requests.put(api, headers=headers, json=payload, timeout=30)
+    saved_response.raise_for_status()
+    print("Reserved distinct topics:")
+    for item in selected:
+        print(f" - [{item[1]}] {item[2]}")
+    return [item[2] for item in selected]
+
 def main():
     if MODE not in {"shorts", "longform"}:
         raise ValueError("MONEY_CONTENT_TYPE must be shorts or longform.")
@@ -278,11 +387,7 @@ def main():
             upload_video(output, data, credits)
         return
 
-    topics = [
-        "为什么有些人越来越有钱？解释资产积累、消费习惯和复利思维",
-        "为什么越会花钱的人，反而可能越有钱？解释消费决策、预算和长期价值",
-        "普通人怎样建立自己的第一份资产？解释储蓄率、持续投入和时间的作用",
-    ]
+    topics = reserve_topics(3)
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
     print(f"Starting Shorts batch at {start_short}/3.")
