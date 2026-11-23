@@ -116,23 +116,26 @@ Title under 65 characters. hook_text must be 3-6 punchy words.
 Narration must be 60-85 words in natural spoken English: hook, surprising fact,
 short explanation, memorable payoff. No greetings or filler.
 
-VISUAL RULE: Every video must open with a topic-specific visual hook featuring an adult woman
-actively interacting with the subject of the fact whenever a suitable licensed clip exists.
-Do not use a random woman portrait unrelated to the topic. Show her holding, touching, observing,
-demonstrating, or reacting to the actual topic. Examples: for a cat fact, open with a woman cuddling
-or playing with a cat; for a dog fact, a woman petting a dog; for a food fact, a woman tasting or
-preparing that food; for a science fact, a woman doing or observing a safe relevant demonstration;
-for a space fact, a woman looking through a telescope or at a star display.
+VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
+an adult woman facing the camera directly, holding eye contact, then playfully sticking out her tongue
+("silly tongue-out / teasing face", non-sexual, friendly) for a brief opening beat. This is a consistent
+brand motif, not a prolonged or suggestive shot. The first visual query must always request this exact
+front-facing action: "adult woman facing camera making playful tongue out silly face close up video".
+After this signature opening, show an adult woman actively interacting with the subject of the fact
+whenever a suitable licensed clip exists. Do not use random unrelated scenery. Examples: for a cat fact,
+show a woman cuddling or playing with a cat; for a dog fact, a woman petting a dog; for a food fact,
+a woman tasting or preparing that food; for a science fact, a woman doing or observing a safe relevant
+demonstration; for a space fact, a woman looking through a telescope or at a star display.
 Keep her fully clothed and non-sexualized. She is an illustrative presenter, not someone claimed
 to have discovered or experienced the fact.
 Set featured_person exactly to "adult woman stock visual".
-visual_queries must contain exactly 3 specific English stock-VIDEO searches showing an adult woman
-interacting with the concrete topic or object, not just a generic portrait. Each query must include
-"woman" and the topic/action. Cat example: "woman cuddling a cat close up video", "woman playing
-with pet cat at home video", "woman holding a purring cat portrait video". For dogs, woman with dog;
-for food, woman tasting or cooking that food; for nature, woman observing the relevant animal or plant.
-If the exact interaction is unavailable, use a woman visibly reacting to a closely related topic visual,
-not unrelated scenery. Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds
+visual_queries must contain exactly 3 specific English stock-VIDEO searches. Query 1 must be exactly
+the front-facing playful tongue-out signature shot described above. Queries 2 and 3 must show an adult
+woman interacting with the concrete topic or object, not just a generic portrait. Each query must include
+"woman" and a specific action/topic. Cat examples: "woman cuddling a cat close up video", "woman playing
+with pet cat at home video". For dogs, woman with dog; for food, woman tasting or cooking that food;
+for nature, woman observing the relevant animal or plant. If the exact interaction is unavailable,
+use a woman visibly reacting to a closely related topic visual, not unrelated scenery. Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds
 as the main visual.
 No Korean entertainment topic. No markdown. Return valid JSON only.
 """
@@ -242,7 +245,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
-                "expressive", "face", "model", "beautiful", "young", "person"
+                "expressive", "face", "model", "beautiful", "young", "person",
+                "facing", "camera", "playful", "silly", "tongue", "out", "sticking"
             }
             topic_terms = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", query or "")
                            if len(w) >= 3 and w.lower() not in generic_terms]
