@@ -93,79 +93,45 @@ def fetch_trending_candidates(limit=20):
 
 
 def make_script(previous_titles=None):
-    """Generate evergreen general-knowledge Shorts with adult women as recurring visuals."""
+    """Generate general-knowledge Shorts with relevant licensed visuals."""
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
-    if not model or model == "gemini-2.5-flash":
-        model = "gemini-3.5-flash-lite"
     previous_titles = previous_titles or []
-    prompt = """Create one original English YouTube Short for a GLOBAL audience for CurioLoop.
-Return to the channel's original format: surprising general knowledge, psychology, science,
-history, nature, everyday mysteries, technology, and useful life knowledge.
-Do NOT make Korean entertainment news or celebrity gossip the topic.
-
-Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
-
-Choose one specific, accurate, genuinely interesting fact that can be explained in 20-35 seconds.
-Prefer well-established facts about human psychology, animals, space, science, history,
-everyday objects, technology, geography, and misunderstood facts.
-Never invent statistics, studies, quotations, experiments, dates, or scientific claims.
-Avoid medical/financial advice, conspiracy theories, and sensational misinformation.
-The first 2 seconds must create immediate curiosity with a concrete, accurate hook.
-Title under 65 characters. hook_text must be 3-6 punchy words.
-Narration must be 60-85 words in natural spoken English: hook, surprising fact,
-short explanation, memorable payoff. No greetings or filler.
-
-VISUAL RULE: Every video must begin with the same recognizable CurioLoop signature shot:
-OPENING ONLY: show a clearly visible adult woman's FACE from the front in a close-up, looking toward
-the camera as she takes one natural bite of a piece of fruit (such as an apple, strawberry, or peach).
-The fruit and the bite must be clearly visible, and her face must remain visible. Make the moment
-cheerful, appetizing, friendly, and non-sexual.
-The first visual query must always request: "adult woman front facing close up taking a bite of fresh fruit smiling at camera vertical video".
-AFTER THE OPENING: prioritize FULL-BODY vertical shots of the woman, ideally head to toe, interacting
-naturally with the subject of the fact. Use side views, three-quarter angles, or candid movement;
-the woman does NOT need to face the camera in these later shots. Do not use random unrelated scenery. Examples: for a cat fact,
-show a woman cuddling or playing with a cat; for a dog fact, a woman petting a dog; for a food fact,
-a woman tasting or preparing that food; for a science fact, a woman doing or observing a safe relevant
-demonstration; for a space fact, a woman looking through a telescope or at a star display.
-Keep her fully clothed and non-sexualized. She is an illustrative presenter, not someone claimed
-to have discovered or experienced the fact.
-Set featured_person exactly to "adult woman stock visual".
-visual_queries must contain exactly 3 specific English stock-VIDEO searches. Query 1 must be exactly
-the front-facing close-up of a woman taking one bite of fruit described above. Queries 2 and 3 must show an adult
-woman in FULL-BODY or head-to-toe framing interacting with the concrete topic or object; these later
-shots may use natural side, three-quarter, or candid angles and do NOT need to face the camera. Each query must include
-"woman" and a specific action/topic. Cat examples: "woman cuddling a cat close up video", "woman playing
-with pet cat at home video". For dogs, woman with dog; for food, woman tasting or cooking that food;
-for nature, woman observing the relevant animal or plant. If the exact interaction is unavailable,
-use a woman visibly reacting to a closely related topic visual, not unrelated scenery. Never use cityscapes, landscapes, buildings, cars, or abstract backgrounds
-as the main visual.
-No Korean entertainment topic. No markdown. Return valid JSON only.
-"""
+    prompt = """Create one original English YouTube Short for a global audience.
+Cover accurate general knowledge: science, psychology, history, animals, nature, fitness,
+technology, everyday mysteries. No Korean entertainment news.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+Choose one specific verified fact; never invent statistics or studies. Avoid medical/financial advice.
+20-35 seconds; narration 60-85 natural English words; title under 65 characters;
+hook_text 3-6 words; immediate accurate curiosity hook.
+VISUAL RULES:
+No fruit-eating opening. First shot must feature a fit-looking athletic adult man OR woman,
+fully clothed, non-sexualized, in a strong natural pose/action.
+Then prioritize real footage of the exact topic/action: actual animal for animal facts,
+actual exercise footage (actively use women exercising when relevant) for fitness facts,
+actual food/preparation for food facts, relevant objects/experiments for science.
+Do not force a woman into every shot. Do not fill with unrelated portraits or scenery.
+If relevant footage is unavailable, choose a different topic rather than mismatched footage.
+Return exactly 3 English stock-VIDEO search queries: first for the athletic male/female opening,
+second and third for the actual topic/action. featured_person must be "fit adult man" or "fit adult woman".
+Return valid JSON only."""
     if previous_titles:
-        prompt += "\n\nDo not repeat these topics, facts, hooks, or angles already used: " + "; ".join(previous_titles[-30:])
+        prompt += "\nAvoid repeating these previous titles/topics: " + "; ".join(previous_titles[-30:])
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     print(f"Generating general-knowledge CurioLoop Short with Gemini model: {model}")
-    response = requests.post(
-        url, params={"key": api_key},
-        json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.85, "responseMimeType": "application/json"}},
-        timeout=90,
-    )
+    response = requests.post(url, params={"key": api_key},
+        json={"contents":[{"parts":[{"text":prompt}]}],
+              "generationConfig":{"temperature":0.85,"responseMimeType":"application/json"}}, timeout=90)
     response.raise_for_status()
-    raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    data = json.loads(raw)
-    for key in ("title", "hook_text", "narration", "visual_theme"):
-        if not isinstance(data.get(key), str) or not data[key].strip():
+    data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+    for key in ("title","hook_text","narration","visual_theme"):
+        if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
-    data["featured_person"] = "adult woman stock visual"
-    if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
-        raise ValueError("Gemini response must include 3 female stock-video visual queries")
-    topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
-    signature_query = "adult woman front facing close up taking a bite of fresh fruit smiling at camera vertical video"
-    data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
-    if len(data["visual_queries"]) < 3:
-        raise ValueError("Gemini returned fewer than 3 usable visual queries")
+    person=str(data.get("featured_person","")).lower()
+    data["featured_person"]="fit adult man" if "man" in person else "fit adult woman"
+    if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
+        raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
+    data["visual_queries"]=[str(q).strip() for q in data["visual_queries"][:3]]
     return data
 
 
@@ -211,21 +177,11 @@ def make_ass(narration):
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
     """Use only tightly topic-matched licensed assets; never fill with unrelated stock footage."""
     featured_person = (featured_person or "").strip()
-    stock_woman_mode = featured_person.lower() == "adult woman stock visual"
-    subject = "adult woman" if stock_woman_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
+    stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
+    subject = featured_person if stock_person_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     visual_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3]
-    # Search the fixed fruit-bite opening independently from the video's topic.
-    signature_queries = [
-        "woman eating fruit",
-        "woman biting apple",
-        "woman eating strawberry",
-        "woman tasting peach",
-        "woman eating fresh fruit",
-    ]
-    query_terms = list(dict.fromkeys([
-        *signature_queries, *visual_terms[1:],
-        "woman full body " + subject, subject, title.strip(),
-    ]))
+    opening_queries = [visual_terms[0]] if visual_terms else ["athletic adult woman fitness workout vertical video"]
+    query_terms = list(dict.fromkeys([*opening_queries, *visual_terms[1:], title.strip(), visual_theme]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
     session.headers.update({"User-Agent": "CurioLoop/1.0"})
@@ -250,27 +206,16 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         meaningful = [w for w in query_words if w not in generic_visual_terms]
         if named_person:
             return bool(meaningful) and any(w in words for w in meaningful)
-        if stock_woman_mode:
-            # Require both an adult-woman indicator and a topic/action match from the query.
-            woman_terms = {"woman", "women", "female", "girl", "lady"}
-            if not any(w in words for w in woman_terms):
-                return False
-            query_lower = (query or "").lower()
-            if query in signature_queries:
-                # Search queries request an eating/bite action, but stock tags often omit verbs.
-                # Require a woman and a concrete fruit tag; do not reject clips only because
-                # Pixabay omitted "eating" or "biting" from its metadata.
-                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple", "kiwi", "mango", "pear", "cherry"}
-                return any(w in words for w in fruit_terms)
-            generic_terms = {
-                "adult", "woman", "women", "female", "girl", "lady", "close", "up",
-                "portrait", "vertical", "video", "footage", "stock", "reaction",
-                "expressive", "face", "model", "beautiful", "young", "person",
-                "facing", "camera", "playful", "silly", "tongue", "out", "sticking", "making"
-            }
+        if stock_person_mode:
+            if query == (visual_terms[0] if visual_terms else ""):
+                person_terms = {"man", "men", "male", "woman", "women", "female"}
+                fitness_terms = {"fitness", "workout", "gym", "athlete", "athletic", "muscle", "muscular", "sport", "training", "bodybuilding", "exercise"}
+                return any(w in words for w in person_terms) and any(w in words for w in fitness_terms)
+            generic_terms = {"adult","woman","women","female","man","men","male","close","up",
+                "portrait","vertical","video","footage","stock","reaction","full","body",
+                "head","toe","fit","fitness","athletic","person","people"}
             topic_terms = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", query or "")
-                           if len(w) >= 3 and w.lower() not in generic_terms]
-            # Topic-specific queries must match a concrete subject/action tag.
+                           if len(w)>=3 and w.lower() not in generic_terms]
             return bool(topic_terms) and any(w in words for w in topic_terms)
         return bool(meaningful) and sum(1 for w in meaningful if w in words) >= min(2, len(meaningful))
 
@@ -309,8 +254,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
-    # The first clip must show a woman eating/biting fruit; later clips follow the fact topic.
-    signature_found = False
+    # Require an athletic adult man/woman opening; following clips must match the topic.
+    opening_found = False
 
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
     pixabay_key = os.getenv("PIXABAY_API_KEY")
@@ -318,7 +263,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         for query_index, query in enumerate(query_terms):
             if len(clips) >= count:
                 break
-            if signature_found and query_index < len(signature_queries):
+            if opening_found and query_index == 0:
                 continue
             try:
                 response = session.get("https://pixabay.com/api/videos/",
@@ -338,23 +283,22 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         render_video(chosen["url"], len(clips)+1, "Pixabay",
                                      "Pixabay Content License (check current terms)",
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
-                        if query_index < len(signature_queries) and len(clips) == 1:
-                            signature_found = True
-                            print(f"Accepted CurioLoop fruit-bite opening from Pixabay query: {query}")
+                        if query_index == 0 and len(clips) == 1:
+                            opening_found = True
+                            print(f"Accepted CurioLoop athletic opening from Pixabay query: {query}")
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
-                    query_limit = 1 if query_index < len(signature_queries) else count
+                    query_limit = 1 if query_index == 0 else count
                     if len(clips) >= query_limit:
                         break
             except Exception as exc:
                 print(f"Pixabay search failed for '{query}': {type(exc).__name__}: {exc}")
 
-    # The signature opening is mandatory and must be a real licensed video clip.
-    # Do not substitute a still image, generic portrait, or unrelated footage.
-    if not signature_found:
+    # The opening must be a real licensed video clip, not a still image.
+    if not opening_found:
         raise RuntimeError(
-            "Required CurioLoop fruit opening not found: a licensed video tagged with an adult woman "
-            "and a specific fruit is mandatory. No substitute footage was used."
+            "Required CurioLoop athletic opening not found: a licensed video tagged with an adult "
+            "man/woman and fitness/workout action is mandatory. No substitute footage was used."
         )
 
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
@@ -493,7 +437,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         raise RuntimeError("No usable topic-matched visual assets found; stopping video generation.")
 
     if len(clips) < 2:
-        raise RuntimeError("The mandatory tongue-out opening was found, but no topic-related follow-up visual was found.")
+        raise RuntimeError("The athletic opening was found, but no topic-related follow-up visual was found.")
 
     # Reserve the first 2.5 seconds for the signature shot; divide the remaining runtime
     # evenly across the topic-related clips.
@@ -527,8 +471,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=28:"
         "enable='between(t,0,2.5)',"
         "ass=captions.ass[base];"
-        f"[{len(clips)+1}:v]scale=150:185[mascot];"
-        "[base][mascot]overlay=W-w-34:340:format=auto[vout]"
+        f"[{len(clips)+1}:v]scale=105:129[mascot];"
+        "[base][mascot]overlay=W-w-28:250:format=auto[vout]"
     )
     cmd += [
         "-filter_complex", ";".join(filters),
