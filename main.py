@@ -159,7 +159,7 @@ No Korean entertainment topic. No markdown. Return valid JSON only.
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
         raise ValueError("Gemini response must include 3 female stock-video visual queries")
     topic_queries = [str(q).strip() for q in data["visual_queries"] if str(q).strip()]
-    signature_query = "adult woman facing camera making playful tongue out silly face close up video"
+    signature_query = "adult woman facing camera smiling playfully cheerful expression close up video"
     data["visual_queries"] = [signature_query] + [q for q in topic_queries if q.lower() != signature_query.lower()][:2]
     if len(data["visual_queries"]) < 3:
         raise ValueError("Gemini returned fewer than 3 usable visual queries")
@@ -245,11 +245,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             if not any(w in words for w in woman_terms):
                 return False
             query_lower = (query or "").lower()
-            if "tongue out" in query_lower:
+            if "smiling playfully" in query_lower:
                 # The signature opening is independent of the video's topic.
-                # Require a woman and tongue-related metadata, with no cat/topic term required.
-                signature_terms = {"tongue", "tongueout", "sticking", "licking"}
-                return any(w in words for w in signature_terms)
+                # Require a woman and a clearly positive, smiling expression.
+                signature_terms = {"smile", "smiling", "laugh", "laughing", "happy", "cheerful", "joy", "grin"}
+                return any(w in words for w in signature_terms}
             generic_terms = {
                 "adult", "woman", "women", "female", "girl", "lady", "close", "up",
                 "portrait", "vertical", "video", "footage", "stock", "reaction",
