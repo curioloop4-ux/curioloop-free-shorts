@@ -256,6 +256,39 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     assets_dir.mkdir(exist_ok=True)
     clips, credits = [], []
 
+    # Persistent visual-asset deduplication across separate GitHub Actions runs.
+    history_path = ROOT / "history" / "used_visuals.json"
+    history_path.parent.mkdir(exist_ok=True)
+    try:
+        history_data = json.loads(history_path.read_text(encoding="utf-8")) if history_path.exists() else {}
+    except (json.JSONDecodeError, OSError):
+        history_data = {}
+    used_assets = set(history_data.get("asset_keys", []))
+
+    def asset_keys(asset_id=None, page_url=None, media_url=None):
+        keys = []
+        for value in (asset_id, page_url, media_url):
+            value = str(value or "").strip()
+            if value:
+                keys.append(re.sub(r"\\/$", "", value.split("?")[0]).lower())
+        return keys
+
+    def already_used(asset_id=None, page_url=None, media_url=None):
+        keys = asset_keys(asset_id, page_url, media_url)
+        return any(key in used_assets for key in keys)
+
+    def remember_asset(asset_id=None, page_url=None, media_url=None):
+        used_assets.update(asset_keys(asset_id, page_url, media_url))
+        # Keep a rolling history to prevent unbounded repository growth.
+        history_data["asset_keys"] = sorted(used_assets)[-1500:]
+        history_data["updated_at"] = __import__("datetime").datetime.now(
+            __import__("datetime").timezone.utc
+        ).isoformat()
+        history_path.write_text(
+            json.dumps(history_data, ensure_ascii=False, indent=2) + "\\n",
+            encoding="utf-8"
+        )
+
     # For named people, generic stock footage is not a valid substitute.
     subject_words = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", subject) if len(w) >= 2]
     generic_visual_terms = {
@@ -339,6 +372,14 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 response.raise_for_status()
                 for item in response.json().get("hits", []):
                     tags = item.get("tags", "")
+                    asset_id = f"pixabay:{item.get('id', '')}" if item.get("id") else None
+                    page_url = item.get("pageURL", "")
+                    video_url = ((item.get("videos", {}).get("large") or
+                                  item.get("videos", {}).get("medium") or
+                                  item.get("videos", {}).get("small") or {}).get("url", ""))
+                    if already_used(asset_id, page_url, video_url):
+                        print(f"Skipping previously used Pixabay clip: {page_url or asset_id}")
+                        continue
                     if not relevant_metadata(tags, query):
                         print(f"Rejecting unrelated Pixabay result: {tags}")
                         continue
@@ -350,6 +391,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         render_video(chosen["url"], len(clips)+1, "Pixabay",
                                      "Pixabay Content License (check current terms)",
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
+                        remember_asset(asset_id, item.get("pageURL", ""), chosen.get("url", ""))
                         if query_index == 0 and len(clips) == 1:
                             opening_found = True
                             print(f"Accepted CurioLoop athletic opening from Pixabay query: {query}")
@@ -383,6 +425,10 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 response.raise_for_status()
                 for item in response.json().get("items", []):
                     image_url = item.get("link")
+                    page_url = item.get("image", {}).get("contextLink") or item.get("displayLink", "")
+                    if already_used(page_url=page_url, media_url=image_url):
+                        print(f"Skipping previously used Google image: {page_url or image_url}")
+                        continue
                     context = item.get("title", "") + " " + item.get("snippet", "")
                     if not image_url or not relevant_metadata(context, query):
                         print(f"Rejecting unrelated Google image result: {context[:120]}")
@@ -392,6 +438,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         render_still(image_url, len(clips)+1, "Google Custom Search result",
                                      "Reuse-rights filter applied; verify original page license",
                                      page_url, item.get("title", "Creator not supplied"))
+                        remember_asset(page_url=page_url, media_url=image_url)
                     except Exception as exc:
                         print(f"Skipping Google image result: {type(exc).__name__}: {exc}")
                     if len(clips) >= count:
@@ -422,6 +469,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                     info_response.raise_for_status()
                     for page in info_response.json().get("query", {}).get("pages", {}).values():
                         info = (page.get("imageinfo") or [{}])[0]
+                        page_title = page.get("title", "Wikimedia Commons image")
+                        commons_page_url = "https://commons.wikimedia.org/wiki/" + page_title.replace(" ", "_")
+                        if already_used(page_url=commons_page_url, media_url=info.get("url", "")):
+                            print(f"Skipping previously used Commons image: {commons_page_url}")
+                            continue
                         meta = info.get("extmetadata") or {}
                         license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
                         normalized = license_name.lower().replace("-", " ").strip()
@@ -429,11 +481,11 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         image_url = info.get("thumburl") or info.get("url")
                         if not allowed or not image_url or info.get("mime") not in ("image/jpeg", "image/png", "image/webp"):
                             continue
-                        page_title = page.get("title", "Wikimedia Commons image")
                         try:
                             render_still(image_url, len(clips)+1, "Wikimedia Commons", license_name,
-                                         "https://commons.wikimedia.org/wiki/" + page_title.replace(" ", "_"),
+                                         commons_page_url,
                                          (meta.get("Artist", {}).get("value") or "Author not listed").strip())
+                            remember_asset(page_url=commons_page_url, media_url=info.get("url", ""))
                         except Exception as exc:
                             print(f"Skipping Commons image: {type(exc).__name__}: {exc}")
                         if len(clips) >= count:
