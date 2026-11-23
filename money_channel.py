@@ -18,7 +18,7 @@ MODEL = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
 MODE = os.getenv("MONEY_CONTENT_TYPE", "shorts").lower()
 IS_LONG = MODE == "longform"
 WIDTH, HEIGHT = (1920, 1080) if IS_LONG else (1080, 1920)
-VOICE = os.getenv("MONEY_TTS_VOICE", "ko-KR-SunHiNeural")
+VOICE = os.getenv("MONEY_TTS_VOICE", "zh-CN-XiaoxiaoNeural")
 GENERIC = {"about", "with", "from", "into", "real", "video", "footage", "cinematic",
            "close", "wide", "shot", "background", "documentary", "concept", "financial"}
 
@@ -32,34 +32,9 @@ def required(name):
 
 def generate_content():
     if IS_LONG:
-        prompt = """한국어 유튜브 경제 다큐멘터리 한 편을 기획하라.
-주제는 부자들의 습관, 소비심리, 저축, 복리, 물가, 금리, 가계경제, 경제사 중 하나.
-투자 종목 추천·매수매도 지시·확정적 수익 약속·과장된 부자 성공담 금지.
-반드시 검증 가능한 경제 원리와 현실적인 사례를 중심으로 설명하고, 사실과 해석을 구분하라.
-JSON만 반환: title, description, sections, sources.
-sections는 정확히 5개 객체이며 각 객체는 heading, narration, visual_queries를 포함한다.
-각 narration은 한국어 230~280 어절이 아니라 공백 기준 230~280개의 단어(어절)로 작성한다.
-전체 분량은 약 1,150~1,400 어절, 자연스러운 내레이션 기준 6~9분을 목표로 한다.
-구조: 강한 질문과 사례, 배경과 핵심 개념, 작동 원리, 현실 사례와 숫자, 오해·한계 및 실천 가능한 결론.
-숫자·통계·연구·인용은 출처가 명확한 경우에만 사용하고, 확인 불가한 수치는 만들지 마라.
-sources에는 한국은행, 통계청, 금융감독원, 한국거래소, 국세청, OECD, World Bank 등
-실제로 존재하는 기관의 주제 관련 URL을 3~5개 포함하라. URL을 추측해 만들지 말고 확실하지 않으면 기관의 공식 메인/자료 페이지를 사용하라.
-각 section의 visual_queries는 실제 화면에 보일 수 있는 영어 Pixabay 영상 검색어 2개.
-일반적인 돈·도시 풍경만 반복하지 말고 내용과 직접 관련된 사물·행동·상황을 지정하라.
-반환은 JSON만."""
+        prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Pixabay视频搜索词，画面与旁白直接相关，并可适当使用漂亮女性、健身男性、商务人士和高品质生活方式镜头。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
-        prompt = """한국어 유튜브 쇼츠용 경제·돈 상식 영상 하나를 작성하라.
-주제는 부자들의 습관, 소비심리, 월급관리, 저축, 복리, 물가, 금리, 가계경제 중 하나.
-투자 종목 추천, 매수매도 지시, 확정 수익 약속, 근거 없는 부자 명언 금지.
-사실과 의견을 구분하고 확인되지 않은 통계나 연구를 절대 만들지 마라.
-JSON만 반환: title, hook_text, narration, description, visual_queries, sources.
-title은 45자 이내, hook_text는 짧고 강렬한 한국어 문구.
-narration은 자연스러운 한국어 110~150 공백 기준 어절, 약 35~55초 분량.
-첫 2초에 시청자의 일상적 궁금증을 자극하고, 구체적인 사례와 핵심 원리를 설명한 뒤 기억에 남는 결론으로 끝내라.
-과장된 공포·부자 혐오·가난 비하·무리한 절약 권유 금지.
-visual_queries는 내용과 직접 관련된 영어 Pixabay 영상 검색어 3개.
-sources는 근거로 참고할 만한 공식 기관 또는 신뢰할 수 있는 자료 URL 2~3개.
-반환은 JSON만."""
+        prompt = """请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：为什么有些人越来越有钱？解释资产积累、消费习惯和复利思维，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries提供5个英文Pixabay搜索词，必须优先匹配脚本内容，可包含漂亮女性、健身男性、商务人士、都市生活方式，但人物画面必须服务于主题，不要无关摆拍。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
         params={"key": required("GEMINI_API_KEY")},
@@ -80,17 +55,16 @@ sources는 근거로 참고할 만한 공식 기관 또는 신뢰할 수 있는 
                 raise ValueError("A documentary section is missing its heading or narration.")
             if not isinstance(section.get("visual_queries"), list) or len(section["visual_queries"]) != 2:
                 raise ValueError("Each documentary section needs two video queries.")
-        data["narration"] = "\n\n".join(s["narration"] for s in sections)
-        data["visual_queries"] = [q for s in sections for q in s["visual_queries"]]
+        data["narration"] = "\n\n".join(section["narration"] for section in sections)
+        data["visual_queries"] = [query for section in sections for query in section["visual_queries"]]
     else:
-        if not isinstance(data.get("narration"), str) or len(data["narration"].split()) < 65:
-            raise ValueError("Short narration is missing or too short.")
-        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 2:
-            raise ValueError("At least two relevant video queries are required.")
+        if not isinstance(data.get("narration"), str) or not (60 <= len(data["narration"]) <= 220):
+            raise ValueError("Chinese narration should be short enough for a 20-30 second Short.")
+        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
+            raise ValueError("At least three relevant video queries are required.")
     if not isinstance(data.get("sources"), list) or len(data["sources"]) < 2:
         raise ValueError("At least two reference sources are required.")
     return data
-
 
 async def make_voice(text):
     path = WORK / "narration.mp3"
@@ -114,16 +88,26 @@ def ass_time(seconds):
 
 
 def make_subtitles(text, duration):
-    words = text.split()
-    groups, current = [], []
-    limit = 7 if IS_LONG else 5
-    for word in words:
-        current.append(word)
-        if len(current) >= limit or re.search(r"[.!?。！？]$", word):
+    groups, current = [], ""
+    if re.search(r"[\\u4e00-\\u9fff]", text):
+        chunks = re.split(r"(?<=[，。！？；])", text.replace("\\n", " "))
+        for chunk in chunks:
+            chunk = chunk.strip()
+            while len(chunk) > 16:
+                groups.append(chunk[:16])
+                chunk = chunk[16:]
+            if chunk:
+                groups.append(chunk)
+    else:
+        words = text.split()
+        limit = 7 if IS_LONG else 5
+        for word in words:
+            current += (" " if current else "") + word
+            if len(current.split()) >= limit or re.search(r"[.!?。！？]$", word):
+                groups.append(current)
+                current = ""
+        if current:
             groups.append(current)
-            current = []
-    if current:
-        groups.append(current)
     weights = [sum(max(1, len(w)) for w in group) for group in groups]
     total = sum(weights) or 1
     lines = [
@@ -137,7 +121,7 @@ def make_subtitles(text, duration):
     cursor = 0.0
     for group, weight in zip(groups, weights):
         span = duration * weight / total
-        caption = " ".join(group).replace("{", "").replace("}", "")
+        caption = str(group).replace("{", "").replace("}", "")
         lines.append(f"Dialogue: 0,{ass_time(cursor)},{ass_time(min(duration, cursor + span))},Default,,0,0,0,,{caption}")
         cursor += span
     path = WORK / "captions.ass"
@@ -228,16 +212,16 @@ def upload_video(path, data, credits):
     sources = "\n".join(f"- {url}" for url in data["sources"])
     visual_credits = "\n".join(dict.fromkeys(credits))
     description = (
-        data.get("description", "돈과 경제를 쉽고 재미있게 설명하는 돈좀아는척입니다.") +
-        "\n\n참고 자료\n" + sources +
-        "\n\n영상 자료 출처\n" + visual_credits +
-        "\n\n본 영상은 경제·금융 정보 제공을 위한 일반적인 교육 콘텐츠이며 개인별 투자 권유가 아닙니다."
+        data.get("description", "欢迎来到有钱研究所，一起了解财富、金钱心理与经济知识。") +
+        "\n\n参考资料\n" + sources +
+        "\n\n视频素材来源\n" + visual_credits +
+        "\n\n本视频仅用于经济与金融知识分享，不构成个人投资建议。"
     )
     body = {
         "snippet": {
             "title": data["title"][:100],
             "description": description[:4900],
-            "tags": ["돈좀아는척", "경제상식", "재테크기초", "부자습관", "돈관리", "경제다큐멘터리"],
+            "tags": ["有钱研究所", "财富知识", "金钱心理学", "富人习惯", "理财常识", "经济科普"],
             "categoryId": "27",
         },
         "status": {"privacyStatus": os.getenv("MONEY_YOUTUBE_PRIVACY_STATUS", "unlisted"),
