@@ -2,7 +2,10 @@
   "recent_ids": [
     "science_01",
     "money_psychology_05",
-    "work_01"
+    "work_01",
+    "beauty_05",
+    "fitness_04",
+    "consumer_05"
   ],
   "recent_topics": [
     {
@@ -19,6 +22,22 @@
       "id": "work_01",
       "category": "일과 생산성",
       "topic": "为什么提高工作效率不一定意味着工作更久？"
+    },
+    {
+      "id": "beauty_05",
+      "category": "美容与形象",
+      "topic": "哪些日常习惯会让形象看起来更精神？"
+    },
+    {
+      "id": "fitness_04",
+      "category": "健身与自我管理",
+      "topic": "健身新手最应该先建立什么习惯？"
+    },
+    {
+      "id": "consumer_05",
+      "category": "소비와 트렌드",
+      "topic": "二手商品市场为什么越来越受关注？"
     }
-  ]
+  ],
+  "mix_position": 3
 }
