@@ -30,11 +30,12 @@ def required(name):
     return value
 
 
-def generate_content():
+def generate_content(topic=None):
     if IS_LONG:
         prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Pixabay视频搜索词，画面与旁白直接相关，并可适当使用漂亮女性、健身男性、商务人士和高品质生活方式镜头。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
-        prompt = """请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：为什么有些人越来越有钱？解释资产积累、消费习惯和复利思维，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries提供5个英文Pixabay搜索词，必须优先匹配脚本内容，可包含漂亮女性、健身男性、商务人士、都市生活方式，但人物画面必须服务于主题，不要无关摆拍。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
+        topic = topic or "为什么有些人越来越有钱？"
+        prompt = f"""请创作一条面向简体中文观众的YouTube Shorts经济知识短视频。主题：{topic}。解释一个具体、可信的经济或金钱心理观点，不要把财富归因于外貌或单一习惯。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部文案使用自然口语化简体中文。title不超过45个汉字；hook_text是前2秒的短钩子；narration约90至130个汉字，适合20至30秒配音，结构为强钩子、一个具体观点或例子、简短结论。不得虚构统计、研究、名言或收益承诺。visual_queries必须提供5个英文Pixabay视频搜索词：至少3个与脚本内容直接相关，另外2个分别用于自然融入身材健美的成年男性、形象时尚有魅力的成年女性镜头（例如健身、商务、品质生活、自我管理场景）；人物镜头必须与旁白主题有联系，不得使用性暗示、无关摆拍或未成年人。sources提供2至3个真实官方或可信机构URL；不确定具体页面时使用机构主页，绝不编造。只返回JSON。"""
     response = requests.post(
         f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent",
         params={"key": required("GEMINI_API_KEY")},
@@ -60,8 +61,8 @@ def generate_content():
     else:
         if not isinstance(data.get("narration"), str) or not (60 <= len(data["narration"]) <= 220):
             raise ValueError("Chinese narration should be short enough for a 20-30 second Short.")
-        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
-            raise ValueError("At least three relevant video queries are required.")
+        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
+            raise ValueError("Five visual search queries are required, including topic-relevant adult people scenes.")
     if not isinstance(data.get("sources"), list) or len(data["sources"]) < 2:
         raise ValueError("At least two reference sources are required.")
     return data
@@ -171,7 +172,7 @@ def download_relevant_clips(queries):
             clips.append(normalized)
             seen.add(item.get("id"))
             credits.append(f"Pixabay: {item.get('user','creator')} | {item.get('pageURL','')} | Check current Pixabay Content License")
-            if len(clips) >= (10 if IS_LONG else 3):
+            if len(clips) >= (10 if IS_LONG else 5):
                 break
     minimum = 6 if IS_LONG else 3
     if len(clips) < minimum:
@@ -238,19 +239,46 @@ def upload_video(path, data, credits):
 def main():
     if MODE not in {"shorts", "longform"}:
         raise ValueError("MONEY_CONTENT_TYPE must be shorts or longform.")
-    print(f"Creating 돈좀아는척 {'long-form documentary' if IS_LONG else 'Short'} with {MODEL}")
-    data = generate_content()
-    print("Selected:", data["title"])
-    (WORK / "script.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
-    voice = asyncio.run(make_voice(data["narration"]))
-    clips, credits = download_relevant_clips(data["visual_queries"])
-    output = render_video(data, voice, clips)
-    (WORK / "visual_credits.txt").write_text("\n".join(dict.fromkeys(credits)), encoding="utf-8")
-    print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
-    if os.getenv("OUTPUT_ONLY", "true").lower() in {"1", "true", "yes"}:
-        print("OUTPUT_ONLY enabled; upload skipped.")
-    else:
-        upload_video(output, data, credits)
+    if IS_LONG:
+        print(f"Creating 有钱研究所 long-form documentary with {MODEL}")
+        data = generate_content()
+        print("Selected:", data["title"])
+        (WORK / "script.json").write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        voice = asyncio.run(make_voice(data["narration"]))
+        clips, credits = download_relevant_clips(data["visual_queries"])
+        output = render_video(data, voice, clips)
+        (WORK / "visual_credits.txt").write_text("\n".join(dict.fromkeys(credits)), encoding="utf-8")
+        print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
+        if os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}:
+            print("OUTPUT_ONLY enabled; upload skipped.")
+        else:
+            upload_video(output, data, credits)
+        return
+
+    topics = [
+        "为什么有些人越来越有钱？解释资产积累、消费习惯和复利思维",
+        "为什么越会花钱的人，反而可能越有钱？解释消费决策、预算和长期价值",
+        "普通人怎样建立自己的第一份资产？解释储蓄率、持续投入和时间的作用",
+    ]
+    output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
+    for index, topic in enumerate(topics, start=1):
+        print(f"\n========== SHORT {index}/3 ==========")
+        data = generate_content(topic)
+        print("Selected:", data["title"])
+        (WORK / f"script_{index}.json").write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        voice = asyncio.run(make_voice(data["narration"]))
+        clips, credits = download_relevant_clips(data["visual_queries"])
+        rendered = render_video(data, voice, clips)
+        output = WORK / f"money_short_{index}.mp4"
+        rendered.replace(output)
+        (WORK / f"visual_credits_{index}.txt").write_text(
+            "\n".join(dict.fromkeys(credits)), encoding="utf-8")
+        print("Rendered:", output, "| Duration:", round(duration_of(output), 1), "seconds")
+        if output_only:
+            print("OUTPUT_ONLY enabled; upload skipped.")
+        else:
+            upload_video(output, data, credits)
 
 
 if __name__ == "__main__":
