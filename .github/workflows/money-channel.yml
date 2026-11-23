@@ -71,6 +71,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ github.token }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          COVERR_API_KEY: ${{ secrets.COVERR_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
           MONEY_YOUTUBE_CLIENT_ID: ${{ secrets.MONEY_YOUTUBE_CLIENT_ID }}
           MONEY_YOUTUBE_CLIENT_SECRET: ${{ secrets.MONEY_YOUTUBE_CLIENT_SECRET }}
