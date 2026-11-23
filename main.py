@@ -35,10 +35,15 @@ def make_script():
     if not model or model == "gemini-2.5-flash":
         model = "gemini-3.5-flash-lite"
     prompt = """Create one original, fact-checkable English YouTube Shorts script for a global audience.
-Return ONLY valid JSON with keys: title, narration, visual_theme.
+Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
 Requirements: title under 65 characters; narration 75-105 words; compelling first sentence;
 one surprising but accurate fact; no medical/financial advice, politics, or fabricated claims.
-visual_theme must be a concise visual direction for an abstract science-style background.
+visual_theme must describe the visual mood. visual_queries must be an array of exactly 3
+short, concrete English search phrases for real photographs that directly illustrate the
+narration (people, places, objects, animals, scientific equipment, or real-world scenes).
+Never use abstract backgrounds, book titles, metaphors, or generic color/style phrases as
+visual_queries. For a topic about waiting in lines, use phrases like "people waiting in queue",
+"supermarket checkout line", and "airport security queue".
 Avoid repeating obvious topics such as tardigrades. Choose a fresh science, nature, history,
 technology, or everyday-curiosity topic. Do not include markdown."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -56,6 +61,11 @@ technology, or everyday-curiosity topic. Do not include markdown."""
     for key in ("title", "narration", "visual_theme"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
+    if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
+        raise ValueError("Gemini response must include 3 concrete visual_queries")
+    data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:3] if str(q).strip()]
+    if len(data["visual_queries"]) < 3:
+        raise ValueError("Gemini returned fewer than 3 usable visual_queries")
     return data
 
 
@@ -99,14 +109,14 @@ def make_ass(narration):
 
 
 
-def fetch_visuals(title, visual_theme, count=3):
+def fetch_visuals(title, visual_theme, visual_queries, count=3):
     """Fetch reusable Commons thumbnails, including thumbnails of SVG originals."""
     api = "https://commons.wikimedia.org/w/api.php"
     headers = {
         "User-Agent": "CurioLoopShorts/1.1 (educational video generator; https://github.com/curioloop4-ux/curioloop-free-shorts)"
     }
     # Search separately: combining title and theme into one long phrase was too restrictive.
-    raw_queries = [title, visual_theme, " ".join(re.findall(r"[a-zA-Z]{4,}", title))]
+    raw_queries = list(visual_queries or []) + [title]
     queries = []
     for query in raw_queries:
         query = " ".join((query or "").split()[:8]).strip()
@@ -132,12 +142,14 @@ def fetch_visuals(title, visual_theme, count=3):
 
         for page in pages.values():
             info = (page.get("imageinfo") or [{}])[0]
-            # Use Commons' raster thumbnail even when the original file is SVG.
+            # Never treat PDF book covers or document previews as photographic visuals.
+            mime = (info.get("mime") or "").lower()
+            if mime not in ("image/jpeg", "image/png", "image/webp", "image/svg+xml"):
+                continue
+            # Use Commons' raster thumbnail for SVG originals; PDFs are excluded above.
             url = info.get("thumburl")
-            if not url:
-                mime = info.get("mime", "")
-                if mime in ("image/jpeg", "image/png", "image/webp"):
-                    url = info.get("url")
+            if not url and mime in ("image/jpeg", "image/png", "image/webp"):
+                url = info.get("url")
             if not url or url in seen:
                 continue
             seen.add(url)
@@ -174,11 +186,11 @@ def fetch_visuals(title, visual_theme, count=3):
     return images, credits
 
 
-def render(title, voice, captions, duration, visual_theme):
+def render(title, voice, captions, duration, visual_theme, visual_queries):
     output = WORK / "curioloop_short.mp4"
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
-    images, credits = fetch_visuals(title, visual_theme, count=3)
+    images, credits = fetch_visuals(title, visual_theme, visual_queries, count=3)
     if not images:
         raise RuntimeError("No usable visual images found; stopping to prevent another grid-only upload.")
 
@@ -270,7 +282,7 @@ def main():
     print("Selected:", script["title"])
     voice = asyncio.run(make_voice(script["narration"]))
     captions, duration = make_ass(script["narration"])
-    rendered, credits = render(script["title"], voice, captions, duration, script["visual_theme"])
+    rendered, credits = render(script["title"], voice, captions, duration, script["visual_theme"], script["visual_queries"])
     upload(rendered, script["title"], script["narration"], credits)
 
 
