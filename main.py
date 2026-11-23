@@ -134,7 +134,7 @@ def fetch_visuals(title, visual_theme, visual_queries, count=3):
         params = {
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 30,
-            "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": 1200
+            "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "iiurlwidth": 1200
         }
         try:
             response = requests.get(api, params=params, headers=headers, timeout=30)
