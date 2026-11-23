@@ -214,9 +214,17 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     stock_woman_mode = featured_person.lower() == "adult woman stock visual"
     subject = "adult woman" if stock_woman_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     visual_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3]
+    # Search the fixed fruit-bite opening independently from the video's topic.
+    signature_queries = [
+        "woman eating fruit",
+        "woman biting apple",
+        "woman eating strawberry",
+        "woman tasting peach",
+        "woman eating fresh fruit",
+    ]
     query_terms = list(dict.fromkeys([
-        *visual_terms, "adult woman close up portrait vertical video",
-        "woman expressive face reaction video", subject, title.strip(),
+        *signature_queries, *visual_terms[1:],
+        "woman full body " + subject, subject, title.strip(),
     ]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
@@ -248,10 +256,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             if not any(w in words for w in woman_terms):
                 return False
             query_lower = (query or "").lower()
-            if "taking a bite of fresh fruit" in query_lower:
-                # The signature opening is independent of the video's topic.
-                # Require a woman plus fruit and eating/bite metadata.
-                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple"}
+            if query in signature_queries:
+                # The opening is topic-independent: require woman + fruit + eating action.
+                fruit_terms = {"fruit", "apple", "strawberry", "orange", "peach", "grape", "watermelon", "banana", "pineapple", "kiwi"}
                 eating_terms = {"eat", "eating", "bite", "biting", "food", "snack", "tasting"}
                 return (any(w in words for w in fruit_terms)
                         and any(w in words for w in eating_terms))
@@ -302,7 +309,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
-    # The first clip must be a front-facing, clearly visible smiling woman's face, not merely any woman clip.
+    # The first clip must show a woman eating/biting fruit; later clips follow the fact topic.
     signature_found = False
 
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
@@ -311,6 +318,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         for query_index, query in enumerate(query_terms):
             if len(clips) >= count:
                 break
+            if signature_found and query_index < len(signature_queries):
+                continue
             try:
                 response = session.get("https://pixabay.com/api/videos/",
                     params={"key": pixabay_key, "q": query, "per_page": 30, "safesearch": "true"},
@@ -329,11 +338,12 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                         render_video(chosen["url"], len(clips)+1, "Pixabay",
                                      "Pixabay Content License (check current terms)",
                                      item.get("pageURL", ""), str(item.get("user", "Pixabay contributor")))
-                        if query_index == 0 and len(clips) == 1:
+                        if query_index < len(signature_queries) and len(clips) == 1:
                             signature_found = True
+                            print(f"Accepted CurioLoop fruit-bite opening from Pixabay query: {query}")
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
-                    query_limit = 1 if query_index == 0 else count
+                    query_limit = 1 if query_index < len(signature_queries) else count
                     if len(clips) >= query_limit:
                         break
             except Exception as exc:
@@ -343,8 +353,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # Do not substitute a still image, generic portrait, or unrelated footage.
     if not signature_found:
         raise RuntimeError(
-            "Required CurioLoop signature opening not found: a licensed close-up video showing an "
-            "adult woman's full face front-facing and smiling is mandatory. No substitute footage was used."
+            "Required CurioLoop fruit-bite opening not found: a licensed video tagged with an adult woman, "
+            "fruit, and an eating/bite action is mandatory. No substitute footage was used."
         )
 
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
