@@ -109,163 +109,111 @@ def make_ass(narration):
 
 
 
-def fetch_visuals(title, visual_theme, visual_queries, count=3):
-    """Fetch Commons images and validate file signatures instead of HTTP MIME headers."""
-    api = "https://commons.wikimedia.org/w/api.php"
-    headers = {"User-Agent": "CurioLoopShorts/1.2 (educational video generator; https://github.com/curioloop4-ux/curioloop-free-shorts)"}
-    raw_queries = list(visual_queries or []) + [title, visual_theme]
-    queries = []
-    for query in raw_queries:
-        query = " ".join((query or "").split()[:8]).strip()
-        if query and query.lower() not in [q.lower() for q in queries]:
-            queries.append(query)
+def fetch_video_clips(title, visual_theme, visual_queries, count=3):
+    """Fetch a small number of real video clips from Pixabay's official video API."""
+    api_key = required("PIXABAY_API_KEY")
+    api = "https://pixabay.com/api/videos/"
+    headers = {"User-Agent": "CurioLoopShorts/2.0"}
+    queries = list(visual_queries or [])
+    query = next((" ".join(str(q).split()[:7]) for q in queries if str(q).strip()), "")
+    if not query:
+        query = " ".join(title.split()[:6])
+    query = query[:100]
 
-    def detect_image(data):
-        if data.startswith(b"\xff\xd8\xff"):
-            return ".jpg"
-        if data.startswith(b"\x89PNG\r\n\x1a\n"):
-            return ".png"
-        if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
-            return ".webp"
-        return None
+    params = {
+        "key": api_key,
+        "q": query,
+        "video_type": "film",
+        "per_page": 20,
+        "safesearch": "true",
+    }
+    try:
+        response = requests.get(api, params=params, headers=headers, timeout=30)
+        response.raise_for_status()
+        results = response.json().get("hits", [])
+        print(f"Pixabay video search '{query}' returned {len(results)} result(s).")
+    except Exception as exc:
+        raise RuntimeError(f"Pixabay video search failed: {type(exc).__name__}: {exc}") from exc
 
-    images, credits, seen = [], [], set()
-    for query in queries:
-        params = {
-            "action": "query", "format": "json", "generator": "search",
-            "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 30,
-            "prop": "imageinfo", "iiprop": "url|mime|extmetadata", "iiurlwidth": 1200
-        }
-        try:
-            response = requests.get(api, params=params, headers=headers, timeout=30)
-            response.raise_for_status()
-            pages = response.json().get("query", {}).get("pages", {})
-            print(f"Wikimedia search '{query}' returned {len(pages)} file result(s).")
-        except Exception as exc:
-            print(f"Wikimedia search failed for '{query}': {exc}")
-            continue
-
-        mime_counts = {}
-        with_info = 0
-        with_url = 0
-        for page in pages.values():
-            infos = page.get("imageinfo") or []
-            if infos:
-                with_info += 1
-            info = infos[0] if infos else {}
-            mime = (info.get("mime") or "MISSING").lower()
-            mime_counts[mime] = mime_counts.get(mime, 0) + 1
-            if info.get("thumburl") or info.get("url"):
-                with_url += 1
-            if mime not in ("image/jpeg", "image/png", "image/webp", "image/svg+xml"):
-                continue
-            candidates = []
-            if info.get("thumburl"):
-                candidates.append(info["thumburl"])
-            if mime in ("image/jpeg", "image/png", "image/webp") and info.get("url"):
-                candidates.append(info["url"])
-
-            valid_data, ext, used_url = None, None, None
-            for url in candidates:
-                if url in seen:
-                    continue
-                seen.add(url)
-                try:
-                    r = requests.get(url, headers=headers, timeout=30)
-                    r.raise_for_status()
-                    data = r.content
-                    detected_ext = detect_image(data)
-                    if len(data) < 5000 or len(data) > 12 * 1024 * 1024:
-                        print(f"Rejected image size {len(data)} bytes: {url[:120]}")
-                        continue
-                    if not detected_ext:
-                        print(f"Rejected response: HTTP {r.status_code}, Content-Type={r.headers.get('Content-Type')}, bytes={len(data)}")
-                        continue
-                    valid_data, ext, used_url = data, detected_ext, url
-                    break
-                except Exception as exc:
-                    print(f"Image download failed: {type(exc).__name__}: {exc}")
-
-            if valid_data is None:
-                continue
-            path = WORK / f"visual_{len(images)+1}{ext}"
-            path.write_bytes(valid_data)
-            images.append(path)
-
-            meta = info.get("extmetadata", {})
-            def plain(key):
-                value = meta.get(key, {}).get("value", "")
-                return re.sub(r"<[^>]+>", "", str(value)).strip()
-            artist = plain("Artist") or "Author not listed"
-            license_name = plain("LicenseShortName") or "See source license"
-            page_url = page.get("canonicalurl") or info.get("descriptionurl") or used_url
-            credits.append(f"{page.get('title', 'Wikimedia image')}: {artist}, {license_name}. {page_url}")
-            print(f"Using visual: {page.get('title', 'Wikimedia image')} ({len(valid_data)} bytes)")
-            if len(images) >= count:
-                break
-        print(f"Image diagnostics for '{query}': imageinfo={with_info}/{len(pages)}, urls={with_url}/{len(pages)}, mime_types={mime_counts}")
-        if len(images) >= count:
+    clips, credits, seen = [], [], set()
+    for item in results:
+        if len(clips) >= count:
             break
+        if int(item.get("duration") or 0) < 3:
+            continue
+        files = item.get("videos") or {}
+        choices = [files.get(k) for k in ("medium", "large", "small", "tiny") if files.get(k)]
+        choices = [v for v in choices if v.get("url")]
+        if not choices:
+            continue
+        # Prefer medium resolution; use the largest available if medium is absent.
+        selected = next((v for v in choices if v.get("width", 0) >= 720), choices[0])
+        url = selected["url"]
+        if url in seen:
+            continue
+        seen.add(url)
+        try:
+            r = requests.get(url, headers=headers, timeout=60)
+            r.raise_for_status()
+            data = r.content
+            if len(data) < 50000 or len(data) > 60 * 1024 * 1024:
+                print(f"Skipped Pixabay clip with unsuitable size: {len(data)} bytes.")
+                continue
+            if len(data) < 12 or data[4:8] != b"ftyp":
+                print("Skipped Pixabay result: downloaded file is not an MP4 video.")
+                continue
+            path = WORK / f"clip_{len(clips)+1}.mp4"
+            path.write_bytes(data)
+            clips.append(path)
+            creator = item.get("user", "Pixabay contributor")
+            page_url = item.get("pageURL", "https://pixabay.com/videos/")
+            credits.append(f"Video by {creator} on Pixabay: {page_url}")
+            print(f"Using video clip {len(clips)}: {creator}, {len(data)} bytes.")
+        except Exception as exc:
+            print(f"Pixabay video download failed: {type(exc).__name__}: {exc}")
 
-    print(f"Downloaded {len(images)} relevant visual image(s) from Wikimedia Commons.")
-    return images, credits
+    print(f"Downloaded {len(clips)} real video clip(s) from Pixabay.")
+    return clips, credits
+
 
 def render(title, voice, captions, duration, visual_theme, visual_queries):
     output = WORK / "curioloop_short.mp4"
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
-    images, credits = fetch_visuals(title, visual_theme, visual_queries, count=3)
-    if not images:
-        raise RuntimeError("No usable visual images found; stopping to prevent another grid-only upload.")
+    clips, credits = fetch_video_clips(title, visual_theme, visual_queries, count=3)
+    if not clips:
+        raise RuntimeError("No usable stock video clips found; stopping to prevent a still-image or blank upload.")
 
-    if images:
-        segment = duration / len(images)
-        cmd = ["ffmpeg", "-y"]
-        for image_path in images:
-            cmd += ["-loop", "1", "-framerate", "30", "-t", f"{segment:.3f}", "-i", str(image_path)]
-        cmd += ["-i", str(voice)]
-        filters = []
-        labels = []
-        for i in range(len(images)):
-            frames = max(1, int(segment * 30))
-            filters.append(
-                f"[{i}:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-                f"crop=1080:1920,zoompan=z='min(zoom+0.0007,1.12)':"
-                f"x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:"
-                f"s=1080x1920:fps=30,setsar=1[v{i}]"
-            )
-            labels.append(f"[v{i}]")
-        filters.append("".join(labels) + f"concat=n={len(images)}:v=1:a=0,")
-        filters[-1] += (
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "textfile=title.txt:fontcolor=white:fontsize=62:"
-            "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
-            "ass=captions.ass[vout]"
+    segment = duration / len(clips)
+    cmd = ["ffmpeg", "-y"]
+    for clip_path in clips:
+        cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
+    cmd += ["-i", str(voice)]
+
+    filters = []
+    labels = []
+    for i in range(len(clips)):
+        filters.append(
+            f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
+            f"crop=1080:1920,trim=duration={segment:.3f},"
+            f"setpts=PTS-STARTPTS,setsar=1[v{i}]"
         )
-        cmd += [
-            "-filter_complex", ";".join(filters), "-map", "[vout]",
-            "-map", f"{len(images)}:a:0", "-t", f"{duration:.2f}",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
-            "-c:a", "aac", "-b:a", "128k", "-shortest",
-            "-movflags", "+faststart", str(output)
-        ]
-    else:
-        # Always provide a moving fallback rather than a static blank canvas.
-        cmd = [
-            "ffmpeg", "-y", "-f", "lavfi", "-i",
-            "color=c=0x101b35:s=1080x1920:r=30", "-i", str(voice),
-            "-t", f"{duration:.2f}", "-vf",
-            "drawgrid=width=120:height=120:thickness=2:color=0x547ca8@0.6,"
-            "drawbox=x='(w-360)/2+120*sin(t)':y=620:w=360:h=360:"
-            "color=0x274d78@0.5:t=fill,"
-            "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-            "textfile=title.txt:fontcolor=white:fontsize=68:"
-            "x=(w-text_w)/2:y=260:box=1:boxcolor=0x000000@0.25:boxborderw=28,"
-            "ass=captions.ass",
-            "-map", "0:v:0", "-map", "1:a:0", "-c:v", "libx264",
-            "-preset", "veryfast", "-crf", "24", "-c:a", "aac",
-            "-b:a", "128k", "-shortest", "-movflags", "+faststart", str(output)
-        ]
+        labels.append(f"[v{i}]")
+    filters.append(
+        "".join(labels) + f"concat=n={len(clips)}:v=1:a=0,"
+        "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+        "textfile=title.txt:fontcolor=white:fontsize=62:"
+        "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
+        "ass=captions.ass[vout]"
+    )
+    cmd += [
+        "-filter_complex", ";".join(filters),
+        "-map", "[vout]", "-map", f"{len(clips)}:a:0",
+        "-t", f"{duration:.2f}",
+        "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+        "-c:a", "aac", "-b:a", "128k", "-shortest",
+        "-movflags", "+faststart", str(output)
+    ]
     subprocess.run(cmd, cwd=WORK, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     return output, credits
 
