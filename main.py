@@ -179,6 +179,8 @@ def render(title, voice, captions, duration, visual_theme):
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
     images, credits = fetch_visuals(title, visual_theme, count=3)
+    if not images:
+        raise RuntimeError("No usable visual images found; stopping to prevent another grid-only upload.")
 
     if images:
         segment = duration / len(images)
