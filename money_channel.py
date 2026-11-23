@@ -451,8 +451,8 @@ APPEARANCE_TOPIC_BANK = [
 ]
 
 
-def reserve_topics(count=10):
-    """Select distinct topics and persist recent IDs in the repository between workflow runs."""
+def reserve_topics(count=3):
+    """Select topics using a persistent rolling 70/30 appearance-to-economics schedule."""
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY")
     branch = os.getenv("GITHUB_REF_NAME", "main")
@@ -467,37 +467,58 @@ def reserve_topics(count=10):
         history = json.loads(__import__("base64").b64decode(saved["content"]).decode("utf-8"))
         file_sha = saved["sha"]
     elif response.status_code == 404:
-        history, file_sha = {"recent_ids": [], "recent_topics": []}, None
+        history, file_sha = {"recent_ids": [], "recent_topics": [], "mix_position": 0}, None
     else:
         response.raise_for_status()
+
     recent_ids = history.get("recent_ids", [])
+    mix_position = int(history.get("mix_position", 0)) % 10
+    # Seven appearance/style slots and three economics slots in every rolling block of ten.
+    mix_schedule = ("appearance", "appearance", "economy", "appearance", "appearance",
+                    "economy", "appearance", "appearance", "appearance", "economy")
     import random
-    appearance_count = int(count * 0.7)
-    economy_count = count - appearance_count
     appearance_available = [item for item in APPEARANCE_TOPIC_BANK if item[0] not in recent_ids]
     economy_available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
-    if len(appearance_available) < appearance_count:
+    if not appearance_available:
         appearance_available = APPEARANCE_TOPIC_BANK[:]
-    if len(economy_available) < economy_count:
+    if not economy_available:
         economy_available = TOPIC_BANK[:]
     random.shuffle(appearance_available)
     random.shuffle(economy_available)
-    selected = appearance_available[:appearance_count] + economy_available[:economy_count]
-    random.shuffle(selected)
-    if len(selected) != count:
-        raise RuntimeError("Could not build the requested 70/30 Shorts batch.")
+
+    selected = []
+    appearance_index = 0
+    economy_index = 0
+    for offset in range(count):
+        topic_type = mix_schedule[(mix_position + offset) % 10]
+        if topic_type == "appearance":
+            if appearance_index >= len(appearance_available):
+                appearance_available = APPEARANCE_TOPIC_BANK[:]
+                random.shuffle(appearance_available)
+                appearance_index = 0
+            selected.append(appearance_available[appearance_index])
+            appearance_index += 1
+        else:
+            if economy_index >= len(economy_available):
+                economy_available = TOPIC_BANK[:]
+                random.shuffle(economy_available)
+                economy_index = 0
+            selected.append(economy_available[economy_index])
+            economy_index += 1
+
     history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
     history["recent_topics"] = (history.get("recent_topics", []) +
                                 [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
+    history["mix_position"] = (mix_position + count) % 10
     encoded = __import__("base64").b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
-    payload = {"message": "Track recently used Chinese channel topics",
+    payload = {"message": "Track rolling 70/30 Chinese channel topic mix and recent topics",
                "content": encoded, "branch": branch}
     if file_sha:
         payload["sha"] = file_sha
     saved_response = requests.put(api, headers=headers, json=payload, timeout=30)
     saved_response.raise_for_status()
-    print("Reserved distinct topics:")
+    print("Reserved topics (rolling 70% appearance/style, 30% economics):")
     for item in selected:
         print(f" - [{item[1]}] {item[2]}")
     return [(item[1], item[2]) for item in selected]
@@ -521,12 +542,12 @@ def main():
             upload_video(output, data, credits)
         return
 
-    topics = reserve_topics(10)
+    topics = reserve_topics(3)
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
-    start_short = max(1, min(10, int(os.getenv("MONEY_START_SHORT", "1"))))
-    print(f"Starting Shorts batch at {start_short}/10 (7 appearance/style + 3 economics).")
+    start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
+    print(f"Starting Shorts batch at {start_short}/3 (rolling 70/30 topic mix).")
     for index, (topic_category, topic) in enumerate(topics[start_short - 1:], start=start_short):
-        print(f"\n========== SHORT {index}/10 ==========")
+        print(f"\n========== SHORT {index}/3 ==========")
         try:
             print("Content category:", topic_category)
             data = generate_content(topic, topic_category)
@@ -546,7 +567,7 @@ def main():
             else:
                 upload_video(output, data, credits)
         except Exception as exc:
-            print(f"SHORT {index}/10 FAILED; continuing with the next topic. Error: {exc}")
+            print(f"SHORT {index}/3 FAILED; continuing with the next topic. Error: {exc}")
             continue
 
 
