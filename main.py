@@ -110,26 +110,31 @@ def make_ass(narration):
 
 
 def fetch_visuals(title, visual_theme, visual_queries, count=3):
-    """Fetch reusable Commons thumbnails, including thumbnails of SVG originals."""
+    """Fetch Commons images and validate file signatures instead of HTTP MIME headers."""
     api = "https://commons.wikimedia.org/w/api.php"
-    headers = {
-        "User-Agent": "CurioLoopShorts/1.1 (educational video generator; https://github.com/curioloop4-ux/curioloop-free-shorts)"
-    }
-    # Search separately: combining title and theme into one long phrase was too restrictive.
-    raw_queries = list(visual_queries or []) + [title]
+    headers = {"User-Agent": "CurioLoopShorts/1.2 (educational video generator; https://github.com/curioloop4-ux/curioloop-free-shorts)"}
+    raw_queries = list(visual_queries or []) + [title, visual_theme]
     queries = []
     for query in raw_queries:
         query = " ".join((query or "").split()[:8]).strip()
         if query and query.lower() not in [q.lower() for q in queries]:
             queries.append(query)
 
+    def detect_image(data):
+        if data.startswith(b"\\xff\\xd8\\xff"):
+            return ".jpg"
+        if data.startswith(b"\\x89PNG\\r\\n\\x1a\\n"):
+            return ".png"
+        if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+            return ".webp"
+        return None
+
     images, credits, seen = [], [], set()
     for query in queries:
         params = {
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 30,
-            "prop": "imageinfo", "iiprop": "url|extmetadata",
-            "iiurlwidth": 1200
+            "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": 1200
         }
         try:
             response = requests.get(api, params=params, headers=headers, timeout=30)
@@ -142,49 +147,58 @@ def fetch_visuals(title, visual_theme, visual_queries, count=3):
 
         for page in pages.values():
             info = (page.get("imageinfo") or [{}])[0]
-            # Never treat PDF book covers or document previews as photographic visuals.
             mime = (info.get("mime") or "").lower()
             if mime not in ("image/jpeg", "image/png", "image/webp", "image/svg+xml"):
                 continue
-            # Use Commons' raster thumbnail for SVG originals; PDFs are excluded above.
-            url = info.get("thumburl")
-            if not url and mime in ("image/jpeg", "image/png", "image/webp"):
-                url = info.get("url")
-            if not url or url in seen:
-                continue
-            seen.add(url)
-            try:
-                data = requests.get(url, headers=headers, timeout=30)
-                data.raise_for_status()
-                content_type = data.headers.get("Content-Type", "").split(";")[0].lower()
-                if content_type not in ("image/jpeg", "image/png", "image/webp"):
-                    continue
-                if len(data.content) > 12 * 1024 * 1024 or len(data.content) < 5_000:
-                    continue
-                ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[content_type]
-                path = WORK / f"visual_{len(images)+1}{ext}"
-                path.write_bytes(data.content)
-                images.append(path)
+            candidates = []
+            if info.get("thumburl"):
+                candidates.append(info["thumburl"])
+            if mime in ("image/jpeg", "image/png", "image/webp") and info.get("url"):
+                candidates.append(info["url"])
 
-                meta = info.get("extmetadata", {})
-                def plain(key):
-                    value = meta.get(key, {}).get("value", "")
-                    return re.sub(r"<[^>]+>", "", str(value)).strip()
-                artist = plain("Artist") or "Author not listed"
-                license_name = plain("LicenseShortName") or "See source license"
-                page_url = page.get("canonicalurl") or info.get("descriptionurl") or url
-                credits.append(f"{page.get('title', 'Wikimedia image')}: {artist}, {license_name}. {page_url}")
-                print(f"Using visual: {page.get('title', 'Wikimedia image')}")
-                if len(images) >= count:
+            valid_data, ext, used_url = None, None, None
+            for url in candidates:
+                if url in seen:
+                    continue
+                seen.add(url)
+                try:
+                    r = requests.get(url, headers=headers, timeout=30)
+                    r.raise_for_status()
+                    data = r.content
+                    detected_ext = detect_image(data)
+                    if len(data) < 5000 or len(data) > 12 * 1024 * 1024:
+                        print(f"Rejected image size {len(data)} bytes: {url[:120]}")
+                        continue
+                    if not detected_ext:
+                        print(f"Rejected response: HTTP {r.status_code}, Content-Type={r.headers.get('Content-Type')}, bytes={len(data)}")
+                        continue
+                    valid_data, ext, used_url = data, detected_ext, url
                     break
-            except Exception as exc:
-                print(f"Skipping unavailable Wikimedia thumbnail: {exc}")
+                except Exception as exc:
+                    print(f"Image download failed: {type(exc).__name__}: {exc}")
+
+            if valid_data is None:
+                continue
+            path = WORK / f"visual_{len(images)+1}{ext}"
+            path.write_bytes(valid_data)
+            images.append(path)
+
+            meta = info.get("extmetadata", {})
+            def plain(key):
+                value = meta.get(key, {}).get("value", "")
+                return re.sub(r"<[^>]+>", "", str(value)).strip()
+            artist = plain("Artist") or "Author not listed"
+            license_name = plain("LicenseShortName") or "See source license"
+            page_url = page.get("canonicalurl") or info.get("descriptionurl") or used_url
+            credits.append(f"{page.get('title', 'Wikimedia image')}: {artist}, {license_name}. {page_url}")
+            print(f"Using visual: {page.get('title', 'Wikimedia image')} ({len(valid_data)} bytes)")
+            if len(images) >= count:
+                break
         if len(images) >= count:
             break
 
     print(f"Downloaded {len(images)} relevant visual image(s) from Wikimedia Commons.")
     return images, credits
-
 
 def render(title, voice, captions, duration, visual_theme, visual_queries):
     output = WORK / "curioloop_short.mp4"
