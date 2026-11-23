@@ -109,7 +109,7 @@ def make_script(previous_titles=None):
         for s in stories
     )
     prompt = """Create one original English YouTube Shorts highlight-style explainer for a GLOBAL audience, using ONLY one or more of the Korean entertainment stories below.
-Return ONLY valid JSON with keys: title, narration, visual_theme, visual_queries.
+Return ONLY valid JSON with keys: title, hook_text, narration, visual_theme, visual_queries.
 CURRENT KOREAN ENTERTAINMENT NEWS (Google News RSS, recent feed):
 """ + story_text + """
 
@@ -128,8 +128,9 @@ Editorial scope:
 - Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
 - Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
 - Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
-- Title under 65 characters; narration 75-105 words; first sentence must hook viewers and final sentence should deliver a clear takeaway.
-- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage matching the selected category (for example: Korean drama filming set, cinema audience reaction, Korean variety show studio, K-pop concert crowd). Do not imply generic stock footage depicts the named celebrity or a specific copyrighted production.
+- Title under 65 characters; hook_text must be a punchy, curiosity-driving on-screen hook of 3-6 words for the first 2.5 seconds. It must accurately reflect the supplied story and must not invent shock, controversy, or reactions.
+- Narration must be 75-105 words. Its first sentence must immediately deliver the strongest verified moment or question; no greetings, channel introduction, or slow setup. Put the most compelling verified detail first, then explain the context, and finish with a clear payoff.
+- visual_theme describes the mood. visual_queries must be exactly 3 short, concrete English phrases for relevant illustrative stock footage. Prefer visually active, close-up, expressive, high-energy moments (for example: energetic K-pop stage performance close up, dramatic Korean drama reaction close up, Korean variety show surprised reaction). Use licensed illustrative stock footage only; do not imply generic stock footage depicts the named celebrity or a specific copyrighted production. Do not imply generic stock footage depicts the named celebrity or a specific copyrighted production.
 - No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
 """
     if previous_titles:
@@ -146,7 +147,7 @@ Editorial scope:
     response.raise_for_status()
     raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
-    for key in ("title", "narration", "visual_theme"):
+    for key in ("title", "hook_text", "narration", "visual_theme"):
         if not isinstance(data.get(key), str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
     if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 3:
@@ -336,10 +337,12 @@ def make_mascot():
     return path
 
 
-def render(title, voice, captions, duration, visual_theme, visual_queries):
+def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries):
     output = WORK / "curioloop_short.mp4"
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
+    hook_path = WORK / "hook.txt"
+    hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
     clips, credits = fetch_video_clips(title, visual_theme, visual_queries, count=3)
     if not clips:
         raise RuntimeError("No usable stock video clips found; stopping to prevent a still-image or blank upload.")
@@ -364,8 +367,12 @@ def render(title, voice, captions, duration, visual_theme, visual_queries):
     filters.append(
         "".join(labels) + f"concat=n={len(clips)}:v=1:a=0,"
         "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-        "textfile=title.txt:fontcolor=white:fontsize=62:"
+        "textfile=title.txt:fontcolor=white:fontsize=54:"
         "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
+        "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
+        "textfile=hook.txt:fontcolor=yellow:fontsize=82:borderw=5:bordercolor=black:"
+        "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=28:"
+        "enable='between(t,0,2.5)',"
         "ass=captions.ass[base];"
         f"[{len(clips)+1}:v]scale=150:185[mascot];"
         "[base][mascot]overlay=W-w-34:340:format=auto[vout]"
@@ -434,10 +441,11 @@ def main():
                 raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
             used_titles.append(script["title"])
             print("Selected:", script["title"])
+            print("Opening hook:", script["hook_text"])
             voice = asyncio.run(make_voice(script["narration"]))
             captions, duration = make_ass(script["narration"])
             rendered, credits = render(
-                script["title"], voice, captions, duration,
+                script["title"], script["hook_text"], voice, captions, duration,
                 script["visual_theme"], script["visual_queries"]
             )
             if os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}:
