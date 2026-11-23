@@ -100,52 +100,76 @@ def make_ass(narration):
 
 
 def fetch_visuals(title, visual_theme, count=3):
-    """Fetch relevant, reusable images from Wikimedia Commons; keep license credits."""
-    query = re.sub(r"[^a-zA-Z0-9 ]", " ", f"{visual_theme} {title}")
-    query = " ".join(query.split()[:12]) or "science nature technology"
+    """Fetch reusable Commons thumbnails, including thumbnails of SVG originals."""
     api = "https://commons.wikimedia.org/w/api.php"
-    headers = {"User-Agent": "CurioLoopShorts/1.0 (automated educational video; contact: project repository)"}
-    params = {
-        "action": "query", "format": "json", "generator": "search",
-        "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 18,
-        "prop": "imageinfo", "iiprop": "url|extmetadata", "iiurlwidth": 1080
+    headers = {
+        "User-Agent": "CurioLoopShorts/1.1 (educational video generator; https://github.com/curioloop4-ux/curioloop-free-shorts)"
     }
-    try:
-        response = requests.get(api, params=params, headers=headers, timeout=25)
-        response.raise_for_status()
-        pages = response.json().get("query", {}).get("pages", {})
-    except Exception as exc:
-        print(f"Wikimedia image search unavailable: {exc}")
-        return [], []
+    # Search separately: combining title and theme into one long phrase was too restrictive.
+    raw_queries = [title, visual_theme, " ".join(re.findall(r"[a-zA-Z]{4,}", title))]
+    queries = []
+    for query in raw_queries:
+        query = " ".join((query or "").split()[:8]).strip()
+        if query and query.lower() not in [q.lower() for q in queries]:
+            queries.append(query)
 
-    images, credits = [], []
-    for page in pages.values():
-        info = (page.get("imageinfo") or [{}])[0]
-        mime = info.get("mime", "")
-        url = info.get("thumburl") or info.get("url")
-        if mime not in ("image/jpeg", "image/png", "image/webp") or not url:
-            continue
+    images, credits, seen = [], [], set()
+    for query in queries:
+        params = {
+            "action": "query", "format": "json", "generator": "search",
+            "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": 30,
+            "prop": "imageinfo", "iiprop": "url|extmetadata",
+            "iiurlwidth": 1200
+        }
         try:
-            data = requests.get(url, headers=headers, timeout=30)
-            data.raise_for_status()
-            if len(data.content) > 12 * 1024 * 1024 or len(data.content) < 10_000:
-                continue
-            ext = ".jpg" if mime == "image/jpeg" else (".png" if mime == "image/png" else ".webp")
-            path = WORK / f"visual_{len(images)+1}{ext}"
-            path.write_bytes(data.content)
-            images.append(path)
-            meta = info.get("extmetadata", {})
-            def plain(key):
-                value = meta.get(key, {}).get("value", "")
-                return re.sub(r"<[^>]+>", "", str(value)).strip()
-            artist = plain("Artist") or "Unknown author"
-            license_name = plain("LicenseShortName") or "License not specified"
-            page_url = page.get("canonicalurl") or info.get("descriptionurl") or ""
-            credits.append(f"{page.get('title','Image')}: {artist}, {license_name}. {page_url}")
-            if len(images) >= count:
-                break
+            response = requests.get(api, params=params, headers=headers, timeout=30)
+            response.raise_for_status()
+            pages = response.json().get("query", {}).get("pages", {})
+            print(f"Wikimedia search '{query}' returned {len(pages)} file result(s).")
         except Exception as exc:
-            print(f"Skipping unavailable Wikimedia image: {exc}")
+            print(f"Wikimedia search failed for '{query}': {exc}")
+            continue
+
+        for page in pages.values():
+            info = (page.get("imageinfo") or [{}])[0]
+            # Use Commons' raster thumbnail even when the original file is SVG.
+            url = info.get("thumburl")
+            if not url:
+                mime = info.get("mime", "")
+                if mime in ("image/jpeg", "image/png", "image/webp"):
+                    url = info.get("url")
+            if not url or url in seen:
+                continue
+            seen.add(url)
+            try:
+                data = requests.get(url, headers=headers, timeout=30)
+                data.raise_for_status()
+                content_type = data.headers.get("Content-Type", "").split(";")[0].lower()
+                if content_type not in ("image/jpeg", "image/png", "image/webp"):
+                    continue
+                if len(data.content) > 12 * 1024 * 1024 or len(data.content) < 5_000:
+                    continue
+                ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}[content_type]
+                path = WORK / f"visual_{len(images)+1}{ext}"
+                path.write_bytes(data.content)
+                images.append(path)
+
+                meta = info.get("extmetadata", {})
+                def plain(key):
+                    value = meta.get(key, {}).get("value", "")
+                    return re.sub(r"<[^>]+>", "", str(value)).strip()
+                artist = plain("Artist") or "Author not listed"
+                license_name = plain("LicenseShortName") or "See source license"
+                page_url = page.get("canonicalurl") or info.get("descriptionurl") or url
+                credits.append(f"{page.get('title', 'Wikimedia image')}: {artist}, {license_name}. {page_url}")
+                print(f"Using visual: {page.get('title', 'Wikimedia image')}")
+                if len(images) >= count:
+                    break
+            except Exception as exc:
+                print(f"Skipping unavailable Wikimedia thumbnail: {exc}")
+        if len(images) >= count:
+            break
+
     print(f"Downloaded {len(images)} relevant visual image(s) from Wikimedia Commons.")
     return images, credits
 
