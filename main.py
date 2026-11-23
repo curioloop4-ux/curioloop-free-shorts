@@ -226,9 +226,19 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         if named_person:
             return bool(meaningful) and any(w in words for w in meaningful)
         if stock_woman_mode:
-            # For the general-knowledge format, validate that the stock asset is actually a woman.
-            woman_terms = {"woman", "women", "female", "girl", "lady", "portrait", "model"}
-            return any(w in words for w in woman_terms)
+            # Require both an adult-woman indicator and a topic/action match from the query.
+            woman_terms = {"woman", "women", "female", "girl", "lady"}
+            if not any(w in words for w in woman_terms):
+                return False
+            generic_terms = {
+                "adult", "woman", "women", "female", "girl", "lady", "close", "up",
+                "portrait", "vertical", "video", "footage", "stock", "reaction",
+                "expressive", "face", "model", "beautiful", "young", "person"
+            }
+            topic_terms = [w.lower() for w in re.findall(r"[A-Za-z0-9가-힣]+", query or "")
+                           if len(w) >= 3 and w.lower() not in generic_terms]
+            # Search phrase should include an actual topic/action, e.g. cat, cuddling, playing.
+            return bool(topic_terms) and any(w in words for w in topic_terms)
         return bool(meaningful) and sum(1 for w in meaningful if w in words) >= min(2, len(meaningful))
 
     def render_still(url, index, source, license_name, credit_url, creator="Not provided"):
