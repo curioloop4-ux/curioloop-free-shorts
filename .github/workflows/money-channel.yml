@@ -12,10 +12,19 @@ on:
           - longform
         default: shorts
       output_only:
-        description: "Render only when true; false uploads all three Shorts"
+        description: "Render only when true; false uploads Shorts"
         required: true
         type: boolean
         default: false
+      start_short:
+        description: "Start Shorts batch at this number (use 2 to resume after the first Short)"
+        required: true
+        type: choice
+        options:
+          - "1"
+          - "2"
+          - "3"
+        default: "1"
       privacy_status:
         description: "YouTube visibility when upload is enabled"
         required: true
@@ -67,6 +76,7 @@ jobs:
           MONEY_YOUTUBE_REFRESH_TOKEN: ${{ secrets.MONEY_YOUTUBE_REFRESH_TOKEN }}
           MONEY_YOUTUBE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
           MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
+          MONEY_START_SHORT: ${{ inputs.start_short }}
           OUTPUT_ONLY: ${{ inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: python money_channel.py
