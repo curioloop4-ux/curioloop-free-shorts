@@ -1,4 +1,4 @@
-name: MoneyKnowHow Korean Channel
+name: Youqian Research Institute Chinese Channel
 
 on:
   workflow_dispatch:
@@ -58,7 +58,7 @@ jobs:
       - name: Validate money channel generator
         run: python -m py_compile money_channel.py
 
-      - name: Generate Korean money video
+      - name: Generate Chinese money video
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
