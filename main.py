@@ -128,9 +128,9 @@ Editorial scope:
 - Avoid unverified dating rumors, private-life speculation, gossip, defamatory allegations, and sensationalized controversy. Do not state allegations as facts.
 - Do not copy or translate any publisher's article, Korean creator's video, script, footage, thumbnail, or distinctive presentation. Write an original concise explainer with context for international viewers.
 - Explain unfamiliar Korean entertainment context briefly (for example, what MAMA is, how a comeback works, or why a chart result matters) only when relevant.
-- Title under 65 characters; hook_text must be a punchy, curiosity-driving on-screen hook of 3-6 words for the first 2.5 seconds. It must accurately reflect the supplied story and must not invent shock, controversy, or reactions.
-- Narration must be 75-105 words. Its first sentence must immediately deliver the strongest verified moment or question; no greetings, channel introduction, or slow setup. Put the most compelling verified detail first, then explain the context, and finish with a clear payoff.
-- featured_person must be the exact public name of the Korean entertainer who is central to the supplied story. Prefer a woman only when she is genuinely relevant; never invent an association or force an unrelated celebrity into the video. If no female entertainer is genuinely relevant, use the main Korean entertainer actually covered by the story.\n- visual_theme describes the mood. visual_queries must be exactly 3 short English scene descriptions for selecting relevant footage of featured_person (for example: stage close-up, live performance, expressive reaction). These are editing guidance only, not permission to use footage.
+- Title under 65 characters; hook_text must be a punchy, curiosity-driving on-screen hook of 3-6 words for the first 2.5 seconds. It must accurately reflect the supplied story and must not invent shock, controversy, or reactions. Prefer a concrete question, unexpected contrast, surprising verified moment, or fan-relevant stakes over vague phrases such as "You Won’t Believe This".
+- Narration must be 65-90 words, designed for a 25-35 second Short. Its first sentence must immediately deliver the strongest verified moment or an intriguing question; no greetings, channel introduction, or slow setup. Use a tight story arc: hook → specific verified detail → why fans care → memorable payoff. Avoid generic biography, empty praise, repeated facts, and list-like filler. Every sentence must add new information.
+- featured_person must be the exact public name of the Korean entertainer who is central to the supplied story. Prefer a woman only when she is genuinely relevant; never invent an association or force an unrelated celebrity into the video. If no female entertainer is genuinely relevant, use the main Korean entertainer actually covered by the story.\n- visual_theme describes the mood. visual_queries must be exactly 3 specific English search phrases for images of featured_person that match the actual story (for example, the named event, stage outfit, drama character, press conference, or interview setting). Do not request generic portraits if the story is about a specific performance or appearance. These are search guidance only.
 - No abstract backgrounds, generic color/style phrases, or unrelated stock footage. Do not include markdown.
 """
     if previous_titles:
@@ -199,71 +199,107 @@ def make_ass(narration):
 
 
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3):
-    """Use only user-supplied footage with confirmed editing/commercial-use rights."""
-    approved_root = ROOT / "licensed_clips"
-    if not approved_root.exists():
-        raise RuntimeError(
-            "No rights-cleared footage folder found. Add authorized clips under "
-            f"licensed_clips/{featured_person}/; CurioLoop will not substitute unrelated stock footage."
-        )
-
-    def normalize(value):
-        return re.sub(r"[^a-z0-9]", "", str(value).lower())
-
-    target_name = normalize(featured_person)
-    person_dirs = [
-        path for path in approved_root.iterdir()
-        if path.is_dir() and normalize(path.name) == target_name
+    """Find topic-matched, openly licensed still images on Wikimedia Commons and animate them."""
+    api_url = "https://commons.wikimedia.org/w/api.php"
+    headers = {"User-Agent": "CurioLoop/1.0 (YouTube Shorts creator; contact: curioloop)"}
+    queries = [
+        featured_person,
+        f"{featured_person} Korean entertainer",
+        *visual_queries[:3],
     ]
-    if not person_dirs:
-        raise RuntimeError(
-            f"No footage folder matches featured person '{featured_person}'. "
-            f"Add authorized MP4/MOV clips to licensed_clips/{featured_person}/. "
-            "Only use footage you have permission to edit and use commercially."
-        )
+    found = {}
+    session = requests.Session()
+    session.headers.update(headers)
 
-    extensions = {".mp4", ".mov", ".m4v", ".webm"}
-    approved_files = sorted(
-        path for directory in person_dirs
-        for path in directory.iterdir()
-        if path.is_file() and path.suffix.lower() in extensions
-    )
-    if not approved_files:
-        raise RuntimeError(
-            f"No video files found for '{featured_person}'. Add authorized MP4/MOV clips to "
-            f"licensed_clips/{featured_person}/."
-        )
-
-    clips, credits = [], []
-    for source in approved_files[:count]:
+    for query in queries:
         try:
-            probe = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(source)],
-                check=True, capture_output=True, text=True, timeout=20,
-            )
-            if float(probe.stdout.strip() or 0) < 3:
-                print(f"Skipping source shorter than 3 seconds: {source.name}")
-                continue
-            target = WORK / f"clip_{len(clips)+1}.mp4"
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", str(source), "-an", "-c:v", "libx264",
-                 "-preset", "veryfast", "-crf", "23", "-movflags", "+faststart", str(target)],
-                check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180,
-            )
-            clips.append(target)
-            credits.append(f"Authorized source file supplied to CurioLoop: {source.name}")
-            print(f"Using authorized footage for {featured_person}: {source.name}")
+            response = session.get(api_url, params={
+                "action": "query",
+                "generator": "search",
+                "gsrsearch": f'"{query}" filetype:bitmap',
+                "gsrnamespace": 6,
+                "gsrlimit": 12,
+                "prop": "imageinfo",
+                "iiprop": "url|extmetadata",
+                "iiurlwidth": 1400,
+                "format": "json",
+            }, timeout=30)
+            response.raise_for_status()
+            pages = response.json().get("query", {}).get("pages", {})
+            for page in pages.values():
+                page_id = str(page.get("pageid", ""))
+                if not page_id or page_id in found:
+                    continue
+                info = (page.get("imageinfo") or [{}])[0]
+                meta = info.get("extmetadata") or {}
+                license_name = (meta.get("LicenseShortName", {}).get("value") or "").strip()
+                license_url = (meta.get("LicenseUrl", {}).get("value") or "").strip()
+                allowed = any(term in license_name.lower() for term in (
+                    "cc0", "cc by", "cc-by", "public domain", "pd"
+                ))
+                if not allowed:
+                    continue
+                image_url = info.get("thumburl") or info.get("url")
+                if not image_url:
+                    continue
+                mime = info.get("mime", "")
+                if mime not in ("image/jpeg", "image/png", "image/webp"):
+                    continue
+                found[page_id] = {
+                    "title": page.get("title", "Wikimedia Commons image"),
+                    "url": image_url,
+                    "page_url": "https://commons.wikimedia.org/wiki/" + page.get("title", "").replace(" ", "_"),
+                    "license": license_name,
+                    "license_url": license_url,
+                    "artist": (meta.get("Artist", {}).get("value") or "Author not listed").strip(),
+                }
         except Exception as exc:
-            print(f"Skipping unusable authorized source {source.name}: {type(exc).__name__}: {exc}")
+            print(f"Wikimedia Commons search failed for '{query}': {type(exc).__name__}: {exc}")
+
+    if not found:
+        raise RuntimeError(
+            f"No topic-matched openly licensed images found for '{featured_person}'. "
+            "No unrelated stock footage will be substituted."
+        )
+
+    assets_dir = WORK / "visual_assets"
+    assets_dir.mkdir(exist_ok=True)
+    clips, credits = [], []
+    for index, asset in enumerate(list(found.values())[:count], 1):
+        try:
+            image_response = session.get(asset["url"], timeout=45)
+            image_response.raise_for_status()
+            image_path = assets_dir / f"commons_{index}.jpg"
+            image_path.write_bytes(image_response.content)
+            clip_path = WORK / f"clip_{index}.mp4"
+            # A slow Ken Burns move makes each still image a moving vertical video segment.
+            subprocess.run([
+                "ffmpeg", "-y", "-loop", "1", "-framerate", "30", "-i", str(image_path),
+                "-vf",
+                "scale=1080:1920:force_original_aspect_ratio=increase,"
+                "crop=1080:1920,"
+                "zoompan=z='min(zoom+0.0012,1.12)':"
+                "x='iw/2-(iw/zoom/2)+sin(on/40)*18':"
+                "y='ih/2-(ih/zoom/2)':d=1:s=1080x1920:fps=30,"
+                "format=yuv420p",
+                "-t", "8", "-an", "-c:v", "libx264", "-preset", "veryfast",
+                "-crf", "23", "-movflags", "+faststart", str(clip_path)
+            ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=180)
+            clips.append(clip_path)
+            credits.append(
+                f"{asset['title']} — {asset['artist']} — {asset['license']} "
+                f"{asset['license_url']} — {asset['page_url']}"
+            )
+            print(f"Using openly licensed image: {asset['title']} ({asset['license']})")
+        except Exception as exc:
+            print(f"Skipping image {asset.get('title', '')}: {type(exc).__name__}: {exc}")
 
     if not clips:
         raise RuntimeError(
-            f"No usable authorized video clips were found for '{featured_person}'. "
-            "Add at least one valid video file to the matching licensed_clips folder."
+            f"Could not turn any licensed images for '{featured_person}' into video segments."
         )
+    (WORK / "visual_credits.txt").write_text("\n".join(credits), encoding="utf-8")
     return clips, credits
-
 
 def make_mascot():
     """Draw the recurring CurioLoop mascot as a transparent PNG using Pillow."""
@@ -306,14 +342,14 @@ def make_mascot():
 
 
 def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries, featured_person):
-    output = WORK / "curioloop_short.mp4"
+    output = WORK / f"curioloop_short_{__import__('time').strftime('%Y%m%d_%H%M%S')}.mp4"
     title_path = WORK / "title.txt"
     title_path.write_text(title.replace("\\n", " ").strip(), encoding="utf-8")
     hook_path = WORK / "hook.txt"
     hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
     clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=3)
     if not clips:
-        raise RuntimeError("No usable stock video clips found; stopping to prevent a still-image or blank upload.")
+        raise RuntimeError("No usable topic-matched visual assets found; stopping video generation.")
 
     segment = duration / len(clips)
     cmd = ["ffmpeg", "-y"]
@@ -408,7 +444,7 @@ def main():
             if title_key in {re.sub(r"[^a-z0-9 ]", "", t.lower()).strip() for t in used_titles}:
                 raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
             used_titles.append(script["title"])
-            print("Selected:", script["title"])
+            print("Selected:", script["title"])\n            print("Featured person:", script["featured_person"])
             print("Opening hook:", script["hook_text"])
             voice = asyncio.run(make_voice(script["narration"]))
             captions, duration = make_ass(script["narration"])
@@ -432,9 +468,9 @@ def main():
         if index < count:
             time.sleep(8)
 
-    print(f"\\nBatch finished: {uploaded}/{count} Short(s) uploaded.")
+    print(f"\\nBatch finished: {uploaded}/{count} Short(s) created.")
     if uploaded == 0:
-        raise RuntimeError("No Shorts were uploaded successfully.")
+        raise RuntimeError("No Shorts were created successfully.")
 
 
 if __name__ == "__main__":
