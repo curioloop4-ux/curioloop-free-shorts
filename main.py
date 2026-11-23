@@ -143,9 +143,33 @@ async def make_voice(text):
 
 
 def make_ass(narration):
-    # Readable short-form captions: 3-word phrases with word-synced yellow karaoke highlight.
+    # Adaptive phrase captions: keep each beat compact and readable on a 9:16 phone screen.
     words = narration.split()
-    groups = [words[i:i+3] for i in range(0, len(words), 3)]
+    groups = []
+    current = []
+    current_chars = 0
+    for word in words:
+        clean = re.sub(r"[^A-Za-z0-9']", "", word)
+        word_chars = max(1, len(clean))
+        proposed_chars = current_chars + (1 if current else 0) + len(word)
+        # 2-3 words per beat; split earlier when a phrase would become too wide.
+        if current and (len(current) >= 3 or proposed_chars > 19):
+            groups.append(current)
+            current = []
+            current_chars = 0
+        current.append(word)
+        current_chars += len(word)
+        # Natural punctuation creates a short visual pause.
+        if re.search(r"[.!?,;:]$", word):
+            groups.append(current)
+            current = []
+            current_chars = 0
+    if current:
+        if len(current) == 1 and groups and sum(len(x) for x in groups[-1]) < 3:
+            groups[-1].extend(current)
+        else:
+            groups.append(current)
+
     probe = subprocess.check_output([
         "ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1", str(WORK / "voice.mp3")
@@ -159,27 +183,49 @@ def make_ass(narration):
         s, c = divmod(rem, 100)
         return f"{h}:{m:02d}:{s:02d}.{c:02d}"
 
+    # Slightly smaller type when a phrase is naturally longer; retain a fixed safe-zone position.
+    longest = max((len(" ".join(group)) for group in groups), default=0)
+    font_size = 68 if longest > 16 else 74
     lines = [
-        "[Script Info]", "ScriptType: v4.00+", "PlayResX: 1080", "PlayResY: 1920", "",
+        "[Script Info]", "ScriptType: v4.00+", "WrapStyle: 2", "PlayResX: 1080", "PlayResY: 1920", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        # Montserrat ExtraBold; yellow karaoke fill, white base, dark stroke, lower-middle safe zone.
-        "Style: Default,Montserrat ExtraBold,76,&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,105,105,390,1", "",
+        f"Style: Default,Montserrat ExtraBold,{font_size},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,120,120,390,1", "",
         "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
-    step = duration / max(len(groups), 1)
-    for i, group in enumerate(groups):
-        group_duration = step
-        weights = [max(1, len(re.sub(r"[^A-Za-z0-9']", "", word))) for word in group]
-        total_weight = sum(weights) or 1
+
+    # Allocate phrase timing by spoken word length and add a small pause for punctuation.
+    weights = []
+    for group in groups:
+        weight = 0.0
+        for word in group:
+            weight += max(2, len(re.sub(r"[^A-Za-z0-9']", "", word)))
+            if re.search(r"[.!?]$", word):
+                weight += 3.0
+            elif re.search(r"[,;:]$", word):
+                weight += 1.5
+        weights.append(weight)
+    total_weight = sum(weights) or 1.0
+    cursor = 0.0
+    for group, weight in zip(groups, weights):
+        group_duration = duration * weight / total_weight
+        karaoke_weights = [
+            max(2, len(re.sub(r"[^A-Za-z0-9']", "", word))) +
+            (2 if re.search(r"[.!?]$", word) else 0)
+            for word in group
+        ]
+        karaoke_total = sum(karaoke_weights) or 1
         karaoke = []
-        for word, weight in zip(group, weights):
-            centiseconds = max(1, round(group_duration * 100 * weight / total_weight))
+        for word, word_weight in zip(group, karaoke_weights):
+            centiseconds = max(1, round(group_duration * 100 * word_weight / karaoke_total))
             karaoke.append(f"{{\\kf{centiseconds}}}{word}")
         text = " ".join(karaoke)
+        end = min(cursor + group_duration, duration)
         lines.append(
-            f"Dialogue: 0,{stamp(i*step)},{stamp(min((i+1)*step, duration))},Default,,0,0,0,,{{\\an2}}{text}"
+            f"Dialogue: 0,{stamp(cursor)},{stamp(end)},Default,,0,0,0,,{{\\an2}}{text}"
         )
+        cursor = end
+
     path = WORK / "captions.ass"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path, duration
