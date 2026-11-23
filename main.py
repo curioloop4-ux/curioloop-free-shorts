@@ -32,7 +32,7 @@ def fetch_korean_entertainment_news(limit=20):
     """Fetch recent Korean entertainment headlines from Google News RSS."""
     url = "https://news.google.com/rss/search"
     params = {
-        "q": '(K-pop OR 아이돌 OR 배우 OR 연예 OR 드라마 OR 영화 OR 가수 OR 예능) when:3d',
+        "q": '(K-pop OR 아이돌 OR 가수 OR 배우 OR 연예 OR 드라마 OR 영화 OR 예능 OR OTT OR 넷플릭스 OR 시상식 OR 콘서트) when:3d',
         "hl": "ko",
         "gl": "KR",
         "ceid": "KR:ko",
