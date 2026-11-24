@@ -84,10 +84,10 @@ jobs:
       - name: Persist visual deduplication history
         if: always()
         run: |
-          if [ -f history/used_visuals.json ] && ! git diff --quiet -- history/used_visuals.json; then
+          if { [ -f history/used_visuals.json ] || [ -f history/used_scripts.json ]; } && ! git diff --quiet -- history/used_visuals.json history/used_scripts.json; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add history/used_visuals.json
+            git add history/used_visuals.json history/used_scripts.json
             git commit -m "Update used visual asset history"
             git push
           else
