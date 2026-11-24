@@ -916,10 +916,19 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     labels = []
     for i in range(len(clips)):
         clip_duration = segment_durations[i]
+        # Give every stock-video scene subtle independent motion and consistent grading.
+        # Alternate horizontal drift so consecutive cuts do not all move in the same direction.
+        pan_direction = 1 if i % 2 == 0 else -1
         filters.append(
             f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
             f"crop=1080:1920,trim=duration={clip_duration:.3f},"
-            f"setpts=PTS-STARTPTS,setsar=1[v{i}]"
+            "setpts=PTS-STARTPTS,setsar=1,"
+            "eq=contrast=1.04:saturation=1.08:brightness=0.01,"
+            "unsharp=5:5:0.30:3:3:0.12,"
+            "zoompan=z='min(zoom+0.00045,1.055)':"
+            f"x='iw/2-(iw/zoom/2)+{pan_direction}*sin(on/55)*10':"
+            "y='ih/2-(ih/zoom/2)+sin(on/75)*5':"
+            "d=1:s=1080x1920:fps=30,format=yuv420p[v{i}]"
         )
         labels.append(f"[v{i}]")
     filters.append(
