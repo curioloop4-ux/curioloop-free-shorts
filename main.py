@@ -928,7 +928,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
             "zoompan=z='min(zoom+0.00045,1.055)':"
             f"x='iw/2-(iw/zoom/2)+{pan_direction}*sin(on/55)*10':"
             "y='ih/2-(ih/zoom/2)+sin(on/75)*5':"
-            "d=1:s=1080x1920:fps=30,format=yuv420p[v{i}]"
+            f"d=1:s=1080x1920:fps=30,format=yuv420p[v{i}]"
         )
         labels.append(f"[v{i}]")
     filters.append(
