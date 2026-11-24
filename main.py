@@ -832,8 +832,10 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     for clip_path in clips:
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
     cmd += ["-i", str(voice)]
-    mascot = make_mascot()
-    cmd += ["-loop", "1", "-i", str(mascot)]
+    animal_mode = os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy"
+    if not animal_mode:
+        mascot = make_mascot()
+        cmd += ["-loop", "1", "-i", str(mascot)]
     music = make_background_music(duration, title, visual_theme)
     cmd += ["-i", str(music)]
 
@@ -856,11 +858,20 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "textfile=hook.txt:fontcolor=yellow:fontsize=82:borderw=5:bordercolor=black:"
         "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=28:"
         "enable='between(t,0,2.5)',"
-        "ass=captions.ass[base];"
-        f"[{len(clips)+1}:v]scale=190:163[mascot];"
-        "[base][mascot]overlay=W-w-28:250:format=auto[vout];"
-        f"[{len(clips)}:a]volume=1.0[voice];"
-        f"[{len(clips)+2}:a]volume=0.08,afade=t=in:st=0:d=0.8,"
+        "ass=captions.ass[base]"
+    )
+    if animal_mode:
+        filters[-1] += ";[base]null[vout]"
+        music_index = len(clips) + 1
+    else:
+        filters[-1] += (
+            f";[{len(clips)+1}:v]scale=190:163[mascot];"
+            "[base][mascot]overlay=W-w-28:250:format=auto[vout]"
+        )
+        music_index = len(clips) + 2
+    filters[-1] += (
+        f";[{len(clips)}:a]volume=1.0[voice];"
+        f"[{music_index}:a]volume=0.08,afade=t=in:st=0:d=0.8,"
         f"afade=t=out:st={max(0, duration-1.2):.2f}:d=1.2[music];"
         "[voice][music]amix=inputs=2:duration=first:dropout_transition=1[aout]"
     )
