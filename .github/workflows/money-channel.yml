@@ -3,6 +3,11 @@ name: Youqian Research Institute Chinese Channel
 on:
   workflow_dispatch:
     inputs:
+      source_video_url:
+        description: "Optional published English Short URL to mirror into Chinese"
+        required: false
+        type: string
+        default: ""
       topic_mode:
         description: "Choose economy or beauty/massage Shorts"
         required: true
@@ -91,6 +96,7 @@ jobs:
           MONEY_YOUTUBE_REFRESH_TOKEN: ${{ secrets.MONEY_YOUTUBE_REFRESH_TOKEN }}
           MONEY_YOUTUBE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
           MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
+          SOURCE_ENGLISH_VIDEO_URL: ${{ inputs.source_video_url }}
           MONEY_TOPIC_MODE: ${{ inputs.topic_mode }}
           MONEY_START_SHORT: ${{ inputs.start_short }}
           MONEY_SHORTS_COUNT: ${{ inputs.shorts_count }}
