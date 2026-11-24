@@ -879,11 +879,11 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         title_lines = [title_lines[0], textwrap.shorten(" ".join(title_lines[1:]), width=22, placeholder="…")]
     title_path.write_text("\n".join(title_lines), encoding="utf-8")
     hook_path = WORK / "hook.txt"
-    clean_hook = re.sub(r"\\s+", " ", hook_text.replace("\\n", " ")).strip()
+    clean_hook = re.sub(r"\s+", " ", hook_text.replace("\\n", " ")).strip()
     # Keep the opening yellow hook within the 9:16 safe area on small screens.
     if len(clean_hook) > 18:
         hook_lines = textwrap.wrap(clean_hook, width=16, break_long_words=True)
-        hook_path.write_text("\\n".join(hook_lines[:2]), encoding="utf-8")
+        hook_path.write_text("\n".join(hook_lines[:2]), encoding="utf-8")
     else:
         hook_path.write_text(clean_hook, encoding="utf-8")
     clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5)
