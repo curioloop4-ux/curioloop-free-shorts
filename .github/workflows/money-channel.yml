@@ -7,7 +7,7 @@ on:
         description: "Optional published English Short URL to mirror into Chinese"
         required: false
         type: string
-        default: ""
+        default: "https://youtube.com/shorts/vMAgY8eRwLA"
       topic_mode:
         description: "Choose economy or beauty/massage Shorts"
         required: true
