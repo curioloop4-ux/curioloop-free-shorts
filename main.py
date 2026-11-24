@@ -4,6 +4,7 @@ import os
 import re
 import subprocess
 import textwrap
+import time
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -133,10 +134,33 @@ Return valid JSON only."""
         )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     print(f"Generating general-knowledge CurioLoop Short with Gemini model: {model}")
-    response = requests.post(url, params={"key": api_key},
-        json={"contents":[{"parts":[{"text":prompt}]}],
-              "generationConfig":{"temperature":0.85,"responseMimeType":"application/json"}}, timeout=90)
-    response.raise_for_status()
+    payload = {"contents":[{"parts":[{"text":prompt}]}],
+               "generationConfig":{"temperature":0.85,"responseMimeType":"application/json"}}
+    response = None
+    retryable_statuses = {429, 500, 502, 503, 504}
+    for attempt in range(1, 6):
+        try:
+            response = requests.post(url, params={"key": api_key},
+                json=payload, timeout=90)
+            if response.status_code in retryable_statuses:
+                if attempt == 5:
+                    response.raise_for_status()
+                wait_seconds = min(8 * (2 ** (attempt - 1)), 60)
+                print(f"Gemini temporarily unavailable (HTTP {response.status_code}); "
+                      f"retrying in {wait_seconds}s ({attempt}/5).")
+                time.sleep(wait_seconds)
+                continue
+            response.raise_for_status()
+            break
+        except requests.exceptions.RequestException as exc:
+            if attempt == 5:
+                raise
+            wait_seconds = min(8 * (2 ** (attempt - 1)), 60)
+            print(f"Gemini request failed ({type(exc).__name__}); "
+                  f"retrying in {wait_seconds}s ({attempt}/5).")
+            time.sleep(wait_seconds)
+    if response is None:
+        raise RuntimeError("Gemini request failed without a response after retries.")
     data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
