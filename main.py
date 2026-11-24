@@ -98,28 +98,6 @@ def fetch_trending_candidates(limit=20):
 
 def make_script(previous_titles=None, featured_gender="woman"):
     """Generate Shorts with relevant licensed visuals."""
-    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
-        # Deterministic pilot: avoid external LLM outages and keep the approved test script fixed.
-        return {
-            "title": "Why Is Dating in Korea So Different From Dating in America?",
-            "hook_text": "DATING CULTURE SHOCK",
-            "narration": "Ever noticed how dating can feel like a different game in Korea and the U.S.? In Korea, some couples put more emphasis on becoming an official couple and marking relationship milestones. In the U.S., some people are comfortable dating casually before defining things. Texting expectations can differ too—but there's no single rule in either country. The real secret? Ask, don't assume.",
-            "visual_theme": "Modern cross-cultural dating and everyday adult couple interactions",
-            "featured_person": "adult couple",
-            "visual_queries": [
-                "adult couple having coffee date cafe conversation video",
-                "adult couple texting smartphones relationship communication video",
-                "adult couple walking together holding hands city street video",
-                "adult couple discussing relationship at cafe video",
-                "adult couple laughing romantic dinner date video"
-            ],
-            "seo_tags": [
-                "Korean dating culture", "American dating culture", "cross cultural dating",
-                "Korean vs American dating", "dating differences", "relationship communication",
-                "dating advice", "international relationships", "dating expectations",
-                "relationship milestones", "modern dating", "healthy relationships"
-            ]
-        }
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
     previous_titles = previous_titles or []
@@ -153,21 +131,16 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
-        prompt = """Create one original English YouTube Short based on this exact pilot topic:
-TITLE: "Why Is Dating in Korea So Different From Dating in America?"
-HOOK: "DATING CULTURE SHOCK"
-NARRATION (use this exact narration, do not rewrite):
-"Ever noticed how dating can feel like a different game in Korea and the U.S.? In Korea, some couples put more emphasis on becoming an official couple and marking relationship milestones. In the U.S., some people are comfortable dating casually before defining things. Texting expectations can differ too—but there's no single rule in either country. The real secret? Ask, don't assume."
-This is a balanced cultural comparison, not a claim about every Korean or American. Use qualifiers such as "some couples" and "some people"; avoid stereotypes, unsupported statistics, and claims that one culture is better.
+        prompt = """Create one original English YouTube Short in the dating, attraction and cross-cultural relationships niche.
+Choose ONE fresh, specific topic for each run. Rotate naturally among: first impressions, signs of mutual interest, dating communication, relationship expectations, Korean-American dating culture comparisons, confidence, style and social skills. Do not use neuroscience or brain-science topics. Do not repeat any title in this list of recent titles: {previous_titles}.
+Prefer ideas with a clear curiosity gap, relatable situation and practical or surprising payoff. Keep cultural observations qualified ("some people", "some couples") and never stereotype nationalities or genders. Do not invent statistics or cite unsupported studies.
 Return ONLY valid JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags.
-Use the exact title and narration above. hook_text must be "DATING CULTURE SHOCK". visual_theme should describe modern cross-cultural dating and everyday couple interactions. featured_person must be exactly "adult couple".
-Return exactly five English licensed stock-video search queries, in this order:
-1) "adult couple having coffee date cafe conversation video"
-2) "adult couple texting smartphones relationship communication video"
-3) "adult couple walking together holding hands city street video"
-4) "adult couple discussing relationship at cafe video"
-5) "adult couple laughing romantic dinner date video"
-Use natural, candid footage of clearly adult couples. Do not imply that ethnicity determines dating behavior. Avoid stereotypes, unsupported statistics, burned-in subtitles, logos, watermarks, and unrelated gym, massage, beauty, or fitness footage. Do not use footage from the reference YouTube video unless its creator has explicitly authorized reuse. seo_tags must be specific to Korean dating culture, American dating culture, cross cultural relationships, dating differences, relationship communication, and dating advice. Return valid JSON only."""
+20-35 seconds; narration 55-80 natural English words; hook_text 3-6 words; title concise and curiosity-driven.
+Use an immediate relatable question or observation, then deliver a clear insight and finish with a natural viewer question or memorable takeaway.
+Visuals: real licensed stock VIDEO of clearly adult people and couples, natural candid interactions matching each narration beat. Avoid burned-in subtitles, logos, watermarks, unrelated gym/massage/beauty footage, and any source video not licensed for reuse. Do not portray ethnicity as determining behavior.
+Return exactly 5 English stock-video search queries that directly depict the specific narration scenes, in narrative order. featured_person should describe the actual main subject (for example "adult couple" or "adult woman") and remain consistent with all five queries.
+seo_tags must be 8-15 specific tags for the exact topic. Return valid JSON only."""
+        prompt = prompt.replace("{previous_titles}", ", ".join(previous_titles[-20:]) or "none")
     if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
         prompt = """Create one original, funny English YouTube Shorts mini-story starring a cute orange cat.
 Build a clear visual comedy arc: immediate funny hook, a simple goal, an escalating mishap, and a surprising but wholesome punchline. Make it understandable without sound. The cat is the consistent main character in every scene. Do not imitate copyrighted characters, existing memes, or specific creators. No cruelty, danger, animal distress, unsafe stunts, or misleading real-world claims.
