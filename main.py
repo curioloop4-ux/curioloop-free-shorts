@@ -121,9 +121,11 @@ actual exercise footage for fitness facts, actual food/preparation for food fact
 and relevant objects/experiments for science.
 Do not replace the opening woman with a man, portrait-only image, unrelated scenery, or abstract graphic.
 If suitable licensed opening footage or topic footage is unavailable, fail rather than use mismatched footage.
-Return exactly 3 English stock-VIDEO search queries: first must be
-"adult woman workout outfit gym stretching fitness full body video",
-second and third for the actual topic/action. featured_person must be exactly "fit adult woman".
+Return exactly 5 English stock-VIDEO search queries in this order:
+1) "adult woman workout outfit gym stretching fitness full body video" for the fixed opening.
+2) "adult woman stylish fashion elegant fitted outfit confident full body video" for a tasteful, eye-catching adult-woman fashion/glamour shot.
+3) "adult woman fitness fashion stylish outfit confident movement video" for a second tasteful adult-woman shot.
+4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
     if previous_titles:
         prompt += (
@@ -275,9 +277,14 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     featured_person = (featured_person or "").strip()
     stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
     subject = featured_person if stock_person_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
-    visual_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()][:3]
-    opening_queries = [visual_terms[0]] if visual_terms else ["athletic adult woman fitness workout vertical video"]
-    query_terms = list(dict.fromkeys([*opening_queries, *visual_terms[1:], title.strip(), visual_theme]))
+    generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
+    opening_queries = [generated_terms[0]] if generated_terms else ["adult woman workout outfit gym stretching fitness full body video"]
+    glamour_queries = [
+        "adult woman stylish fashion elegant fitted outfit confident full body video",
+        "adult woman fitness fashion stylish outfit confident movement video",
+    ]
+    topic_queries = generated_terms[1:5] if len(generated_terms) > 1 else [title.strip(), visual_theme]
+    query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
     session.headers.update({"User-Agent": "CurioLoop/1.0"})
@@ -412,6 +419,13 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                     if not relevant_metadata(tags, query):
                         print(f"Rejecting unrelated Pixabay result: {tags}")
                         continue
+                    if query_index in (1, 2):
+                        words = set(re.findall(r"[a-z]+", str(tags).lower()))
+                        adult_woman_terms = {"woman", "women", "female"}
+                        glamour_terms = {"fashion", "style", "model", "elegant", "beauty", "dress", "fitness", "confident", "portrait", "outfit"}
+                        if not (words & adult_woman_terms) or not (words & glamour_terms):
+                            print(f"Skipping non-matching glamour footage: {tags}")
+                            continue
                     variants = item.get("videos", {})
                     chosen = variants.get("large") or variants.get("medium") or variants.get("small")
                     if not chosen or not chosen.get("url"):
@@ -426,7 +440,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                             print(f"Accepted CurioLoop athletic opening from Pixabay query: {query}")
                     except Exception as exc:
                         print(f"Skipping Pixabay video: {type(exc).__name__}: {exc}")
-                    query_limit = 1 if query_index == 0 else count
+                    query_limit = 1 if query_index in (0, 1, 2) else count
                     if len(clips) >= query_limit:
                         break
             except Exception as exc:
