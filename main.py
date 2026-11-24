@@ -882,7 +882,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
     cmd += ["-i", str(voice)]
     animal_mode = os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy"
-    if not animal_mode:
+    dating_mode = os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction"
+    if not animal_mode and not dating_mode:
         mascot = make_mascot()
         cmd += ["-loop", "1", "-i", str(mascot)]
     music = make_background_music(duration, title, visual_theme)
@@ -909,7 +910,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "enable='between(t,0,2.5)',"
         "ass=captions.ass[base]"
     )
-    if animal_mode:
+    if animal_mode or dating_mode:
         filters[-1] += ";[base]null[vout]"
         music_index = len(clips) + 1
     else:
