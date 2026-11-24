@@ -32,7 +32,7 @@ on:
           - mixed
           - beauty
           - general
-        default: animal_comedy
+        default: mixed
 
 permissions:
   contents: write
