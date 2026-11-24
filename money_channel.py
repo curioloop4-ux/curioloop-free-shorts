@@ -208,8 +208,10 @@ def download_relevant_clips(queries):
                 "fps=30,format=yuv420p"
             )
             ffmpeg_args = ["-vf", video_filter]
+        # Keep opening exercise/massage shots on screen longer before cutting away.
+        clip_seconds = 10 if not IS_LONG else 8
         subprocess.run([
-            "ffmpeg", "-y", "-i", str(raw), "-t", "8",
+            "ffmpeg", "-y", "-i", str(raw), "-t", str(clip_seconds),
             *ffmpeg_args,
             "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
             "-movflags", "+faststart", str(normalized)
