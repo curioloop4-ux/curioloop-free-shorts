@@ -511,44 +511,70 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     return clips, credits
 
 def make_mascot():
-    """Draw the recurring CurioLoop mascot as a transparent PNG using Pillow."""
+    """Draw CurioLoop's cute orange squirrel mascot as a transparent PNG."""
     path = WORK / "loopy_mascot.png"
     scale = 3
-    image = Image.new("RGBA", (260 * scale, 320 * scale), (0, 0, 0, 0))
+    image = Image.new("RGBA", (300 * scale, 340 * scale), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
     def p(coords):
         return tuple(int(v * scale) for v in coords)
 
-    # Soft drop shadow, antennae and round alien head.
-    draw.ellipse(p((40, 285, 226, 310)), fill=(0, 0, 0, 65))
-    draw.line([p((83, 86)), p((67, 34))], fill=(116, 190, 235, 255), width=7 * scale)
-    draw.line([p((177, 86)), p((195, 34))], fill=(116, 190, 235, 255), width=7 * scale)
-    draw.ellipse(p((51, 12, 82, 43)), fill=(145, 220, 255, 255), outline=(255, 255, 255, 255), width=3 * scale)
-    draw.ellipse(p((180, 12, 211, 43)), fill=(145, 220, 255, 255), outline=(255, 255, 255, 255), width=3 * scale)
-    draw.ellipse(p((25, 50, 235, 252)), fill=(120, 204, 250, 255), outline=(255, 255, 255, 255), width=7 * scale)
-    draw.ellipse(p((39, 62, 221, 239)), fill=(159, 224, 255, 255))
+    # Ground shadow.
+    draw.ellipse(p((38, 310, 260, 332)), fill=(0, 0, 0, 55))
 
-    # Large friendly eyes, highlights and rosy cheeks.
-    draw.ellipse(p((66, 112, 119, 180)), fill=(18, 35, 66, 255))
-    draw.ellipse(p((143, 112, 196, 180)), fill=(18, 35, 66, 255))
-    draw.ellipse(p((78, 121, 94, 139)), fill=(255, 255, 255, 255))
-    draw.ellipse(p((155, 121, 171, 139)), fill=(255, 255, 255, 255))
-    draw.ellipse(p((47, 177, 91, 198)), fill=(255, 145, 165, 110))
-    draw.ellipse(p((171, 177, 215, 198)), fill=(255, 145, 165, 110))
-    draw.arc(p((105, 166, 157, 210)), start=10, end=170, fill=(25, 55, 85, 255), width=6 * scale)
+    # Big curled squirrel tail behind the body, with a cream inner swirl.
+    draw.ellipse(p((150, 90, 292, 255)), fill=(190, 94, 39, 255),
+                 outline=(125, 58, 27, 255), width=5 * scale)
+    draw.ellipse(p((176, 118, 270, 224)), fill=(255, 220, 166, 255))
+    draw.ellipse(p((194, 139, 254, 204)), fill=(190, 94, 39, 255))
+    draw.ellipse(p((207, 151, 242, 190)), fill=(255, 220, 166, 255))
 
-    # Small white hoodie and blue infinity-style chest mark.
-    draw.rounded_rectangle(p((45, 225, 215, 307)), radius=25 * scale,
-                           fill=(250, 252, 255, 255), outline=(90, 160, 210, 255), width=5 * scale)
-    draw.arc(p((87, 218, 173, 275)), start=180, end=360, fill=(120, 170, 205, 255), width=5 * scale)
-    draw.arc(p((105, 260, 137, 282)), start=190, end=530, fill=(25, 145, 225, 255), width=6 * scale)
-    draw.arc(p((125, 260, 157, 282)), start=10, end=350, fill=(25, 145, 225, 255), width=6 * scale)
+    # Ears with warm inner fur.
+    draw.ellipse(p((61, 35, 119, 112)), fill=(190, 94, 39, 255),
+                 outline=(125, 58, 27, 255), width=4 * scale)
+    draw.ellipse(p((73, 49, 108, 99)), fill=(255, 190, 157, 255))
+    draw.ellipse(p((143, 35, 201, 112)), fill=(190, 94, 39, 255),
+                 outline=(125, 58, 27, 255), width=4 * scale)
+    draw.ellipse(p((154, 49, 190, 99)), fill=(255, 190, 157, 255))
 
-    image = image.resize((260, 320), Image.Resampling.LANCZOS)
+    # Head and cream muzzle.
+    draw.ellipse(p((55, 68, 210, 236)), fill=(224, 126, 54, 255),
+                 outline=(125, 58, 27, 255), width=5 * scale)
+    draw.ellipse(p((73, 86, 192, 219)), fill=(244, 159, 83, 255))
+    draw.ellipse(p((83, 163, 184, 222)), fill=(255, 232, 198, 255))
+
+    # Eyes, highlights, nose, smile and cheeks.
+    draw.ellipse(p((91, 126, 119, 161)), fill=(45, 35, 30, 255))
+    draw.ellipse(p((148, 126, 176, 161)), fill=(45, 35, 30, 255))
+    draw.ellipse(p((97, 131, 105, 140)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((154, 131, 162, 140)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((75, 164, 105, 181)), fill=(244, 125, 126, 115))
+    draw.ellipse(p((164, 164, 194, 181)), fill=(244, 125, 126, 115))
+    draw.ellipse(p((126, 166, 141, 177)), fill=(92, 48, 35, 255))
+    draw.arc(p((112, 166, 154, 202)), start=15, end=165,
+             fill=(100, 53, 38, 255), width=4 * scale)
+
+    # Small front paws and a cream belly, giving a clear squirrel silhouette.
+    draw.ellipse(p((88, 215, 178, 312)), fill=(224, 126, 54, 255),
+                 outline=(125, 58, 27, 255), width=4 * scale)
+    draw.ellipse(p((105, 230, 162, 300)), fill=(255, 232, 198, 255))
+    draw.ellipse(p((82, 235, 116, 270)), fill=(244, 159, 83, 255),
+                 outline=(125, 58, 27, 255), width=3 * scale)
+    draw.ellipse(p((153, 235, 187, 270)), fill=(244, 159, 83, 255),
+                 outline=(125, 58, 27, 255), width=3 * scale)
+
+    # Acorn held at the front reinforces the squirrel identity.
+    draw.ellipse(p((125, 251, 153, 285)), fill=(145, 83, 42, 255),
+                 outline=(100, 54, 28, 255), width=2 * scale)
+    draw.polygon([p((123, 255)), p((139, 239)), p((155, 255))],
+                 fill=(104, 67, 38, 255))
+    draw.line([p((139, 242)), p((144, 234))], fill=(82, 117, 57, 255),
+              width=3 * scale)
+
+    image = image.resize((300, 340), Image.Resampling.LANCZOS)
     image.save(path)
     return path
-
 
 def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries, featured_person):
     output = WORK / f"curioloop_short_{__import__('time').strftime('%Y%m%d_%H%M%S')}.mp4"
