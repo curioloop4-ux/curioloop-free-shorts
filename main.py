@@ -800,7 +800,8 @@ def main():
                 for title in used_titles
             }
             # Alternate female-focused and male-focused videos across batches using saved script history.
-            featured_gender = "woman" if len(prior_scripts) % 2 == 0 else "man"
+            last_featured = prior_scripts[-1].get("featured_person", "") if prior_scripts else ""
+            featured_gender = "man" if last_featured == "fit adult woman" else "woman"
             print(f"Featured subject rotation: adult {featured_gender}")
             script = None
             for attempt in range(3):
