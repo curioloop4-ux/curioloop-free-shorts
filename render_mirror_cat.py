@@ -110,7 +110,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             " -i " + shlex_quote(str(voice)) +
             " -vf " + shlex_quote("subtitles=" + str(ass).replace("\\", "/")) +
             " -map 0:v:0 -map 1:a:0 -c:v libx264 -preset veryfast -crf 21 "
-            "-c:a aac -b:a 160k -shortest -movflags +faststart " + shlex_quote(str(out)) +
+            "-c:a aac -b:a 160k -movflags +faststart " + shlex_quote(str(out)) +
             " >/dev/null 2>&1"
         )
         os.system(cmd)
