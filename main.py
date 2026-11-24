@@ -519,6 +519,35 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         clips.append(clip_path)
         credits.append(f"{source} — {creator} — {license_name} — {credit_url}")
 
+    def has_embedded_captions(video_path, index):
+        """Reject stock clips with obvious burned-in subtitles in the lower screen area."""
+        detected = []
+        for sample_no, timestamp in enumerate(("0.8", "3.0", "5.5"), start=1):
+            frame_path = assets_dir / f"ocr_check_{index}_{sample_no}.jpg"
+            try:
+                subprocess.run([
+                    "ffmpeg", "-y", "-ss", timestamp, "-i", str(video_path),
+                    "-vf", "crop=iw:ih*0.42:0:ih*0.58,scale=960:-1",
+                    "-frames:v", "1", str(frame_path)
+                ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, timeout=45)
+                result = subprocess.run(
+                    ["tesseract", str(frame_path), "stdout", "--psm", "6"],
+                    check=True, capture_output=True, text=True, timeout=30
+                )
+                text_found = re.sub(r"\\s+", " ", result.stdout).strip()
+                words = re.findall(r"[A-Za-z]{2,}", text_found)
+                if len(words) >= 2 and len(" ".join(words)) >= 10:
+                    detected.append(" ".join(words).lower())
+            except subprocess.CalledProcessError:
+                # A frame that cannot be sampled is not evidence of subtitles.
+                pass
+            finally:
+                frame_path.unlink(missing_ok=True)
+        if detected:
+            print(f"Rejecting clip with possible burned-in subtitles: {detected}")
+            return True
+        return False
+
     def render_video(url, index, source, license_name, credit_url, creator="Not provided"):
         response = session.get(url, timeout=90, stream=True)
         response.raise_for_status()
@@ -527,6 +556,9 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             for chunk in response.iter_content(chunk_size=1024 * 1024):
                 if chunk:
                     output_file.write(chunk)
+        if has_embedded_captions(video_path, index):
+            video_path.unlink(missing_ok=True)
+            raise RuntimeError("Possible burned-in subtitles detected; selecting another clean clip.")
         clip_path = WORK / f"clip_{index}.mp4"
         subprocess.run([
             "ffmpeg", "-y", "-i", str(video_path), "-t", "8",
