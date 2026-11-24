@@ -170,8 +170,11 @@ Use exactly 5 English stock-video search queries in this order:
 4) adult woman skincare routine applying moisturizer beauty salon video
 5) stylish adult woman confident fashion full body video
 All people must be clearly adults and fully clothed. No nudity, lingerie, sexual activity, minors, medical claims or invasive procedures. Return valid JSON only."""
-    # Alternate the featured adult subject while keeping the same topic-first format.
-    if featured_gender == "man":
+    # Keep animal-comedy prompts free of the legacy human-subject instructions.
+    if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
+        data_featured_person = "cat"
+        opening_visual_queries = []
+    elif featured_gender == "man":
         prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult man. The first three visuals must feature a man sweating after a workout, a professional sports massage involving an adult man, and an adult man exercising. Do not use women as the featured subject in these opening visuals. Keep him fully clothed and non-sexualized."
         data_featured_person = "fit adult man"
         opening_visual_queries = [
