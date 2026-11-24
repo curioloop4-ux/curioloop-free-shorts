@@ -93,6 +93,89 @@ def generate_content(topic=None, topic_category='经济'):
         raise ValueError("At least two reference sources are required.")
     return data
 
+
+def generate_from_english_source(video_url):
+    """Resolve a published English Short to its saved source script, then localize it."""
+    video_match = re.search(r"(?:youtu\.be/|youtube\.com/(?:shorts/|watch\?.*v=))([A-Za-z0-9_-]{11})", video_url)
+    if not video_match:
+        raise ValueError("SOURCE_ENGLISH_VIDEO_URL must be a valid YouTube video or Shorts URL.")
+    video_id = video_match.group(1)
+    oembed_url = f"https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v={video_id}&format=json"
+    metadata_response = requests.get(oembed_url, timeout=30)
+    metadata_response.raise_for_status()
+    published_title = str(metadata_response.json().get("title", "")).strip()
+    if not published_title:
+        raise RuntimeError("Could not read the English YouTube video's title.")
+
+    history_path = ROOT / "history" / "used_scripts.json"
+    if not history_path.exists():
+        raise FileNotFoundError("history/used_scripts.json is missing; cannot safely map this video to its source script.")
+    history = json.loads(history_path.read_text(encoding="utf-8"))
+    scripts = history.get("scripts", [])
+    def normalize_title(value):
+        return re.sub(r"[^a-z0-9]+", "", str(value).lower())
+    target = normalize_title(published_title)
+    matches = [item for item in scripts if normalize_title(item.get("title", "")) == target]
+    if len(matches) != 1:
+        known = ", ".join(item.get("title", "") for item in scripts[-8:])
+        raise RuntimeError(
+            f"Cannot uniquely match published title '{published_title}' to saved English script history. "
+            f"Known recent titles: {known}. No topic will be guessed."
+        )
+    source = matches[0]
+    print(f"Matched English source video {video_id}: {source['title']}")
+
+    prompt = f"""将以下已发布英文YouTube Shorts改编为自然、地道、适合简体中文观众的中文版本。
+必须忠实保留原视频的主题、事实、论点、因果关系和叙事顺序，不得增加原文没有的研究、统计数字、医学结论或承诺。可以调整语序和表达，使中文口语自然、有节奏，适合约20至35秒的Shorts旁白。
+英文标题：{source.get('title','')}
+英文旁白：{source.get('narration','')}
+主题视觉方向：{source.get('visual_theme','')}
+只返回JSON，字段为title, hook_text, narration, description, topic_visual_queries。
+title使用简体中文，简短且有好奇心；hook_text适合开头字幕；narration约90至130个汉字，准确翻译原文，不要扩写；description简洁。
+topic_visual_queries必须恰好提供2个英文视频素材搜索词，直接对应原文主题和动作，优先真实成年人物场景、全身或中景，人物清楚可见。不得提供无关风景、手部特写、未成年人或不当画面。"""
+    endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
+    payload = {
+        "contents": [{"parts": [{"text": prompt}]}],
+        "generationConfig": {"temperature": 0.25, "responseMimeType": "application/json"},
+    }
+    response = None
+    for attempt in range(5):
+        try:
+            response = requests.post(endpoint, params={"key": required("GEMINI_API_KEY")},
+                                     json=payload, timeout=150)
+            if response.status_code not in {429, 500, 502, 503, 504}:
+                response.raise_for_status()
+                break
+            if attempt == 4:
+                response.raise_for_status()
+            wait = min(30, 5 * (2 ** attempt))
+            print(f"Gemini temporarily unavailable (HTTP {response.status_code}); retrying in {wait}s.")
+            time.sleep(wait)
+        except requests.exceptions.RequestException:
+            if attempt == 4:
+                raise
+            time.sleep(min(30, 5 * (2 ** attempt)))
+    if response is None:
+        raise RuntimeError("Gemini translation failed without a response.")
+    data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+    for key in ("title", "hook_text", "narration", "description"):
+        if not isinstance(data.get(key), str) or not data[key].strip():
+            raise ValueError(f"Chinese localization is missing {key}.")
+    if not isinstance(data.get("topic_visual_queries"), list) or len(data["topic_visual_queries"]) != 2:
+        raise ValueError("Chinese localization must return exactly two topic-specific visual queries.")
+    data["narration"] = data["narration"].strip()
+    data["visual_queries"] = [
+        "adult woman sweating after cardio workout gym fitness full body video",
+        "professional adult woman massage therapist giving shoulder massage spa wellness video",
+        "adult woman fitness workout gym stretching full body exercise video",
+    ] + [str(q).strip() for q in data["topic_visual_queries"]]
+    data["sources"] = []
+    data["source_english_video_id"] = video_id
+    data["source_english_title"] = source["title"]
+    data["featured_person"] = source.get("featured_person", "fit adult woman")
+    print("Chinese localization generated from the matched English script.")
+    return data
+
 async def make_voice(text):
     path = WORK / "narration.mp3"
     await edge_tts.Communicate(text, VOICE, rate="-3%", volume="+0%").save(str(path))
@@ -367,14 +450,15 @@ def upload_video(path, data, credits):
         scopes=["https://www.googleapis.com/auth/youtube.upload"],
     )
     youtube = build("youtube", "v3", credentials=creds)
-    sources = "\n".join(f"- {url}" for url in data["sources"])
+    sources = "\n".join(f"- {url}" for url in data.get("sources", []) if url)
     visual_credits = "\n".join(dict.fromkeys(credits))
-    description = (
-        data.get("description", "欢迎来到有钱研究所，一起了解财富、金钱心理与经济知识。") +
-        "\n\n参考资料\n" + sources +
-        "\n\n视频素材来源\n" + visual_credits +
-        "\n\n本视频仅用于经济与金融知识分享，不构成个人投资建议。"
-    )
+    description = data.get("description", "欢迎来到有钱研究所。")
+    if sources:
+        description += "\n\n参考资料\n" + sources
+    elif data.get("source_english_title"):
+        description += "\n\n本视频为英文原视频的简体中文本地化版本。"
+    description += "\n\n视频素材来源\n" + visual_credits
+    description += "\n\n本视频仅用于知识分享，不构成个人投资建议。"
     body = {
         "snippet": {
             "title": data["title"][:100],
@@ -538,6 +622,29 @@ def reserve_topics(count=3):
     return [(item[1], item[2]) for item in selected]
 
 def main():
+    source_video_url = os.getenv("SOURCE_ENGLISH_VIDEO_URL", "").strip()
+    if source_video_url:
+        if IS_LONG:
+            raise ValueError("English-to-Chinese mirroring currently supports Shorts only.")
+        print("Creating Chinese mirror from the specified English Short.")
+        data = generate_from_english_source(source_video_url)
+        (WORK / "source_mirror_script.json").write_text(
+            json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+        voice = asyncio.run(make_voice(data["narration"]))
+        clips, credits = download_relevant_clips(data["visual_queries"])
+        rendered = render_video(data, voice, clips)
+        output = WORK / "money_short_mirror.mp4"
+        if rendered != output:
+            rendered.replace(output)
+        (WORK / "visual_credits_mirror.txt").write_text(
+            "\n".join(dict.fromkeys(credits)), encoding="utf-8")
+        print("Rendered Chinese mirror:", output, "| Duration:", round(duration_of(output), 1), "seconds")
+        if os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}:
+            print("OUTPUT_ONLY enabled; upload skipped.")
+        else:
+            upload_video(output, data, credits)
+        return
+
     if MODE not in {"shorts", "longform"}:
         raise ValueError("MONEY_CONTENT_TYPE must be shorts or longform.")
     if IS_LONG:
