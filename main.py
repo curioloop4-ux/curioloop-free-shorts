@@ -772,7 +772,10 @@ def make_background_music(duration, title="", visual_theme=""):
     samples = array("h")
     # One consistent, unobtrusive modern wellness groove; no abrupt scene changes.
     topic = (str(title) + " " + str(visual_theme)).lower()
-    if any(word in topic for word in ("massage", "recovery", "stretch", "relax", "mobility")):
+    if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
+        root = 146.83
+        pulse_level = 0.032
+    elif any(word in topic for word in ("massage", "recovery", "stretch", "relax", "mobility")):
         root = 110.0
         pulse_level = 0.018
     elif any(word in topic for word in ("workout", "fitness", "exercise", "strength", "gym")):
