@@ -262,6 +262,22 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     data["seo_tags"] = [str(tag).strip().lstrip("#") for tag in data["seo_tags"] if str(tag).strip()]
     data["seo_tags"] = data["seo_tags"][:15]
     if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
+        # Add specific search-intent tags, not unrelated trending keywords.
+        priority_tags = [
+            "dating advice", "relationship psychology", "what makes a man attractive",
+            "female attraction", "confidence", "body language", "eye contact",
+            "dating tips", "romantic attraction", "how to be attractive",
+            "social skills", "charisma", "healthy relationships"
+        ]
+        merged = []
+        seen = set()
+        for tag in priority_tags + data["seo_tags"]:
+            key = re.sub(r"[^a-z0-9]", "", tag.lower())
+            if key and key not in seen:
+                merged.append(tag)
+                seen.add(key)
+        data["seo_tags"] = merged[:15]
+    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
         data["featured_person"] = "fit adult woman"
         if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
             raise ValueError("Dating attraction mode requires five topic-specific stock-video queries")
@@ -302,8 +318,8 @@ def make_ass(narration):
         clean = re.sub(r"[^A-Za-z0-9']", "", word)
         word_chars = max(1, len(clean))
         proposed_chars = current_chars + (1 if current else 0) + len(word)
-        # 2-3 words per beat; split earlier when a phrase would become too wide.
-        if current and (len(current) >= 3 or proposed_chars > 19):
+        # Keep karaoke captions inside mobile safe margins; short phrases prevent edge clipping.
+        if current and (len(current) >= 2 or proposed_chars > 15):
             groups.append(current)
             current = []
             current_chars = 0
@@ -335,12 +351,13 @@ def make_ass(narration):
 
     # Slightly smaller type when a phrase is naturally longer; retain a fixed safe-zone position.
     longest = max((len(" ".join(group)) for group in groups), default=0)
-    font_size = 68 if longest > 16 else 74
+    # Conservative type size plus wide side margins prevents clipping on narrow phones.
+    font_size = 56 if longest > 15 else 62
     lines = [
         "[Script Info]", "ScriptType: v4.00+", "WrapStyle: 2", "PlayResX: 1080", "PlayResY: 1920", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Default,Montserrat ExtraBold,{font_size},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,120,120,390,1", "",
+        f"Style: Default,Montserrat ExtraBold,{font_size},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,4,1,2,190,190,390,1", "",
         "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
 
@@ -862,7 +879,13 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         title_lines = [title_lines[0], textwrap.shorten(" ".join(title_lines[1:]), width=22, placeholder="…")]
     title_path.write_text("\n".join(title_lines), encoding="utf-8")
     hook_path = WORK / "hook.txt"
-    hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
+    clean_hook = re.sub(r"\\s+", " ", hook_text.replace("\\n", " ")).strip()
+    # Keep the opening yellow hook within the 9:16 safe area on small screens.
+    if len(clean_hook) > 18:
+        hook_lines = textwrap.wrap(clean_hook, width=16, break_long_words=True)
+        hook_path.write_text("\\n".join(hook_lines[:2]), encoding="utf-8")
+    else:
+        hook_path.write_text(clean_hook, encoding="utf-8")
     clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5)
     if not clips:
         raise RuntimeError("No usable topic-matched visual assets found; stopping video generation.")
@@ -905,8 +928,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "textfile=title.txt:fontcolor=white:fontsize=46:line_spacing=12:"
         "x=(w-text_w)/2:y=150:box=1:boxcolor=0x000000@0.45:boxborderw=24,"
         "drawtext=fontfile=/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf:"
-        "textfile=hook.txt:fontcolor=yellow:fontsize=82:borderw=5:bordercolor=black:"
-        "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=28:"
+        "textfile=hook.txt:fontcolor=yellow:fontsize=68:borderw=4:bordercolor=black:"
+        "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=22:"
         "enable='between(t,0,2.5)',"
         "ass=captions.ass[base]"
     )
