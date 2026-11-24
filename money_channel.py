@@ -250,6 +250,8 @@ def download_relevant_clips(queries):
         for query_index, query in enumerate(queries):
             if len(clips) >= target:
                 break
+            if not IS_LONG and query_index == 0 and opening_found:
+                continue
             if not IS_LONG and query_index > 0 and not opening_found:
                 continue
             try:
