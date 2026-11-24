@@ -1,4 +1,5 @@
 name: CurioLoop One-Time Dating Culture Pilot
+# Retry after making the pilot script deterministic.
 
 on:
   push:
