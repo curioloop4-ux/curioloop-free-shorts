@@ -3,6 +3,14 @@ name: Youqian Research Institute Chinese Channel
 on:
   workflow_dispatch:
     inputs:
+      topic_mode:
+        description: "Choose economy or beauty/massage Shorts"
+        required: true
+        type: choice
+        options:
+          - beauty
+          - economy
+        default: beauty
       content_type:
         description: "Choose Shorts or long-form documentary"
         required: true
@@ -78,6 +86,7 @@ jobs:
           MONEY_YOUTUBE_REFRESH_TOKEN: ${{ secrets.MONEY_YOUTUBE_REFRESH_TOKEN }}
           MONEY_YOUTUBE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
           MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
+          MONEY_TOPIC_MODE: ${{ inputs.topic_mode }}
           MONEY_START_SHORT: ${{ inputs.start_short }}
           OUTPUT_ONLY: ${{ inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
