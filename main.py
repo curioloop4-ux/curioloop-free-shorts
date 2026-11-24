@@ -811,7 +811,7 @@ def upload(path, title, narration, credits=None, seo_tags=None):
     clean_tags = []
     seen_tags = set()
     for tag in base_tags + (seo_tags or []):
-        tag = re.sub(r"\\s+", " ", str(tag)).strip().lstrip("#")
+        tag = re.sub(r"\s+", " ", str(tag)).strip().lstrip("#")
         key = tag.casefold()
         if not tag or key in seen_tags or len(tag) > 60:
             continue
@@ -836,7 +836,7 @@ def upload(path, title, narration, credits=None, seo_tags=None):
     body = {
         "snippet": {
             "title": title[:100],
-            "description": narration + ("\\n\\nVisual credits:\\n" + "\\n".join(credits) if credits else "") + "\\n\\nCurioLoop | Curious facts and surprising discoveries.\\n\\n" + " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean_tags[:3] if re.sub(r"[^A-Za-z0-9]", "", tag)),
+            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\nCurioLoop | Curious facts and surprising discoveries.\n\n" + " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean_tags[:3] if re.sub(r"[^A-Za-z0-9]", "", tag)),
             "tags": clean_tags,
             "categoryId": "24",
         },
