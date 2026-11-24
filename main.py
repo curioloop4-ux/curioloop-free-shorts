@@ -757,8 +757,12 @@ def upload(path, title, narration, credits=None):
         media_body=MediaFileUpload(str(path), mimetype="video/mp4", resumable=True),
     )
     result = request.execute()
-    print("Uploaded video ID:", result.get("id"))
+    video_id = result.get("id")
+    print("Uploaded video ID:", video_id)
+    if video_id:
+        print("Uploaded video URL:", f"https://www.youtube.com/watch?v={video_id}")
     print("Privacy status:", privacy)
+    return video_id
 
 
 def main():
@@ -823,7 +827,7 @@ def main():
                 str(script.get("visual_theme", "")),
                 str(script.get("narration", ""))[:110],
             ]).strip(" |"))
-            prior_scripts.append({
+            script_record = {
                 "title": script["title"],
                 "visual_theme": script.get("visual_theme", ""),
                 "narration": script.get("narration", ""),
@@ -831,7 +835,8 @@ def main():
                 "created_at": __import__("datetime").datetime.now(
                     __import__("datetime").timezone.utc
                 ).isoformat(),
-            })
+            }
+            prior_scripts.append(script_record)
             # Keep a rolling record of the 300 most recent generated scripts.
             script_history["scripts"] = prior_scripts[-300:]
             script_history_path.write_text(
@@ -851,7 +856,15 @@ def main():
                 print(f"VIDEO_ONLY: Rendered MP4 saved at {rendered}; YouTube upload skipped.")
                 uploaded += 1
             else:
-                upload(rendered, script["title"], script["narration"], credits)
+                video_id = upload(rendered, script["title"], script["narration"], credits)
+                if video_id:
+                    script_record["youtube_video_id"] = video_id
+                    script_record["youtube_url"] = f"https://www.youtube.com/watch?v={video_id}"
+                    script_history["scripts"] = prior_scripts[-300:]
+                    script_history_path.write_text(
+                        json.dumps(script_history, ensure_ascii=False, indent=2) + "\n",
+                        encoding="utf-8"
+                    )
                 uploaded += 1
         except Exception as exc:
             print(f"Short {index} failed: {type(exc).__name__}: {exc}")
