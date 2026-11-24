@@ -132,6 +132,19 @@ Return valid JSON only."""
 Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 20-35 seconds; narration 60-85 natural English words; concise curiosity-driven title; hook_text 3-6 words. Open with a relatable question or surprising observation, explain one clear fact, and end with a memorable takeaway.
 Visuals: first three search queries must show the selected featured adult (woman or man, alternate by episode) in relevant real-world activity, with a post-activity/sweat moment, recovery or massage where relevant, and exercise/action. Remaining two queries must directly depict the actual topic: real animals for animal facts, real experiments for science, archival objects or places for history, and topic-specific human activity where appropriate. Do not force beauty/massage footage into unrelated topics. All people clearly adults, fully clothed and non-sexualized. Return exactly five English stock-video queries in the same order as the visual plan. Return valid JSON only."""
+    if os.getenv("CONTENT_MODE", "general").lower() == "fitness_recovery":
+        prompt = """Create one original English YouTube Short about women's lower-body fitness, hip mobility and professional recovery massage.
+The specific episode topic is why hips can feel stiff after sitting for long periods, and how gentle movement, glute activation and professional massage may support comfort. Keep claims conservative: do not say massage burns fat, removes cellulite, reshapes the waist, cures pain or permanently lengthens muscles. Do not invent statistics or cite unnamed studies.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+20-35 seconds; narration 60-85 natural English words; concise curiosity-driven title; hook_text 3-6 words. Start with a relatable question about getting up after sitting, explain the role of movement and glute activation, then distinguish temporary relaxation from fat loss or body reshaping.
+VISUAL RULES: feature clearly adult women in tasteful, fully clothed athletic clothing. Use real licensed stock VIDEO, not stills. Include clear, professional, non-sexualized fitness and massage footage. Massage must look like legitimate sports/recovery or wellness treatment, with no intimate framing.
+Return exactly 5 English stock-video queries in this order:
+1) adult woman performing hip thrust glute workout in gym full body video
+2) professional therapist giving lower back massage to adult woman sports recovery wellness video
+3) professional sports massage therapist massaging adult woman's thigh quadriceps recovery video
+4) adult woman performing glute bridge and hip mobility exercise gym video
+5) adult woman doing gentle hip flexor stretch after workout fitness recovery video
+All subjects must be clearly adults. No nudity, lingerie, sexual activity, minors, or suggestive close-ups. Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "beauty":
         prompt = """Create one original English YouTube Short for adult male viewers interested in women, focused on practical beauty, skincare, haircare, massage, fashion, personal presentation and attraction psychology. Use a respectful, informative angle about trends, first impressions or everyday self-care without objectifying women or promising results.
 Choose one useful, evidence-aware everyday tip. Do not promise medical or cosmetic results; do not diagnose or prescribe treatments. Avoid unsupported claims and fabricated studies.
@@ -156,13 +169,21 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
             "adult man fitness workout gym stretching full body exercise video",
         ]
     else:
-        prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult woman. The first three visuals must feature a woman sweating after a workout, a professional massage involving an adult woman, and an adult woman exercising. Keep her fully clothed and non-sexualized."
+        prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult woman. Keep her fully clothed and non-sexualized."
         data_featured_person = "fit adult woman"
-        opening_visual_queries = [
-            "adult woman sweating after cardio workout gym fitness full body video",
-            "professional adult woman massage therapist giving shoulder massage spa wellness video",
-            "adult woman fitness workout gym stretching full body exercise video",
-        ]
+        if os.getenv("CONTENT_MODE", "general").lower() == "fitness_recovery":
+            opening_visual_queries = [
+                "adult woman performing hip thrust glute workout in gym full body video",
+                "professional therapist giving lower back massage to adult woman sports recovery wellness video",
+                "professional sports massage therapist massaging adult woman's thigh quadriceps recovery video",
+            ]
+        else:
+            prompt += " The first three visuals must feature a woman sweating after a workout, a professional massage involving an adult woman, and an adult woman exercising."
+            opening_visual_queries = [
+                "adult woman sweating after cardio workout gym fitness full body video",
+                "professional adult woman massage therapist giving shoulder massage spa wellness video",
+                "adult woman fitness workout gym stretching full body exercise video",
+            ]
     if previous_titles:
         prompt += (
             "\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
