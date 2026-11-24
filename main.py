@@ -321,7 +321,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             "professional adult woman massage therapist giving shoulder massage spa wellness video",
             "adult woman fitness workout gym stretching full body exercise video",
         ]
-    topic_queries = generated_terms[3:5] if len(generated_terms) > 3 else [title.strip(), visual_theme]    query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
+    topic_queries = generated_terms[3:5] if len(generated_terms) > 3 else [title.strip(), visual_theme]
+    query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
     session.headers.update({"User-Agent": "CurioLoop/1.0"})
