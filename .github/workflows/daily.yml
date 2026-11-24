@@ -2,12 +2,14 @@ name: CurioLoop Daily Shorts
 
 on:
   schedule:
-    # U.S. audience coverage: 9 AM, 12 PM, 3 PM, 6 PM, 9 PM Eastern (UTC schedule; shifts by DST)
-    - cron: "0 14 * * *"
-    - cron: "0 17 * * *"
+    # Five daily Shorts for English-speaking audiences.
+    # Targets 8 AM, 11 AM, 3 PM, 6 PM and 8 PM US Eastern during standard time.
+    # GitHub cron uses UTC, so these slots shift one hour later in US daylight time.
+    - cron: "0 13 * * *"
+    - cron: "0 16 * * *"
     - cron: "0 20 * * *"
     - cron: "0 23 * * *"
-    - cron: "0 2 * * *"
+    - cron: "0 1 * * *"
   workflow_dispatch:
     inputs:
       shorts_count:
