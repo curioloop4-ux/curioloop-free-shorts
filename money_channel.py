@@ -186,16 +186,14 @@ def download_relevant_clips(queries):
             )
             ffmpeg_args = ["-vf", video_filter]
         else:
-            # Preserve the complete source frame; blurred duplicate fills the vertical canvas.
+            # Shorts: fill the vertical 9:16 frame and center-crop landscape footage.
+            # Do not shrink the full horizontal frame into a small inset or blurred layout.
             video_filter = (
-                f"[0:v]split=2[bg][fg];"
-                f"[bg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
-                f"crop={WIDTH}:{HEIGHT},boxblur=22:10[bg];"
-                f"[fg]scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=decrease[fg];"
-                f"[bg][fg]overlay=(W-w)/2:(H-h)/2,"
-                "fps=30,format=yuv420p[v]"
+                f"scale={WIDTH}:{HEIGHT}:force_original_aspect_ratio=increase,"
+                f"crop={WIDTH}:{HEIGHT}:(in_w-out_w)/2:(in_h-out_h)/2,"
+                "fps=30,format=yuv420p"
             )
-            ffmpeg_args = ["-filter_complex", video_filter, "-map", "[v]"]
+            ffmpeg_args = ["-vf", video_filter]
         subprocess.run([
             "ffmpeg", "-y", "-i", str(raw), "-t", "10",
             *ffmpeg_args,
