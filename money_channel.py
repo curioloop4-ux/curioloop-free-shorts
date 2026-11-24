@@ -555,8 +555,10 @@ def main():
     topics = reserve_topics(3)
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
-    print(f"Starting Shorts batch at {start_short}/3 (economy and business topics).")
-    for index, (topic_category, topic) in enumerate(topics[start_short - 1:], start=start_short):
+    shorts_count = max(1, min(3, int(os.getenv("MONEY_SHORTS_COUNT", "1"))))
+    selected_topics = topics[start_short - 1:start_short - 1 + shorts_count]
+    print(f"Starting {len(selected_topics)} Short(s) at position {start_short}/3 ({os.getenv('MONEY_TOPIC_MODE', 'economy')} mode).")
+    for index, (topic_category, topic) in enumerate(selected_topics, start=start_short):
         print(f"\n========== SHORT {index}/3 ==========")
         try:
             print("Content category:", topic_category)
