@@ -181,12 +181,12 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
-    # DailyNibble signature opening: always use a licensed adult-woman workout video.
+    # CurioLoop signature opening: licensed adult-woman workout footage, followed by massage and exercise.
     data["featured_person"] = "fit adult woman"
     if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
         raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
     data["visual_queries"]=[str(q).strip() for q in data["visual_queries"][:3]]
-    data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
+    data["visual_queries"][0] = "adult woman sweating after cardio workout gym fitness full body video"
     return data
 
 
@@ -292,7 +292,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
     subject = featured_person if stock_person_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
-    opening_queries = [generated_terms[0]] if generated_terms else ["adult woman workout outfit gym stretching fitness full body video"]
+    opening_queries = ["adult woman sweating after cardio workout gym fitness full body video"]
     glamour_queries = [
         "professional adult woman massage therapist giving shoulder massage spa wellness video",
         "adult woman fitness workout gym stretching full body exercise video",
@@ -654,12 +654,17 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     if len(clips) < 2:
         raise RuntimeError("The athletic opening was found, but no topic-related follow-up visual was found.")
 
-    # Reserve the first 2.5 seconds for the signature shot; divide the remaining runtime
-    # evenly across the topic-related clips.
-    # Give the opening person-led workout/massage footage a longer screen presence.
-    opening_duration = min(6.0, max(5.0, duration * 0.25))
-    topic_segment = (duration - opening_duration) / (len(clips) - 1)
-    segment_durations = [opening_duration] + [topic_segment] * (len(clips) - 1)
+    # Three-part person-led opening: post-workout sweat, professional massage, then exercise.
+    # Keep this opening visually prominent, then devote the rest of the runtime to topic-matched footage.
+    intro_clip_count = min(3, len(clips))
+    intro_duration = min(8.0, max(6.0, duration * 0.28))
+    intro_segment = intro_duration / intro_clip_count
+    topic_clip_count = len(clips) - intro_clip_count
+    topic_segment = (duration - intro_duration) / topic_clip_count if topic_clip_count else 0
+    segment_durations = (
+        [intro_segment] * intro_clip_count
+        + ([topic_segment] * topic_clip_count if topic_clip_count else [])
+    )
     cmd = ["ffmpeg", "-y"]
     for clip_path in clips:
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
