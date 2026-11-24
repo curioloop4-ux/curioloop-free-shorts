@@ -256,6 +256,22 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     if response is None:
         raise RuntimeError("Gemini request failed without a response after retries.")
     data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
+        # Lock this one-off pilot to the approved topic/script so the model cannot drift.
+        data.update({
+            "title": "Why Is Dating in Korea So Different From Dating in America?",
+            "hook_text": "DATING CULTURE SHOCK",
+            "narration": "Ever noticed how dating can feel like a different game in Korea and the U.S.? In Korea, some couples put more emphasis on becoming an official couple and marking relationship milestones. In the U.S., some people are comfortable dating casually before defining things. Texting expectations can differ too—but there's no single rule in either country. The real secret? Ask, don't assume.",
+            "visual_theme": "Modern cross-cultural dating and everyday adult couple interactions",
+            "featured_person": "adult couple",
+            "visual_queries": [
+                "adult couple having coffee date cafe conversation video",
+                "adult couple texting smartphones relationship communication video",
+                "adult couple walking together holding hands city street video",
+                "adult couple discussing relationship at cafe video",
+                "adult couple laughing romantic dinner date video"
+            ]
+        })
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
