@@ -676,10 +676,23 @@ def main():
     for index in range(1, count + 1):
         print(f"\\n========== SHORT {index}/{count} ==========")
         try:
-            script = make_script(recent_prompts)
-            title_key = re.sub(r"[^a-z0-9 ]", "", script["title"].lower()).strip()
-            if title_key in {re.sub(r"[^a-z0-9 ]", "", t.lower()).strip() for t in used_titles}:
-                raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
+            duplicate_title_keys = {
+                re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
+                for title in used_titles
+            }
+            script = None
+            for attempt in range(3):
+                candidate = make_script(recent_prompts)
+                candidate_key = re.sub(r"[^a-z0-9 ]", "", candidate["title"].lower()).strip()
+                if candidate_key not in duplicate_title_keys:
+                    script = candidate
+                    break
+                print(f"Duplicate title returned; requesting a fresh script ({attempt + 1}/3): {candidate['title']}")
+                recent_prompts.append(
+                    "REJECTED DUPLICATE: " + candidate["title"] + " | Do not reuse this topic or angle."
+                )
+            if script is None:
+                raise RuntimeError("Gemini returned duplicate titles three times; refusing to reuse a script.")
             used_titles.append(script["title"])
             recent_prompts.append(" | ".join([
                 str(script.get("title", "")),
