@@ -93,7 +93,7 @@ def fetch_trending_candidates(limit=20):
         return []
 
 
-def make_script(previous_titles=None):
+def make_script(previous_titles=None, featured_gender="woman"):
     """Generate general-knowledge Shorts with relevant licensed visuals."""
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
@@ -141,6 +141,23 @@ Use exactly 5 English stock-video search queries in this order:
 4) adult woman skincare routine applying moisturizer beauty salon video
 5) stylish adult woman confident fashion full body video
 All people must be clearly adults and fully clothed. No nudity, lingerie, sexual activity, minors, medical claims or invasive procedures. Return valid JSON only."""
+    # Alternate the featured adult subject while keeping the same topic-first format.
+    if featured_gender == "man":
+        prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult man. The first three visuals must feature a man sweating after a workout, a professional sports massage involving an adult man, and an adult man exercising. Do not use women as the featured subject in these opening visuals. Keep him fully clothed and non-sexualized."
+        data_featured_person = "fit adult man"
+        opening_visual_queries = [
+            "adult man sweating after cardio workout gym fitness full body video",
+            "professional sports massage adult man athlete recovery video",
+            "adult man fitness workout gym stretching full body exercise video",
+        ]
+    else:
+        prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult woman. The first three visuals must feature a woman sweating after a workout, a professional massage involving an adult woman, and an adult woman exercising. Keep her fully clothed and non-sexualized."
+        data_featured_person = "fit adult woman"
+        opening_visual_queries = [
+            "adult woman sweating after cardio workout gym fitness full body video",
+            "professional adult woman massage therapist giving shoulder massage spa wellness video",
+            "adult woman fitness workout gym stretching full body exercise video",
+        ]
     if previous_titles:
         prompt += (
             "\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
@@ -181,12 +198,11 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
-    # CurioLoop signature opening: licensed adult-woman workout footage, followed by massage and exercise.
-    data["featured_person"] = "fit adult woman"
+    # Alternate female- and male-focused episodes; opening footage follows the selected subject.
+    data["featured_person"] = data_featured_person
     if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
         raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
-    data["visual_queries"]=[str(q).strip() for q in data["visual_queries"][:3]]
-    data["visual_queries"][0] = "adult woman sweating after cardio workout gym fitness full body video"
+    data["visual_queries"] = opening_visual_queries
     return data
 
 
@@ -292,13 +308,19 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
     subject = featured_person if stock_person_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
-    opening_queries = ["adult woman sweating after cardio workout gym fitness full body video"]
-    glamour_queries = [
-        "professional adult woman massage therapist giving shoulder massage spa wellness video",
-        "adult woman fitness workout gym stretching full body exercise video",
-    ]
-    topic_queries = generated_terms[1:5] if len(generated_terms) > 1 else [title.strip(), visual_theme]
-    query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
+    if featured_person.lower() == "fit adult man":
+        opening_queries = ["adult man sweating after cardio workout gym fitness full body video"]
+        glamour_queries = [
+            "professional sports massage adult man athlete recovery video",
+            "adult man fitness workout gym stretching full body exercise video",
+        ]
+    else:
+        opening_queries = ["adult woman sweating after cardio workout gym fitness full body video"]
+        glamour_queries = [
+            "professional adult woman massage therapist giving shoulder massage spa wellness video",
+            "adult woman fitness workout gym stretching full body exercise video",
+        ]
+    topic_queries = generated_terms[1:5] if len(generated_terms) > 1 else [title.strip(), visual_theme]    query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
     session.headers.update({"User-Agent": "CurioLoop/1.0"})
@@ -597,8 +619,7 @@ def make_mascot():
     draw.ellipse(p((101, 170, 314, 348)), fill=orange, outline=outline, width=7 * scale)
     draw.ellipse(p((139, 211, 278, 337)), fill=cream)
 
-    # Big rounded head with soft cheeks.
-    draw.ellipse(p((58, 57, 316, 267)), fill=orange, outline=outline, width=7 * scale)
+    # Big rounded head with soft cheeks.    draw.ellipse(p((58, 57, 316, 267)), fill=orange, outline=outline, width=7 * scale)
     draw.ellipse(p((77, 77, 297, 247)), fill=light_orange)
     draw.ellipse(p((99, 165, 274, 252)), fill=cream)
 
@@ -777,9 +798,12 @@ def main():
                 re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
                 for title in used_titles
             }
+            # Alternate female-focused and male-focused videos across batches using saved script history.
+            featured_gender = "woman" if len(prior_scripts) % 2 == 0 else "man"
+            print(f"Featured subject rotation: adult {featured_gender}")
             script = None
             for attempt in range(3):
-                candidate = make_script(recent_prompts)
+                candidate = make_script(recent_prompts, featured_gender=featured_gender)
                 candidate_key = re.sub(r"[^a-z0-9 ]", "", candidate["title"].lower()).strip()
                 if candidate_key not in duplicate_title_keys:
                     script = candidate
@@ -800,6 +824,7 @@ def main():
                 "title": script["title"],
                 "visual_theme": script.get("visual_theme", ""),
                 "narration": script.get("narration", ""),
+                "featured_person": script.get("featured_person", ""),
                 "created_at": __import__("datetime").datetime.now(
                     __import__("datetime").timezone.utc
                 ).isoformat(),
