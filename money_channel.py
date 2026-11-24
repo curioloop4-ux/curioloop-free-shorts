@@ -37,9 +37,9 @@ def generate_content(topic=None, topic_category='经济'):
     else:
         topic = topic or "为什么有些人越来越有钱？"
         if topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理"}:
-            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2和第3个搜索词应安排成年女性的吸睛人物镜头：穿着时尚、合身但得体的服装，展现自信姿态、优雅动作或时尚/健身场景，画面有魅力但不裸露、不涉及性行为；第4和第5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景。全部使用真实授权素材，全身或腰部以上中景，脸部清楚、人物为主体。禁止内衣/裸露、性行为、未成年人、手部特写、无人物风景及钞票硬币特写。sources提供2至3个真实可信来源URL，不得编造。"""
+            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
         else:
-            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2和第3个搜索词应安排成年女性的吸睛人物镜头：穿着时尚、合身但得体的服装，展现自信姿态、优雅动作或时尚/健身场景，画面有魅力但不裸露、不涉及性行为；第4和第5个必须精准对应本条主题，优先呈现成年男女进行与主题直接相关的真实活动。全部使用真实授权素材，全身或腰部以上中景，脸部清楚、人物为主体。禁止内衣/裸露、性行为、未成年人、手部特写和无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
+            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须精准对应本条主题，优先呈现成年男女进行与主题直接相关的真实活动；人物脸部清楚，优先全身或腰部以上中景，人物占画面主体。场景可为街拍穿搭、健身训练、护肤、发型整理、镜前准备或社交互动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -284,11 +284,6 @@ def download_relevant_clips(queries):
                     woman_terms = ("woman", "women", "female", "girl")
                     fitness_terms = ("fitness", "workout", "gym", "stretch", "yoga", "exercise", "training", "athletic")
                     if not any(term in searchable for term in woman_terms) or not any(term in searchable for term in fitness_terms):
-                        continue
-                if not IS_LONG and query_index in (1, 2):
-                    woman_terms = ("woman", "women", "female", "girl")
-                    style_terms = ("fashion", "style", "model", "elegant", "beauty", "dress", "fitness", "confident", "portrait")
-                    if not any(term in searchable for term in woman_terms) or not any(term in searchable for term in style_terms):
                         continue
                 bad_terms = (
                     "hand close up", "hands close up", "finger close up", "fingers close up",
