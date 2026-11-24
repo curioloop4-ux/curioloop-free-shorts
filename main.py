@@ -98,13 +98,13 @@ def make_script(previous_titles=None):
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
     previous_titles = previous_titles or []
-    prompt = """Create one original English YouTube Short for a global audience.
-Cover accurate general knowledge: science, psychology, history, animals, nature, fitness,
-technology, everyday mysteries. No Korean entertainment news.
+    prompt = """Create one original English YouTube Short for adult male viewers interested in women, attraction, beauty, style and relationship psychology.
+Choose accurate, engaging topics such as women's beauty and fashion trends, first impressions, attraction psychology, dating communication, grooming, fitness and social behavior. Keep the perspective informative and respectful; never objectify women or make manipulative dating claims. No Korean entertainment news.
 Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 Choose one specific verified fact; never invent statistics or studies. Avoid medical/financial advice.
 20-35 seconds; narration 60-85 natural English words; title 35-45 characters maximum, concise and punchy;
 hook_text 3-6 words; immediate curiosity hook that follows the casual opening.
+AUDIENCE ANGLE: frame the hook around what adult men commonly notice, misunderstand or find interesting about women, while avoiding stereotypes and treating women as people rather than props.
 NARRATION OPENING RULES:
 Start with a relatable everyday-life observation, familiar habit, small frustration, or casual question.
 Do NOT begin by naming the scientific concept, stating the fact, or sounding like a lecture.
@@ -112,7 +112,7 @@ Use a conversational bridge from the everyday situation into the surprising fact
 Example style only: "Ever notice how you feel more awake after a quick walk?" Then explain the real reason.
 Keep the opening natural, specific to the topic, and accurate; do not use generic clickbait.
 VISUAL RULES:
-The first shot must be a real licensed stock VIDEO of an adult woman wearing tasteful athletic/workout clothing,
+Use confident adult women as the primary visual focus when relevant, with tasteful fashion, beauty, wellness and fitness footage. The first shot must be a real licensed stock VIDEO of an adult woman wearing tasteful athletic/workout clothing,
 doing a natural fitness-related action (walking into a gym, stretching, tying running shoes, warming up,
 or exercising). Attractive, healthy, confident presentation is fine; fully clothed and non-sexualized.
 Use a medium or full-body shot with the woman clearly visible. Do not use a still image for the opening.
@@ -128,7 +128,7 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "beauty":
-        prompt = """Create one original English YouTube Short about practical beauty, skincare, haircare, grooming, massage or personal presentation for a global adult audience.
+        prompt = """Create one original English YouTube Short for adult male viewers interested in women, focused on practical beauty, skincare, haircare, massage, fashion, personal presentation and attraction psychology. Use a respectful, informative angle about trends, first impressions or everyday self-care without objectifying women or promising results.
 Choose one useful, evidence-aware everyday tip. Do not promise medical or cosmetic results; do not diagnose or prescribe treatments. Avoid unsupported claims and fabricated studies.
 Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 20-35 seconds; narration 60-85 natural English words; title concise and curiosity-driven; hook_text 3-6 words.
