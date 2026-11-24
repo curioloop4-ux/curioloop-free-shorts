@@ -130,6 +130,20 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 3) "adult woman fitness fashion stylish outfit confident movement video" for a second tasteful adult-woman shot.
 4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
+    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
+        prompt = """Create one original English YouTube Short for an adult audience interested in dating, attraction, relationship psychology and sensual style.
+FIRST VIDEO TOPIC: "What Makes a Man Instantly Attractive?" Explain that appearance may catch attention, but confidence, calm body language, natural eye contact and making others comfortable can create attraction. Avoid gender stereotypes, manipulation tactics, fake science and unsupported statistics. Keep it respectful, confident, playful and slightly provocative, but non-explicit.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags.
+Use this exact title: "What Makes a Man Instantly Attractive? 👀🔥"
+hook_text: "REAL ATTRACTION"
+Narration: 45-55 natural English words, about 20-25 seconds. Start with "Looks get attention..." and explain confidence, eye contact and making others comfortable. End with a punchy line about natural confidence.
+Return exactly five English stock-video search queries in this order:
+1) "attractive adult woman fitness workout gym confident full body video"
+2) "handsome adult man stylish fashion confident walking city video"
+3) "attractive adult couple romantic eye contact elegant evening setting video"
+4) "confident adult man relaxed body language smart casual outfit video"
+5) "adult couple flirting smiling natural conversation restaurant video"
+All people must be clearly adults, fully clothed and non-explicit. Sensual atmosphere is acceptable; no nudity, lingerie, sexual activity or minors. Use real licensed stock VIDEO, not stills. seo_tags must be relevant to dating, attraction, confidence, body language and relationship psychology. Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
         prompt = """Create one original, funny English YouTube Shorts mini-story starring a cute orange cat.
 Build a clear visual comedy arc: immediate funny hook, a simple goal, an escalating mishap, and a surprising but wholesome punchline. Make it understandable without sound. The cat is the consistent main character in every scene. Do not imitate copyrighted characters, existing memes, or specific creators. No cruelty, danger, animal distress, unsafe stunts, or misleading real-world claims.
@@ -175,6 +189,9 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     # Keep animal-comedy prompts free of the legacy human-subject instructions.
     if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
         data_featured_person = "cat"
+        opening_visual_queries = []
+    elif os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
+        data_featured_person = "fit adult woman"
         opening_visual_queries = []
     elif featured_gender == "man":
         prompt += "\nFEATURED SUBJECT: The featured person in this episode must be an attractive, confident adult man. The first three visuals must feature a man sweating after a workout, a professional sports massage involving an adult man, and an adult man exercising. Do not use women as the featured subject in these opening visuals. Keep him fully clothed and non-sexualized."
@@ -244,7 +261,14 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
         data["seo_tags"] = []
     data["seo_tags"] = [str(tag).strip().lstrip("#") for tag in data["seo_tags"] if str(tag).strip()]
     data["seo_tags"] = data["seo_tags"][:15]
-    if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
+    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
+        data["featured_person"] = "fit adult woman"
+        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
+            raise ValueError("Dating attraction mode requires five topic-specific stock-video queries")
+        data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:5] if str(q).strip()]
+        if len(data["visual_queries"]) != 5:
+            raise ValueError("Dating attraction mode requires five non-empty visual queries")
+    elif os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
         data["featured_person"] = "cat"
         if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
             raise ValueError("Animal comedy script must include five cat-specific stock-video queries")
@@ -361,10 +385,17 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     """Use only tightly topic-matched licensed assets; never fill with unrelated stock footage."""
     featured_person = (featured_person or "").strip()
     animal_mode = os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy"
+    dating_mode = os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction"
     stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
     subject = featured_person if stock_person_mode or animal_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
-    if animal_mode:
+    if dating_mode:
+        if len(generated_terms) < 5:
+            raise RuntimeError("Dating attraction requires five specific adult stock-video queries.")
+        opening_queries = [generated_terms[0]]
+        glamour_queries = generated_terms[1:3]
+        topic_queries = generated_terms[3:5]
+    elif animal_mode:
         if len(generated_terms) < 5:
             raise RuntimeError("Animal comedy requires five cat-specific visual queries.")
         opening_queries = [generated_terms[0]]
@@ -565,7 +596,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                     if not relevant_metadata(tags, query):
                         print(f"Rejecting unrelated Pixabay result: {tags}")
                         continue
-                    if not animal_mode and query_index in (1, 2):
+                    if not animal_mode and not dating_mode and query_index in (1, 2):
                         words = set(re.findall(r"[a-z]+", str(tags).lower()))
                         adult_woman_terms = {"woman", "women", "female"}
                         glamour_terms = {"fashion", "style", "model", "elegant", "beauty", "dress", "fitness", "confident", "portrait", "outfit"}
