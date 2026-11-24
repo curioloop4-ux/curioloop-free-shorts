@@ -237,6 +237,8 @@ def download_relevant_clips(queries):
         response.raise_for_status()
         return response.json().get("hits", [])
 
+    # Search order is intentional: the first footage is always a woman exercising,
+    # followed by massage/spa footage when the topic is beauty or relaxation.
     for source in ("Coverr", "Pixabay"):
         if len(clips) >= target:
             break
