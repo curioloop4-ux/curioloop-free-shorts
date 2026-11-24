@@ -520,7 +520,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 for item in response.json().get("hits", []):
                     tags = item.get("tags", "")
                     asset_id = f"pixabay:{item.get('id', '')}" if item.get("id") else None
-                    page_url = item.get("pageURL", "")                    video_url = ((item.get("videos", {}).get("large") or
+                    page_url = item.get("pageURL", "")
+                    video_url = ((item.get("videos", {}).get("large") or
                                   item.get("videos", {}).get("medium") or
                                   item.get("videos", {}).get("small") or {}).get("url", ""))
                     if already_used(asset_id, page_url, video_url):
