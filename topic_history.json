@@ -5,7 +5,10 @@
     "work_01",
     "beauty_05",
     "fitness_04",
-    "consumer_05"
+    "consumer_05",
+    "beauty_02",
+    "beauty_04",
+    "business_01"
   ],
   "recent_topics": [
     {
@@ -37,7 +40,22 @@
       "id": "consumer_05",
       "category": "소비와 트렌드",
       "topic": "二手商品市场为什么越来越受关注？"
+    },
+    {
+      "id": "beauty_02",
+      "category": "美容与形象",
+      "topic": "发型真的会改变一个人的整体气质吗？"
+    },
+    {
+      "id": "beauty_04",
+      "category": "美容与形象",
+      "topic": "为什么自然妆容越来越受欢迎？"
+    },
+    {
+      "id": "business_01",
+      "category": "기업과 비즈니스",
+      "topic": "星巴克真正卖给顾客的只是咖啡吗？"
     }
   ],
-  "mix_position": 3
+  "mix_position": 6
 }
