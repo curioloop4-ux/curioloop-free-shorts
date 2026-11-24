@@ -36,10 +36,10 @@ def generate_content(topic=None, topic_category='经济'):
         prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Coverr或Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景。画面优先出现外形好看、身材匀称或健美、穿着合身时尚服装的成年女性或成年男性（仅限明确成年人），例如修身西装、合体衬衫、商务套装、运动服或简洁时尚日常服装。优先全身镜头或腰部以上中景，人物完整清晰、脸部可见、主体居中，至少一名完整成年人占据画面主要区域。明确避免手部特写、手指特写、只出现手、被裁掉的头部或半截身体、远处小人物、背影遮挡和模糊人物。禁止用硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形或无关风景充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
         topic = topic or "为什么有些人越来越有钱？"
-        if topic_category == "经济":
-            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文搜索词，必须与经济主题对应，画面为穿着合体时尚服装、外形出众的成年男女进行工作、购物、创业或预算讨论；全身或腰部以上中景，脸部清楚，人物为主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
+        if topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理"}:
+            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
         else:
-            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词，精准对应本条主题，优先呈现外形出众、身材匀称或健美的成年女性和成年男性，穿时尚合身服装；人物脸部清楚，优先全身或腰部以上中景，人物占画面主体。场景可为街拍穿搭、健身训练、护肤、发型整理、镜前准备或社交互动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
+            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须精准对应本条主题，优先呈现成年男女进行与主题直接相关的真实活动；人物脸部清楚，优先全身或腰部以上中景，人物占画面主体。场景可为街拍穿搭、健身训练、护肤、发型整理、镜前准备或社交互动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -86,7 +86,9 @@ def generate_content(topic=None, topic_category='经济'):
         if not isinstance(data.get("narration"), str) or not (60 <= len(data["narration"]) <= 220):
             raise ValueError("Chinese narration should be short enough for a 20-30 second Short.")
         if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
-            raise ValueError("Five visual search queries are required, including topic-relevant adult people scenes.")
+            raise ValueError("Five visual search queries are required, including the fixed adult-woman fitness opening.")
+        data["visual_queries"] = [str(query).strip() for query in data["visual_queries"][:5]]
+        data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
     if not isinstance(data.get("sources"), list) or len(data["sources"]) < 2:
         raise ValueError("At least two reference sources are required.")
     return data
@@ -113,46 +115,57 @@ def ass_time(seconds):
 
 
 def make_subtitles(text, duration):
-    groups, current = [], ""
-    if re.search(r"[\\u4e00-\\u9fff]", text):
-        chunks = re.split(r"(?<=[，。！？；])", text.replace("\\n", " "))
-        for chunk in chunks:
-            chunk = chunk.strip()
-            while len(chunk) > 16:
-                groups.append(chunk[:16])
-                chunk = chunk[16:]
-            if chunk:
-                groups.append(chunk)
-    else:
-        words = text.split()
-        limit = 7 if IS_LONG else 5
-        for word in words:
-            current += (" " if current else "") + word
-            if len(current.split()) >= limit or re.search(r"[.!?。！？]$", word):
-                groups.append(current)
-                current = ""
-        if current:
-            groups.append(current)
-    weights = [sum(max(1, len(w)) for w in group) for group in groups]
-    total = sum(weights) or 1
+    """Chinese phrase-by-phrase karaoke captions matching CurioLoop's bold yellow/white style."""
+    clean_text = re.sub(r"\s+", "", text)
+    segments = re.split(r"(?<=[，。！？；：])", clean_text)
+    groups = []
+    for segment in segments:
+        segment = segment.strip()
+        while len(segment) > 8:
+            groups.append(segment[:8])
+            segment = segment[8:]
+        if segment:
+            groups.append(segment)
+    if not groups:
+        groups = [clean_text or "有钱研究所"]
+
+    def stamp(seconds):
+        cs = int(seconds * 100)
+        h, rem = divmod(cs, 360000)
+        m, rem = divmod(rem, 6000)
+        sec, centisec = divmod(rem, 100)
+        return f"{h}:{m:02d}:{sec:02d}.{centisec:02d}"
+
+    weights = []
+    for group in groups:
+        weights.append(sum(2.0 if char in "，。！？；：、" else 1.0 for char in group))
+    total_weight = sum(weights) or 1.0
     lines = [
         "[Script Info]", "ScriptType: v4.00+", "WrapStyle: 2",
         f"PlayResX: {WIDTH}", f"PlayResY: {HEIGHT}", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Default,Noto Sans CJK KR,{54 if IS_LONG else 72},&H00FFFFFF,&H00FFFFFF,&H00101010,&H90000000,1,0,1,4,2,2,100,100,{90 if IS_LONG else 300},1",
+        f"Style: Default,Noto Sans CJK SC,{72 if IS_LONG else 74},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,120,120,{390 if not IS_LONG else 180},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
     cursor = 0.0
     for group, weight in zip(groups, weights):
-        span = duration * weight / total
-        caption = str(group).replace("{", "").replace("}", "")
-        lines.append(f"Dialogue: 0,{ass_time(cursor)},{ass_time(min(duration, cursor + span))},Default,,0,0,0,,{caption}")
-        cursor += span
+        group_duration = duration * weight / total_weight
+        char_weights = [2 if char in "，。！？；：、" else 1 for char in group]
+        char_total = sum(char_weights) or 1
+        karaoke = []
+        for char, char_weight in zip(group, char_weights):
+            centiseconds = max(1, round(group_duration * 100 * char_weight / char_total))
+            karaoke.append(f"{{\\kf{centiseconds}}}{char}")
+        end_time = min(cursor + group_duration, duration)
+        lines.append(
+            f"Dialogue: 0,{stamp(cursor)},{stamp(end_time)},Default,,0,0,0,,{{\\an2}}{''.join(karaoke)}"
+        )
+        cursor = end_time
+
     path = WORK / "captions.ass"
     path.write_text("\n".join(lines), encoding="utf-8")
     return path
-
 
 def download_relevant_clips(queries):
     """Prefer Coverr's official API; fall back to Pixabay when Coverr has no suitable results."""
@@ -168,6 +181,7 @@ def download_relevant_clips(queries):
     # Use topic-specific search phrases from the generated script.
     queries = [str(query).strip() for query in queries if str(query).strip()]
     clips, credits, seen = [], [], set()
+    opening_found = IS_LONG
 
     def normalize_download(url, number):
         raw = WORK / f"raw_{number}.mp4"
@@ -195,7 +209,7 @@ def download_relevant_clips(queries):
             )
             ffmpeg_args = ["-vf", video_filter]
         subprocess.run([
-            "ffmpeg", "-y", "-i", str(raw), "-t", "10",
+            "ffmpeg", "-y", "-i", str(raw), "-t", "8",
             *ffmpeg_args,
             "-an", "-c:v", "libx264", "-preset", "veryfast", "-crf", "22",
             "-movflags", "+faststart", str(normalized)
@@ -233,9 +247,11 @@ def download_relevant_clips(queries):
             print("PIXABAY_API_KEY is not set; skipping Pixabay fallback.")
             continue
         print(f"Searching {source} for topic-matched people footage.")
-        for query in queries:
+        for query_index, query in enumerate(queries):
             if len(clips) >= target:
                 break
+            if not IS_LONG and query_index > 0 and not opening_found:
+                continue
             try:
                 hits = search_coverr(query) if source == "Coverr" else search_pixabay(query)
             except requests.exceptions.RequestException as exc:
@@ -262,6 +278,11 @@ def download_relevant_clips(queries):
                 )
                 if not any(term in searchable for term in people_terms):
                     continue
+                if not IS_LONG and query_index == 0:
+                    woman_terms = ("woman", "women", "female", "girl")
+                    fitness_terms = ("fitness", "workout", "gym", "stretch", "yoga", "exercise", "training", "athletic")
+                    if not any(term in searchable for term in woman_terms) or not any(term in searchable for term in fitness_terms):
+                        continue
                 bad_terms = (
                     "hand close up", "hands close up", "finger close up", "fingers close up",
                     "hand closeup", "finger closeup", "isolated hand", "desert", "sand dune",
@@ -291,6 +312,9 @@ def download_relevant_clips(queries):
                     print(f"Could not process {source} clip {item_id}: {exc}")
                     continue
                 clips.append(normalized)
+                if not IS_LONG and query_index == 0 and not opening_found:
+                    opening_found = True
+                    print("Accepted fixed adult-woman fitness opening.")
                 seen.add(item_id)
                 if source == "Coverr":
                     credits.append(f"Coverr video: {page_url} | Coverr attribution")
@@ -298,6 +322,8 @@ def download_relevant_clips(queries):
                     credits.append(f"Pixabay: {creator} | {page_url} | Check current Pixabay Content License")
                 print(f"Selected {source} clip {item_id}: {item.get('title', query)}")
                 break  # at most one clip per query
+    if not IS_LONG and not opening_found:
+        raise RuntimeError("Required adult-woman fitness opening was not found in licensed stock video; refusing to use unrelated footage.")
     if len(clips) < minimum:
         raise RuntimeError(
             f"Only {len(clips)} relevant licensed clips found; need at least {minimum}. "
@@ -450,7 +476,7 @@ APPEARANCE_TOPIC_BANK = [
 
 
 def reserve_topics(count=3):
-    """Select topics using a persistent rolling 70/30 appearance-to-economics schedule."""
+    """Choose distinct economy, business and money topics without recent repeats."""
     token = os.getenv("GITHUB_TOKEN")
     repo = os.getenv("GITHUB_REPOSITORY")
     branch = os.getenv("GITHUB_REF_NAME", "main")
@@ -465,58 +491,30 @@ def reserve_topics(count=3):
         history = json.loads(__import__("base64").b64decode(saved["content"]).decode("utf-8"))
         file_sha = saved["sha"]
     elif response.status_code == 404:
-        history, file_sha = {"recent_ids": [], "recent_topics": [], "mix_position": 0}, None
+        history, file_sha = {"recent_ids": [], "recent_topics": []}, None
     else:
         response.raise_for_status()
 
     recent_ids = history.get("recent_ids", [])
-    mix_position = int(history.get("mix_position", 0)) % 10
-    # Seven appearance/style slots and three economics slots in every rolling block of ten.
-    mix_schedule = ("appearance", "appearance", "economy", "appearance", "appearance",
-                    "economy", "appearance", "appearance", "appearance", "economy")
+    available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
+    if len(available) < count:
+        available = TOPIC_BANK[:]
     import random
-    appearance_available = [item for item in APPEARANCE_TOPIC_BANK if item[0] not in recent_ids]
-    economy_available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
-    if not appearance_available:
-        appearance_available = APPEARANCE_TOPIC_BANK[:]
-    if not economy_available:
-        economy_available = TOPIC_BANK[:]
-    random.shuffle(appearance_available)
-    random.shuffle(economy_available)
+    random.shuffle(available)
+    selected = available[:count]
 
-    selected = []
-    appearance_index = 0
-    economy_index = 0
-    for offset in range(count):
-        topic_type = mix_schedule[(mix_position + offset) % 10]
-        if topic_type == "appearance":
-            if appearance_index >= len(appearance_available):
-                appearance_available = APPEARANCE_TOPIC_BANK[:]
-                random.shuffle(appearance_available)
-                appearance_index = 0
-            selected.append(appearance_available[appearance_index])
-            appearance_index += 1
-        else:
-            if economy_index >= len(economy_available):
-                economy_available = TOPIC_BANK[:]
-                random.shuffle(economy_available)
-                economy_index = 0
-            selected.append(economy_available[economy_index])
-            economy_index += 1
-
-    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
+    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(TOPIC_BANK):]
     history["recent_topics"] = (history.get("recent_topics", []) +
-                                [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-(len(TOPIC_BANK) + len(APPEARANCE_TOPIC_BANK)):]
-    history["mix_position"] = (mix_position + count) % 10
+        [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-len(TOPIC_BANK):]
     encoded = __import__("base64").b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
-    payload = {"message": "Track rolling 70/30 Chinese channel topic mix and recent topics",
+    payload = {"message": "Track recent Chinese economy and business topics",
                "content": encoded, "branch": branch}
     if file_sha:
         payload["sha"] = file_sha
     saved_response = requests.put(api, headers=headers, json=payload, timeout=30)
     saved_response.raise_for_status()
-    print("Reserved topics (rolling 70% appearance/style, 30% economics):")
+    print("Reserved Chinese economy/business topics:")
     for item in selected:
         print(f" - [{item[1]}] {item[2]}")
     return [(item[1], item[2]) for item in selected]
@@ -543,7 +541,7 @@ def main():
     topics = reserve_topics(3)
     output_only = os.getenv("OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     start_short = max(1, min(3, int(os.getenv("MONEY_START_SHORT", "1"))))
-    print(f"Starting Shorts batch at {start_short}/3 (rolling 70/30 topic mix).")
+    print(f"Starting Shorts batch at {start_short}/3 (economy and business topics).")
     for index, (topic_category, topic) in enumerate(topics[start_short - 1:], start=start_short):
         print(f"\n========== SHORT {index}/3 ==========")
         try:
