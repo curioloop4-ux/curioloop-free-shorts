@@ -1128,12 +1128,18 @@ def main():
                 retry_instruction = (
                     "The title below is already used and MUST NOT appear again: "
                     + repr(candidate["title"])
-                    + ". Generate a different subject and a different factual takeaway. "
-                    "Do not write about male attractiveness, confidence, body language, or first impressions. "
-                    "Choose a clearly distinct, useful topic from everyday science, nature, history, technology, "
-                    "or practical human behavior. Make the narration and visual queries specific to that new topic. "
-                    "Avoid all previously used titles and topics listed in the conversation context. "
-                    "Retry number " + str(attempt + 1) + ". Variation token: " + str(time.time_ns())
+                    + ". Generate a different subject, central idea, and narration. "
+                    + (
+                        "Stay within dating and relationships, but choose a different angle such as communication "
+                        "expectations, planning a first date, cultural differences, or recognizing mutual interest. "
+                        "Do not reuse attractiveness, confidence, or first-impression framing. "
+                        if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction"
+                        else "Do not write about male attractiveness, confidence, body language, or first impressions. "
+                             "Choose a clearly distinct, useful topic from everyday science, nature, history, technology, "
+                             "or practical human behavior. Make the narration and visual queries specific to that new topic. "
+                    )
+                    + "Avoid all previously used titles and topics listed in the conversation context. "
+                    + "Retry number " + str(attempt + 1) + ". Variation token: " + str(time.time_ns())
                 )
             if script is None:
                 raise RuntimeError("Gemini returned duplicate titles three times; refusing to reuse a script.")
