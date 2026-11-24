@@ -27,9 +27,10 @@ on:
         required: true
         type: choice
         options:
+          - mixed
           - beauty
           - general
-        default: beauty
+        default: mixed
 
 permissions:
   contents: write
