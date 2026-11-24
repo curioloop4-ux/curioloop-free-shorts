@@ -100,7 +100,7 @@ def make_script(previous_titles=None, featured_gender="woman"):
     previous_titles = previous_titles or []
     prompt = """Create one original English YouTube Short for adult male viewers interested in women, attraction, beauty, style and relationship psychology.
 Choose accurate, engaging topics such as women's beauty and fashion trends, first impressions, attraction psychology, dating communication, grooming, fitness and social behavior. Keep the perspective informative and respectful; never objectify women or make manipulative dating claims. No Korean entertainment news.
-Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags. seo_tags must contain 8-15 concise, highly relevant YouTube search tags for this exact video. Include the main topic, specific activity/concept, audience intent and natural keyword variations. Do not add unrelated viral trends, competitor names, or misleading popular terms.
 Choose one specific verified fact; never invent statistics or studies. Avoid medical/financial advice.
 20-35 seconds; narration 60-85 natural English words; title 35-45 characters maximum, concise and punchy;
 hook_text 3-6 words; immediate curiosity hook that follows the casual opening.
@@ -129,13 +129,13 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "mixed":
         prompt = """Create one original English YouTube Short for a broad curiosity channel. Rotate across science and space, history, strange inventions, psychology, nature and animal facts, everyday mysteries, beauty and fitness, and surprising human achievements. Select a specific, verifiable fact with strong visual storytelling potential. Do not repeatedly choose the same category in consecutive episodes. Avoid fabricated studies, unsupported statistics, medical or financial advice, and copyrighted characters or scenes.
-Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags. seo_tags must contain 8-15 concise, highly relevant YouTube search tags for this exact video. Include the main topic, specific activity/concept, audience intent and natural keyword variations. Do not add unrelated viral trends, competitor names, or misleading popular terms.
 20-35 seconds; narration 60-85 natural English words; concise curiosity-driven title; hook_text 3-6 words. Open with a relatable question or surprising observation, explain one clear fact, and end with a memorable takeaway.
 Visuals: first three search queries must show the selected featured adult (woman or man, alternate by episode) in relevant real-world activity, with a post-activity/sweat moment, recovery or massage where relevant, and exercise/action. Remaining two queries must directly depict the actual topic: real animals for animal facts, real experiments for science, archival objects or places for history, and topic-specific human activity where appropriate. Do not force beauty/massage footage into unrelated topics. All people clearly adults, fully clothed and non-sexualized. Return exactly five English stock-video queries in the same order as the visual plan. Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "fitness_recovery":
         prompt = """Create one original English YouTube Short about women's lower-body fitness, hip mobility and professional recovery massage.
 The specific episode topic is why hips can feel stiff after sitting for long periods, and how gentle movement, glute activation and professional massage may support comfort. Keep claims conservative: do not say massage burns fat, removes cellulite, reshapes the waist, cures pain or permanently lengthens muscles. Do not invent statistics or cite unnamed studies.
-Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags. seo_tags must contain 8-15 concise, highly relevant YouTube search tags for this exact video. Include the main topic, specific activity/concept, audience intent and natural keyword variations. Do not add unrelated viral trends, competitor names, or misleading popular terms.
 20-35 seconds; narration 60-85 natural English words; concise curiosity-driven title; hook_text 3-6 words. Start with a relatable question about getting up after sitting, explain the role of movement and glute activation, then distinguish temporary relaxation from fat loss or body reshaping.
 VISUAL RULES: feature clearly adult women in tasteful, fully clothed athletic clothing. Use real licensed stock VIDEO, not stills. Include clear, professional, non-sexualized fitness and massage footage. Massage must look like legitimate sports/recovery or wellness treatment, with no intimate framing.
 Return exactly 5 English stock-video queries in this order:
@@ -148,7 +148,7 @@ All subjects must be clearly adults. No nudity, lingerie, sexual activity, minor
     if os.getenv("CONTENT_MODE", "general").lower() == "beauty":
         prompt = """Create one original English YouTube Short for adult male viewers interested in women, focused on practical beauty, skincare, haircare, massage, fashion, personal presentation and attraction psychology. Use a respectful, informative angle about trends, first impressions or everyday self-care without objectifying women or promising results.
 Choose one useful, evidence-aware everyday tip. Do not promise medical or cosmetic results; do not diagnose or prescribe treatments. Avoid unsupported claims and fabricated studies.
-Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags. seo_tags must contain 8-15 concise, highly relevant YouTube search tags for this exact video. Include the main topic, specific activity/concept, audience intent and natural keyword variations. Do not add unrelated viral trends, competitor names, or misleading popular terms.
 20-35 seconds; narration 60-85 natural English words; title concise and curiosity-driven; hook_text 3-6 words.
 Open with a relatable beauty or self-care question, then give one practical takeaway and a memorable close.
 VISUAL RULES: first shot is a licensed video of an attractive adult woman in tasteful, fully clothed fitness or self-care clothing, clearly visible in a medium/full-body shot. Follow with beauty-related adult footage: professional facial massage, gentle skincare routine, scalp massage or haircare, and a confident stylish adult woman.
@@ -224,6 +224,10 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
+    if not isinstance(data.get("seo_tags"), list):
+        data["seo_tags"] = []
+    data["seo_tags"] = [str(tag).strip().lstrip("#") for tag in data["seo_tags"] if str(tag).strip()]
+    data["seo_tags"] = data["seo_tags"][:15]
     # Alternate female- and male-focused episodes; opening footage follows the selected subject.
     data["featured_person"] = data_featured_person
     if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
@@ -801,7 +805,22 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     subprocess.run(cmd, cwd=WORK, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     return output, credits
 
-def upload(path, title, narration, credits=None):
+def upload(path, title, narration, credits=None, seo_tags=None):
+    # Combine channel identity with AI-generated topic tags; stay within YouTube's 500-char limit.
+    base_tags = ["CurioLoop", "Shorts"]
+    clean_tags = []
+    seen_tags = set()
+    for tag in base_tags + (seo_tags or []):
+        tag = re.sub(r"\\s+", " ", str(tag)).strip().lstrip("#")
+        key = tag.casefold()
+        if not tag or key in seen_tags or len(tag) > 60:
+            continue
+        if len(",".join(clean_tags + [tag])) > 480:
+            continue
+        clean_tags.append(tag)
+        seen_tags.add(key)
+    if not clean_tags:
+        clean_tags = base_tags
     creds = Credentials(
         None,
         refresh_token=required("YOUTUBE_REFRESH_TOKEN"),
@@ -817,8 +836,8 @@ def upload(path, title, narration, credits=None):
     body = {
         "snippet": {
             "title": title[:100],
-            "description": narration + ("\n\nVisual credits:\n" + "\n".join(credits) if credits else "") + "\n\nCurioLoop | Curious facts, surprising science, psychology, history and everyday mysteries.\n\n#Shorts #CurioLoop #Facts #DidYouKnow #Psychology #Science #Knowledge",
-            "tags": ["Shorts", "CurioLoop", "Facts", "Did You Know", "General Knowledge", "Psychology", "Science", "History", "Interesting Facts"],
+            "description": narration + ("\\n\\nVisual credits:\\n" + "\\n".join(credits) if credits else "") + "\\n\\nCurioLoop | Curious facts and surprising discoveries.\\n\\n" + " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean_tags[:3] if re.sub(r"[^A-Za-z0-9]", "", tag)),
+            "tags": clean_tags,
             "categoryId": "24",
         },
         "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False},
@@ -928,7 +947,7 @@ def main():
                 print(f"VIDEO_ONLY: Rendered MP4 saved at {rendered}; YouTube upload skipped.")
                 uploaded += 1
             else:
-                video_id = upload(rendered, script["title"], script["narration"], credits)
+                video_id = upload(rendered, script["title"], script["narration"], credits, script.get("seo_tags", []))
                 if video_id:
                     script_record["youtube_video_id"] = video_id
                     script_record["youtube_url"] = f"https://www.youtube.com/watch?v={video_id}"
