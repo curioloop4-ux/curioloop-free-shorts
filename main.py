@@ -239,12 +239,20 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
         data["seo_tags"] = []
     data["seo_tags"] = [str(tag).strip().lstrip("#") for tag in data["seo_tags"] if str(tag).strip()]
     data["seo_tags"] = data["seo_tags"][:15]
-    # Alternate female- and male-focused episodes; opening footage follows the selected subject.
-    data["featured_person"] = data_featured_person
-    if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
-        raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
-    topic_visual_queries = [str(q).strip() for q in data["visual_queries"][3:5] if str(q).strip()]
-    data["visual_queries"] = opening_visual_queries + topic_visual_queries
+    if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
+        data["featured_person"] = "cat"
+        if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
+            raise ValueError("Animal comedy script must include five cat-specific stock-video queries")
+        data["visual_queries"] = [str(q).strip() for q in data["visual_queries"][:5] if str(q).strip()]
+        if len(data["visual_queries"]) != 5:
+            raise ValueError("Animal comedy visual queries must contain five non-empty entries")
+    else:
+        # Alternate female- and male-focused episodes; opening footage follows the selected subject.
+        data["featured_person"] = data_featured_person
+        if not isinstance(data.get("visual_queries"),list) or len(data["visual_queries"])<3:
+            raise ValueError("Gemini response must include 3 topic-specific stock-video queries")
+        topic_visual_queries = [str(q).strip() for q in data["visual_queries"][3:5] if str(q).strip()]
+        data["visual_queries"] = opening_visual_queries + topic_visual_queries
     return data
 
 
@@ -347,10 +355,17 @@ def make_ass(narration):
 def fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5):
     """Use only tightly topic-matched licensed assets; never fill with unrelated stock footage."""
     featured_person = (featured_person or "").strip()
+    animal_mode = os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy"
     stock_person_mode = featured_person.lower() in {"fit adult man", "fit adult woman"}
-    subject = featured_person if stock_person_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
+    subject = featured_person if stock_person_mode or animal_mode else (featured_person if featured_person and featured_person.lower() != "none" else title.strip())
     generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
-    if featured_person.lower() == "fit adult man":
+    if animal_mode:
+        if len(generated_terms) < 5:
+            raise RuntimeError("Animal comedy requires five cat-specific visual queries.")
+        opening_queries = [generated_terms[0]]
+        glamour_queries = generated_terms[1:3]
+        topic_queries = generated_terms[3:5]
+    elif featured_person.lower() == "fit adult man":
         opening_queries = ["adult man sweating after cardio workout gym fitness full body video"]
         glamour_queries = [
             "professional sports massage adult man athlete recovery video",
@@ -362,7 +377,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             "professional adult woman massage therapist giving shoulder massage spa wellness video",
             "adult woman fitness workout gym stretching full body exercise video",
         ]
-    topic_queries = generated_terms[3:5] if len(generated_terms) > 3 else [title.strip(), visual_theme]
+        topic_queries = generated_terms[3:5] if len(generated_terms) > 3 else [title.strip(), visual_theme]
     query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
     query_terms = [q for q in query_terms if q and q.lower() != "none"]
     session = requests.Session()
@@ -545,7 +560,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                     if not relevant_metadata(tags, query):
                         print(f"Rejecting unrelated Pixabay result: {tags}")
                         continue
-                    if query_index in (1, 2):
+                    if not animal_mode and query_index in (1, 2):
                         words = set(re.findall(r"[a-z]+", str(tags).lower()))
                         adult_woman_terms = {"woman", "women", "female"}
                         glamour_terms = {"fashion", "style", "model", "elegant", "beauty", "dress", "fitness", "confident", "portrait", "outfit"}
@@ -575,8 +590,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # The opening must be a real licensed video clip, not a still image.
     if not opening_found:
         raise RuntimeError(
-            "Required CurioLoop athletic opening not found: a licensed video tagged with an adult "
-            "man/woman and fitness/workout action is mandatory. No substitute footage was used."
+            "Required topic-matched opening video was not found from the licensed stock sources. "
+            "No unrelated footage was substituted."
         )
 
     # Google Custom Search images: accept only explicit reuse-rights results and matching metadata.
