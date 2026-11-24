@@ -1,6 +1,9 @@
 name: CurioLoop Daily Shorts
 
 on:
+  push:
+    paths:
+      - ".run-shorts-now"
   schedule:
     # Five daily Shorts. Stagger away from :00 to reduce GitHub Actions schedule congestion.
     # Korea Standard Time (UTC+9): 22:17, 01:17, 05:17, 08:17, 10:17.
