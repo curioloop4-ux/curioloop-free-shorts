@@ -125,7 +125,12 @@ Return exactly 3 English stock-VIDEO search queries: first must be
 second and third for the actual topic/action. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
     if previous_titles:
-        prompt += "\nAvoid repeating these previous titles/topics: " + "; ".join(previous_titles[-30:])
+        prompt += (
+            "\\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
+            "or narrative structure from any item below. Choose a clearly different subject "
+            "and build a fresh script, not a paraphrase. Previously used scripts (title | theme | opening): "
+            + " || ".join(previous_titles[-30:])
+        )
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     print(f"Generating general-knowledge CurioLoop Short with Gemini model: {model}")
     response = requests.post(url, params={"key": api_key},
@@ -646,16 +651,55 @@ def main():
     count = max(1, min(count, 10))
     print(f"Starting batch: {count} Short(s).")
     uploaded = 0
-    used_titles = []
+
+    # Persistent script history prevents repeated topics across separate workflow runs.
+    script_history_path = ROOT / "history" / "used_scripts.json"
+    script_history_path.parent.mkdir(exist_ok=True)
+    try:
+        script_history = json.loads(script_history_path.read_text(encoding="utf-8")) if script_history_path.exists() else {"scripts": []}
+    except (json.JSONDecodeError, OSError):
+        script_history = {"scripts": []}
+    if not isinstance(script_history, dict) or not isinstance(script_history.get("scripts"), list):
+        script_history = {"scripts": []}
+
+    prior_scripts = script_history["scripts"]
+    used_titles = [item.get("title", "") for item in prior_scripts if isinstance(item, dict) and item.get("title")]
+    recent_prompts = [
+        " | ".join([
+            str(item.get("title", "")),
+            str(item.get("visual_theme", "")),
+            str(item.get("narration", ""))[:110],
+        ]).strip(" |")
+        for item in prior_scripts[-30:] if isinstance(item, dict)
+    ]
 
     for index in range(1, count + 1):
         print(f"\\n========== SHORT {index}/{count} ==========")
         try:
-            script = make_script(used_titles)
+            script = make_script(recent_prompts)
             title_key = re.sub(r"[^a-z0-9 ]", "", script["title"].lower()).strip()
             if title_key in {re.sub(r"[^a-z0-9 ]", "", t.lower()).strip() for t in used_titles}:
                 raise RuntimeError(f"Duplicate title detected; refusing duplicate upload: {script['title']}")
             used_titles.append(script["title"])
+            recent_prompts.append(" | ".join([
+                str(script.get("title", "")),
+                str(script.get("visual_theme", "")),
+                str(script.get("narration", ""))[:110],
+            ]).strip(" |"))
+            prior_scripts.append({
+                "title": script["title"],
+                "visual_theme": script.get("visual_theme", ""),
+                "narration": script.get("narration", ""),
+                "created_at": __import__("datetime").datetime.now(
+                    __import__("datetime").timezone.utc
+                ).isoformat(),
+            })
+            # Keep a rolling record of the 300 most recent generated scripts.
+            script_history["scripts"] = prior_scripts[-300:]
+            script_history_path.write_text(
+                json.dumps(script_history, ensure_ascii=False, indent=2) + "\\n",
+                encoding="utf-8"
+            )
             print("Selected:", script["title"])
             print("Featured person:", script["featured_person"])
             print("Opening hook:", script["hook_text"])
