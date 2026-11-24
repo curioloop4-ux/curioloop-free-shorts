@@ -1,4 +1,7 @@
 import asyncio
+import math
+import wave
+from array import array
 import json
 import os
 import re
@@ -735,6 +738,48 @@ def make_mascot():
     image.save(path)
     return path
 
+def make_background_music(duration, title="", visual_theme=""):
+    """Create one original instrumental track that runs continuously under the full Short."""
+    path = WORK / "background_music.wav"
+    sample_rate = 22050
+    total = max(1, int(sample_rate * duration))
+    samples = array("h")
+    # One consistent, unobtrusive modern wellness groove; no abrupt scene changes.
+    topic = (str(title) + " " + str(visual_theme)).lower()
+    if any(word in topic for word in ("massage", "recovery", "stretch", "relax", "mobility")):
+        root = 110.0
+        pulse_level = 0.018
+    elif any(word in topic for word in ("workout", "fitness", "exercise", "strength", "gym")):
+        root = 123.47
+        pulse_level = 0.026
+    else:
+        root = 98.0
+        pulse_level = 0.020
+    chord_steps = (1.0, 1.25, 1.5, 1.333333)
+    for i in range(total):
+        t = i / sample_rate
+        chord = chord_steps[int(t // 4) % len(chord_steps)]
+        pad = (
+            math.sin(2 * math.pi * root * t)
+            + math.sin(2 * math.pi * root * chord * t)
+            + math.sin(2 * math.pi * root * 2 * t)
+        ) / 3
+        beat_phase = t % 0.5
+        pulse_env = max(0.0, 1.0 - beat_phase / 0.20)
+        pulse = math.sin(2 * math.pi * 55.0 * beat_phase) * pulse_env
+        fade_in = min(1.0, t / 0.8)
+        fade_out = min(1.0, max(0.0, (duration - t) / 1.2))
+        # Quiet source level; the final FFmpeg mix attenuates it further beneath narration.
+        value = (0.105 * pad + pulse_level * pulse) * fade_in * fade_out
+        samples.append(int(max(-1.0, min(1.0, value)) * 32767))
+    with wave.open(str(path), "wb") as audio:
+        audio.setnchannels(1)
+        audio.setsampwidth(2)
+        audio.setframerate(sample_rate)
+        audio.writeframes(samples.tobytes())
+    return path
+
+
 def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries, featured_person):
     output = WORK / f"curioloop_short_{__import__('time').strftime('%Y%m%d_%H%M%S')}.mp4"
     title_path = WORK / "title.txt"
@@ -766,6 +811,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     cmd += ["-i", str(voice)]
     mascot = make_mascot()
     cmd += ["-loop", "1", "-i", str(mascot)]
+    music = make_background_music(duration, title, visual_theme)
+    cmd += ["-i", str(music)]
 
     filters = []
     labels = []
@@ -788,11 +835,15 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "enable='between(t,0,2.5)',"
         "ass=captions.ass[base];"
         f"[{len(clips)+1}:v]scale=190:163[mascot];"
-        "[base][mascot]overlay=W-w-28:250:format=auto[vout]"
+        "[base][mascot]overlay=W-w-28:250:format=auto[vout];"
+        f"[{len(clips)}:a]volume=1.0[voice];"
+        f"[{len(clips)+2}:a]volume=0.08,afade=t=in:st=0:d=0.8,"
+        f"afade=t=out:st={max(0, duration-1.2):.2f}:d=1.2[music];"
+        "[voice][music]amix=inputs=2:duration=first:dropout_transition=1[aout]"
     )
     cmd += [
         "-filter_complex", ";".join(filters),
-        "-map", "[vout]", "-map", f"{len(clips)}:a:0",
+        "-map", "[vout]", "-map", "[aout]",
         "-t", f"{duration:.2f}",
         "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
         "-c:a", "aac", "-b:a", "128k", "-shortest",
