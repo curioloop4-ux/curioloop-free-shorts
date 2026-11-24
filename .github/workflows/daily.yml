@@ -27,12 +27,13 @@ on:
         required: true
         type: choice
         options:
+          - dating_attraction
           - animal_comedy
           - fitness_recovery
           - mixed
           - beauty
           - general
-        default: mixed
+        default: dating_attraction
 
 permissions:
   contents: write
@@ -80,7 +81,7 @@ jobs:
           YOUTUBE_PRIVACY_STATUS: public
           OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || 'mixed' }}
+          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || 'dating_attraction' }}
           SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 1 }}
         run: python main.py
 
