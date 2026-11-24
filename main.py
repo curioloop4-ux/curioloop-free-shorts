@@ -258,11 +258,13 @@ def make_ass(narration):
         current.append(word)
         current_chars += len(word)
         # Natural punctuation creates a short visual pause.
-        if re.search(r"[.!?,;:]$", word):            groups.append(current)
+        if re.search(r"[.!?,;:]$", word):
+            groups.append(current)
             current = []
             current_chars = 0
     if current:
-        if len(current) == 1 and groups and sum(len(x) for x in groups[-1]) < 3:            groups[-1].extend(current)
+        if len(current) == 1 and groups and sum(len(x) for x in groups[-1]) < 3:
+            groups[-1].extend(current)
         else:
             groups.append(current)
 
