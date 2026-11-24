@@ -2,14 +2,13 @@ name: CurioLoop Daily Shorts
 
 on:
   schedule:
-    # Six daily Shorts: three dating/attraction and three curiosity/knowledge.
-    # UTC cron converted to Korea Standard Time (UTC+9): 22:00, 01:00, 05:00, 08:00, 10:00, 13:00.
-    - cron: "0 13 * * *"
-    - cron: "0 16 * * *"
-    - cron: "0 20 * * *"
-    - cron: "0 23 * * *"
-    - cron: "0 1 * * *"
-    - cron: "0 4 * * *"
+    # Five daily Shorts. Stagger away from :00 to reduce GitHub Actions schedule congestion.
+    # Korea Standard Time (UTC+9): 22:17, 01:17, 05:17, 08:17, 10:17.
+    - cron: "17 13 * * *"
+    - cron: "17 16 * * *"
+    - cron: "17 20 * * *"
+    - cron: "17 23 * * *"
+    - cron: "17 1 * * *"
   workflow_dispatch:
     inputs:
       shorts_count:
@@ -81,7 +80,7 @@ jobs:
           YOUTUBE_PRIVACY_STATUS: public
           OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || ((github.event.schedule == '0 13 * * *' || github.event.schedule == '0 20 * * *' || github.event.schedule == '0 1 * * *') && 'dating_attraction' || 'mixed') }}
+          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || ((github.event.schedule == '17 13 * * *' || github.event.schedule == '17 20 * * *' || github.event.schedule == '17 1 * * *') && 'dating_attraction' || 'mixed') }}
           SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 1 }}
         run: python main.py
 
