@@ -535,68 +535,76 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     return clips, credits
 
 def make_mascot():
-    """Draw CurioLoop's cute orange squirrel mascot as a transparent PNG."""
+    """Draw a larger, rounder and extra-cute CurioLoop squirrel mascot."""
     path = WORK / "loopy_mascot.png"
     scale = 3
-    image = Image.new("RGBA", (300 * scale, 340 * scale), (0, 0, 0, 0))
+    image = Image.new("RGBA", (420 * scale, 360 * scale), (0, 0, 0, 0))
     draw = ImageDraw.Draw(image)
 
     def p(coords):
         return tuple(int(v * scale) for v in coords)
 
-    # Ground shadow.
-    draw.ellipse(p((38, 310, 260, 332)), fill=(0, 0, 0, 55))
+    outline = (111, 53, 29, 255)
+    orange = (211, 105, 42, 255)
+    light_orange = (239, 145, 72, 255)
+    cream = (255, 229, 190, 255)
+    pink = (255, 169, 166, 255)
 
-    # Big curled squirrel tail behind the body, with a cream inner swirl.
-    draw.ellipse(p((150, 90, 292, 255)), fill=(190, 94, 39, 255),
-                 outline=(125, 58, 27, 255), width=5 * scale)
-    draw.ellipse(p((176, 118, 270, 224)), fill=(255, 220, 166, 255))
-    draw.ellipse(p((194, 139, 254, 204)), fill=(190, 94, 39, 255))
-    draw.ellipse(p((207, 151, 242, 190)), fill=(255, 220, 166, 255))
+    # Large fluffy curled tail makes the squirrel silhouette broad and recognizable.
+    draw.ellipse(p((222, 58, 410, 292)), fill=orange, outline=outline, width=7 * scale)
+    draw.ellipse(p((247, 91, 384, 260)), fill=(255, 213, 157, 255))
+    draw.ellipse(p((271, 116, 365, 235)), fill=light_orange)
+    draw.ellipse(p((286, 134, 348, 213)), fill=cream)
+    # Small fluffy tufts on the outside of the tail.
+    draw.ellipse(p((354, 73, 405, 137)), fill=orange, outline=outline, width=5 * scale)
+    draw.ellipse(p((360, 215, 410, 274)), fill=orange, outline=outline, width=5 * scale)
 
-    # Ears with warm inner fur.
-    draw.ellipse(p((61, 35, 119, 112)), fill=(190, 94, 39, 255),
-                 outline=(125, 58, 27, 255), width=4 * scale)
-    draw.ellipse(p((73, 49, 108, 99)), fill=(255, 190, 157, 255))
-    draw.ellipse(p((143, 35, 201, 112)), fill=(190, 94, 39, 255),
-                 outline=(125, 58, 27, 255), width=4 * scale)
-    draw.ellipse(p((154, 49, 190, 99)), fill=(255, 190, 157, 255))
+    # Ears peek out above the oversized head.
+    draw.ellipse(p((73, 20, 164, 126)), fill=orange, outline=outline, width=6 * scale)
+    draw.ellipse(p((91, 43, 147, 111)), fill=pink)
+    draw.ellipse(p((207, 20, 298, 126)), fill=orange, outline=outline, width=6 * scale)
+    draw.ellipse(p((224, 43, 280, 111)), fill=pink)
 
-    # Head and cream muzzle.
-    draw.ellipse(p((55, 68, 210, 236)), fill=(224, 126, 54, 255),
-                 outline=(125, 58, 27, 255), width=5 * scale)
-    draw.ellipse(p((73, 86, 192, 219)), fill=(244, 159, 83, 255))
-    draw.ellipse(p((83, 163, 184, 222)), fill=(255, 232, 198, 255))
+    # Wide, chubby body and belly.
+    draw.ellipse(p((101, 170, 314, 348)), fill=orange, outline=outline, width=7 * scale)
+    draw.ellipse(p((139, 211, 278, 337)), fill=cream)
 
-    # Eyes, highlights, nose, smile and cheeks.
-    draw.ellipse(p((91, 126, 119, 161)), fill=(45, 35, 30, 255))
-    draw.ellipse(p((148, 126, 176, 161)), fill=(45, 35, 30, 255))
-    draw.ellipse(p((97, 131, 105, 140)), fill=(255, 255, 255, 255))
-    draw.ellipse(p((154, 131, 162, 140)), fill=(255, 255, 255, 255))
-    draw.ellipse(p((75, 164, 105, 181)), fill=(244, 125, 126, 115))
-    draw.ellipse(p((164, 164, 194, 181)), fill=(244, 125, 126, 115))
-    draw.ellipse(p((126, 166, 141, 177)), fill=(92, 48, 35, 255))
-    draw.arc(p((112, 166, 154, 202)), start=15, end=165,
-             fill=(100, 53, 38, 255), width=4 * scale)
+    # Big rounded head with soft cheeks.
+    draw.ellipse(p((58, 57, 316, 267)), fill=orange, outline=outline, width=7 * scale)
+    draw.ellipse(p((77, 77, 297, 247)), fill=light_orange)
+    draw.ellipse(p((99, 165, 274, 252)), fill=cream)
 
-    # Small front paws and a cream belly, giving a clear squirrel silhouette.
-    draw.ellipse(p((88, 215, 178, 312)), fill=(224, 126, 54, 255),
-                 outline=(125, 58, 27, 255), width=4 * scale)
-    draw.ellipse(p((105, 230, 162, 300)), fill=(255, 232, 198, 255))
-    draw.ellipse(p((82, 235, 116, 270)), fill=(244, 159, 83, 255),
-                 outline=(125, 58, 27, 255), width=3 * scale)
-    draw.ellipse(p((153, 235, 187, 270)), fill=(244, 159, 83, 255),
-                 outline=(125, 58, 27, 255), width=3 * scale)
+    # Large sparkling eyes, raised brows and rosy cheeks.
+    draw.arc(p((112, 105, 166, 132)), start=190, end=345, fill=outline, width=4 * scale)
+    draw.arc(p((213, 105, 267, 132)), start=195, end=350, fill=outline, width=4 * scale)
+    draw.ellipse(p((121, 126, 157, 174)), fill=(48, 35, 31, 255))
+    draw.ellipse(p((218, 126, 254, 174)), fill=(48, 35, 31, 255))
+    draw.ellipse(p((130, 133, 141, 146)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((227, 133, 238, 146)), fill=(255, 255, 255, 255))
+    draw.ellipse(p((105, 178, 151, 202)), fill=(255, 116, 133, 105))
+    draw.ellipse(p((226, 178, 272, 202)), fill=(255, 116, 133, 105))
 
-    # Acorn held at the front reinforces the squirrel identity.
-    draw.ellipse(p((125, 251, 153, 285)), fill=(145, 83, 42, 255),
-                 outline=(100, 54, 28, 255), width=2 * scale)
-    draw.polygon([p((123, 255)), p((139, 239)), p((155, 255))],
-                 fill=(104, 67, 38, 255))
-    draw.line([p((139, 242)), p((144, 234))], fill=(82, 117, 57, 255),
-              width=3 * scale)
+    # Tiny nose, happy smile and two little front teeth.
+    draw.ellipse(p((181, 177, 197, 190)), fill=(92, 48, 39, 255))
+    draw.arc(p((157, 180, 220, 224)), start=15, end=165, fill=outline, width=5 * scale)
+    draw.rounded_rectangle(p((174, 207, 185, 222)), radius=3 * scale,
+                           fill=(255, 255, 250, 255), outline=outline, width=2 * scale)
+    draw.rounded_rectangle(p((187, 207, 198, 222)), radius=3 * scale,
+                           fill=(255, 255, 250, 255), outline=outline, width=2 * scale)
 
-    image = image.resize((300, 340), Image.Resampling.LANCZOS)
+    # Little paws hugging a large acorn at the front.
+    draw.ellipse(p((116, 247, 173, 291)), fill=light_orange, outline=outline, width=4 * scale)
+    draw.ellipse(p((235, 247, 292, 291)), fill=light_orange, outline=outline, width=4 * scale)
+    draw.ellipse(p((174, 249, 231, 319)), fill=(151, 87, 45, 255),
+                 outline=outline, width=4 * scale)
+    draw.pieslice(p((169, 243, 236, 283)), start=180, end=360,
+                  fill=(112, 72, 39, 255), outline=outline, width=3 * scale)
+    draw.line([p((203, 248)), p((210, 233))], fill=(91, 125, 58, 255),
+              width=5 * scale)
+
+    # A soft ground shadow anchors the character.
+    draw.ellipse(p((85, 333, 345, 355)), fill=(0, 0, 0, 45))
+    image = image.resize((420, 360), Image.Resampling.LANCZOS)
     image.save(path)
     return path
 
@@ -650,7 +658,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         "x=(w-text_w)/2:y=590:box=1:boxcolor=0x000000@0.58:boxborderw=28:"
         "enable='between(t,0,2.5)',"
         "ass=captions.ass[base];"
-        f"[{len(clips)+1}:v]scale=105:129[mascot];"
+        f"[{len(clips)+1}:v]scale=190:163[mascot];"
         "[base][mascot]overlay=W-w-28:250:format=auto[vout]"
     )
     cmd += [
