@@ -753,17 +753,13 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
     if len(clips) < 2:
         raise RuntimeError("The athletic opening was found, but no topic-related follow-up visual was found.")
 
-    # Three-part person-led opening: post-workout sweat, professional massage, then exercise.
-    # Keep this opening visually prominent, then devote the rest of the runtime to topic-matched footage.
-    intro_clip_count = min(3, len(clips))
-    intro_duration = min(8.0, max(6.0, duration * 0.28))
-    intro_segment = intro_duration / intro_clip_count
-    topic_clip_count = len(clips) - intro_clip_count
-    topic_segment = (duration - intro_duration) / topic_clip_count if topic_clip_count else 0
-    segment_durations = (
-        [intro_segment] * intro_clip_count
-        + ([topic_segment] * topic_clip_count if topic_clip_count else [])
-    )
+    # Distribute runtime evenly across all selected clips so the opening
+    # does not flash by while the final shots linger too long.
+    clip_count = len(clips)
+    base_segment = duration / clip_count
+    segment_durations = [base_segment] * clip_count
+    # Correct any floating-point drift on the final clip.
+    segment_durations[-1] = max(0.1, duration - sum(segment_durations[:-1]))
     cmd = ["ffmpeg", "-y"]
     for clip_path in clips:
         cmd += ["-stream_loop", "-1", "-i", str(clip_path)]
