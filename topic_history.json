@@ -1,14 +1,11 @@
 {
   "recent_ids": [
-    "science_01",
-    "money_psychology_05",
-    "work_01",
-    "beauty_05",
-    "fitness_04",
-    "consumer_05",
     "beauty_02",
     "beauty_04",
-    "business_01"
+    "business_01",
+    "massage_02",
+    "massage_03",
+    "massage_04"
   ],
   "recent_topics": [
     {
@@ -55,6 +52,21 @@
       "id": "business_01",
       "category": "기업과 비즈니스",
       "topic": "星巴克真正卖给顾客的只是咖啡吗？"
+    },
+    {
+      "id": "massage_02",
+      "category": "按摩与放松",
+      "topic": "头皮按摩为什么会让人感觉放松？"
+    },
+    {
+      "id": "massage_03",
+      "category": "按摩与放松",
+      "topic": "肩颈按摩前后应该注意哪些基本事项？"
+    },
+    {
+      "id": "massage_04",
+      "category": "按摩与放松",
+      "topic": "为什么专业SPA护理通常强调轻柔手法？"
     }
   ],
   "mix_position": 6
