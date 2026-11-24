@@ -127,6 +127,20 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 3) "adult woman fitness fashion stylish outfit confident movement video" for a second tasteful adult-woman shot.
 4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
+    if os.getenv("CONTENT_MODE", "general").lower() == "beauty":
+        prompt = """Create one original English YouTube Short about practical beauty, skincare, haircare, grooming, massage or personal presentation for a global adult audience.
+Choose one useful, evidence-aware everyday tip. Do not promise medical or cosmetic results; do not diagnose or prescribe treatments. Avoid unsupported claims and fabricated studies.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+20-35 seconds; narration 60-85 natural English words; title concise and curiosity-driven; hook_text 3-6 words.
+Open with a relatable beauty or self-care question, then give one practical takeaway and a memorable close.
+VISUAL RULES: first shot is a licensed video of an attractive adult woman in tasteful, fully clothed fitness or self-care clothing, clearly visible in a medium/full-body shot. Follow with beauty-related adult footage: professional facial massage, gentle skincare routine, scalp massage or haircare, and a confident stylish adult woman.
+Use exactly 5 English stock-video search queries in this order:
+1) adult woman workout outfit gym stretching fitness full body video
+2) professional facial massage adult woman spa skincare treatment video
+3) adult woman scalp massage hair care salon video
+4) adult woman skincare routine applying moisturizer beauty salon video
+5) stylish adult woman confident fashion full body video
+All people must be clearly adults and fully clothed. No nudity, lingerie, sexual activity, minors, medical claims or invasive procedures. Return valid JSON only."""
     if previous_titles:
         prompt += (
             "\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
