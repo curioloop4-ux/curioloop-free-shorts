@@ -33,13 +33,13 @@ def required(name):
 
 def generate_content(topic=None, topic_category='经济'):
     if IS_LONG:
-        prompt = """请制作一部面向简体中文观众的经济类YouTube纪录片。主题围绕财富习惯、消费心理、储蓄、复利、通胀或家庭经济。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Coverr或Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景。画面优先出现外形好看、身材匀称或健美、穿着合身时尚服装的成年女性或成年男性（仅限明确成年人），例如修身西装、合体衬衫、商务套装、运动服或简洁时尚日常服装。优先全身镜头或腰部以上中景，人物完整清晰、脸部可见、主体居中，至少一名完整成年人占据画面主要区域。明确避免手部特写、手指特写、只出现手、被裁掉的头部或半截身体、远处小人物、背影遮挡和模糊人物。禁止用硬币、钞票、金币、钞票堆、钱包特写、抽象金融图形或无关风景充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
+        prompt = """请制作一部面向简体中文成年男性观众的YouTube纪录片，受众对女性魅力、时尚美容、第一印象、两性沟通和关系心理感兴趣。主题可结合女性时尚与美容趋势、吸引力心理、约会沟通、社交行为、个人形象及相关消费文化；保持尊重、客观，不物化女性、不宣扬操控技巧、不制造性别对立。若选择经济主题，应从男性观众关心的消费、形象产业和社会趋势切入。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Coverr或Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景。画面优先出现外形出众、气质自信、穿着得体时尚的成年女性；需要时搭配成年男性互动场景。优先全身镜头或腰部以上中景，人物完整清晰、脸部可见、主体居中。明确避免手部特写、被裁掉的头部或半截身体、远处小人物、背影遮挡和模糊人物。禁止用无关风景或抽象图形充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
         topic = topic or "为什么有些人越来越有钱？"
         if topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理", "按摩与放松"}:
-            prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
+            prompt = f"""请创作一条面向简体中文成年男性观众的Shorts。受众对女性魅力、时尚美容、第一印象和关系心理感兴趣。主题：{topic}。优先从男性观众关注的女性消费趋势、时尚美容产业、社交心理或关系中的金钱心理切入，保持尊重客观，不物化女性。解释具体可信的观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
         else:
-            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场。若主题类别为美容与形象或按摩与放松，后续搜索词优先安排professional facial massage、adult woman scalp massage、spa skincare treatment、shoulder massage等真实按摩与护肤场景，至少3个搜索词明确包含massage或spa，并确保画面中成年顾客和/或专业理疗师清楚可见。其他主题则使用与主题直接相关的成年人物活动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
+            prompt = f"""请创作一条面向简体中文成年男性观众的高吸引力Shorts。受众对女性外形、时尚美容、魅力心理、第一印象和两性沟通感兴趣。类别：{topic_category}。主题：{topic}。从男性观众好奇的问题切入，内容围绕女性时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、吸引力心理、约会沟通或自我管理，必须与主题一致。尊重女性，不物化、不刻板化、不提供操控或骚扰建议。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场。若主题类别为美容与形象或按摩与放松，后续搜索词优先安排professional facial massage、adult woman scalp massage、spa skincare treatment、shoulder massage等真实按摩与护肤场景，至少3个搜索词明确包含massage或spa，并确保画面中成年顾客和/或专业理疗师清楚可见。其他主题则使用与主题直接相关的成年人物活动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -562,6 +562,7 @@ def main():
     shorts_count = max(1, min(3, int(os.getenv("MONEY_SHORTS_COUNT", "1"))))
     selected_topics = topics[start_short - 1:start_short - 1 + shorts_count]
     print(f"Starting {len(selected_topics)} Short(s) at position {start_short}/3 ({os.getenv('MONEY_TOPIC_MODE', 'economy')} mode).")
+    successful_uploads = 0
     for index, (topic_category, topic) in enumerate(selected_topics, start=start_short):
         print(f"\n========== SHORT {index}/3 ==========")
         try:
@@ -582,9 +583,15 @@ def main():
                 print("OUTPUT_ONLY enabled; upload skipped.")
             else:
                 upload_video(output, data, credits)
+                successful_uploads += 1
         except Exception as exc:
-            print(f"SHORT {index}/3 FAILED; continuing with the next topic. Error: {exc}")
+            error_text = str(exc)
+            print(f"SHORT {index}/3 FAILED. Error: {error_text}")
+            if "uploadLimitExceeded" in error_text or "exceeded the number of videos" in error_text:
+                raise RuntimeError("YouTube daily upload quota reached. Video was rendered and saved as an artifact, but not uploaded. Retry after the quota resets.") from exc
             continue
+    if not output_only and successful_uploads == 0:
+        raise RuntimeError("No Chinese Shorts were uploaded successfully. Check the errors above; generated files are available as workflow artifacts.")
 
 
 if __name__ == "__main__":
