@@ -767,7 +767,17 @@ def make_mascot():
     return path
 
 def make_background_music(duration, title="", visual_theme=""):
-    """Create one original instrumental track that runs continuously under the full Short."""
+    """Use one reusable royalty-free music file for the whole Short; synthesize a fallback if absent."""
+    music_dir = ROOT / "assets" / "music"
+    if music_dir.exists():
+        tracks = sorted(
+            p for p in music_dir.iterdir()
+            if p.is_file() and p.suffix.lower() in (".mp3", ".wav", ".m4a", ".aac", ".ogg")
+        )
+        if tracks:
+            print(f"Using one continuous background music track: {tracks[0].name}")
+            return tracks[0]
+
     path = WORK / "background_music.wav"
     sample_rate = 22050
     total = max(1, int(sample_rate * duration))
@@ -800,8 +810,8 @@ def make_background_music(duration, title="", visual_theme=""):
         pulse = math.sin(2 * math.pi * 55.0 * beat_phase) * pulse_env
         fade_in = min(1.0, t / 0.8)
         fade_out = min(1.0, max(0.0, (duration - t) / 1.2))
-        # Quiet source level; the final FFmpeg mix attenuates it further beneath narration.
-        value = (0.105 * pad + pulse_level * pulse) * fade_in * fade_out
+        # Audible fallback bed; final FFmpeg mix keeps narration in front.
+        value = (0.22 * pad + pulse_level * 1.8 * pulse) * fade_in * fade_out
         samples.append(int(max(-1.0, min(1.0, value)) * 32767))
     with wave.open(str(path), "wb") as audio:
         audio.setnchannels(1)
@@ -879,7 +889,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
         music_index = len(clips) + 2
     filters[-1] += (
         f";[{len(clips)}:a]volume=1.0[voice];"
-        f"[{music_index}:a]volume=0.08,afade=t=in:st=0:d=0.8,"
+        f"[{music_index}:a]volume=0.24,afade=t=in:st=0:d=0.8,"
         f"afade=t=out:st={max(0, duration-1.2):.2f}:d=1.2[music];"
         "[voice][music]amix=inputs=2:duration=first:dropout_transition=1[aout]"
     )
