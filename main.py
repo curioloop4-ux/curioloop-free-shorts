@@ -237,8 +237,7 @@ def make_ass(narration):
         current.append(word)
         current_chars += len(word)
         # Natural punctuation creates a short visual pause.
-        if re.search(r"[.!?,;:]$", word):
-            groups.append(current)
+        if re.search(r"[.!?,;:]$", word):            groups.append(current)
             current = []
             current_chars = 0
     if current:
@@ -385,7 +384,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
         if named_person:
             return bool(meaningful) and any(w in words for w in meaningful)
         if stock_person_mode:
-            if query == (visual_terms[0] if visual_terms else ""):
+            if query == (query_terms[0] if query_terms else ""):
                 person_terms = {"man", "men", "male", "woman", "women", "female"}
                 fitness_terms = {"fitness", "workout", "gym", "athlete", "athletic", "muscle", "muscular", "sport", "training", "bodybuilding", "exercise"}
                 return any(w in words for w in person_terms) and any(w in words for w in fitness_terms)
@@ -447,8 +446,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             try:
                 response = session.get(
                     "https://api.pexels.com/videos/search",
-                    headers={"Authorization": pexels_key},
-                    params={"query": query, "per_page": 20, "orientation": "portrait"},
+                    headers={"Authorization": pexels_key},                    params={"query": query, "per_page": 20, "orientation": "portrait"},
                     timeout=35,
                 )
                 response.raise_for_status()
@@ -697,8 +695,7 @@ def make_mascot():
     # Little paws hugging a large acorn at the front.
     draw.ellipse(p((116, 247, 173, 291)), fill=light_orange, outline=outline, width=4 * scale)
     draw.ellipse(p((235, 247, 292, 291)), fill=light_orange, outline=outline, width=4 * scale)
-    draw.ellipse(p((174, 249, 231, 319)), fill=(151, 87, 45, 255),
-                 outline=outline, width=4 * scale)
+    draw.ellipse(p((174, 249, 231, 319)), fill=(151, 87, 45, 255),                 outline=outline, width=4 * scale)
     draw.pieslice(p((169, 243, 236, 283)), start=180, end=360,
                   fill=(112, 72, 39, 255), outline=outline, width=3 * scale)
     draw.line([p((203, 248)), p((210, 233))], fill=(91, 125, 58, 255),
