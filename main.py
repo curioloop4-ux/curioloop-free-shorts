@@ -127,6 +127,11 @@ Return exactly 5 English stock-VIDEO search queries in this order:
 3) "adult woman fitness fashion stylish outfit confident movement video" for a second tasteful adult-woman shot.
 4) and 5) must show the exact topic/action. All people must be clearly adults, fully clothed and non-explicit; no lingerie, nudity, sexual activity or minors. Keep the two glamour shots natural and relevant to the subject's mood. featured_person must be exactly "fit adult woman".
 Return valid JSON only."""
+    if os.getenv("CONTENT_MODE", "general").lower() == "mixed":
+        prompt = """Create one original English YouTube Short for a broad curiosity channel. Rotate across science and space, history, strange inventions, psychology, nature and animal facts, everyday mysteries, beauty and fitness, and surprising human achievements. Select a specific, verifiable fact with strong visual storytelling potential. Do not repeatedly choose the same category in consecutive episodes. Avoid fabricated studies, unsupported statistics, medical or financial advice, and copyrighted characters or scenes.
+Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
+20-35 seconds; narration 60-85 natural English words; concise curiosity-driven title; hook_text 3-6 words. Open with a relatable question or surprising observation, explain one clear fact, and end with a memorable takeaway.
+Visuals: first three search queries must show the selected featured adult (woman or man, alternate by episode) in relevant real-world activity, with a post-activity/sweat moment, recovery or massage where relevant, and exercise/action. Remaining two queries must directly depict the actual topic: real animals for animal facts, real experiments for science, archival objects or places for history, and topic-specific human activity where appropriate. Do not force beauty/massage footage into unrelated topics. All people clearly adults, fully clothed and non-sexualized. Return exactly five English stock-video queries in the same order as the visual plan. Return valid JSON only."""
     if os.getenv("CONTENT_MODE", "general").lower() == "beauty":
         prompt = """Create one original English YouTube Short for adult male viewers interested in women, focused on practical beauty, skincare, haircare, massage, fashion, personal presentation and attraction psychology. Use a respectful, informative angle about trends, first impressions or everyday self-care without objectifying women or promising results.
 Choose one useful, evidence-aware everyday tip. Do not promise medical or cosmetic results; do not diagnose or prescribe treatments. Avoid unsupported claims and fabricated studies.
@@ -237,8 +242,7 @@ def make_ass(narration):
             current = []
             current_chars = 0
     if current:
-        if len(current) == 1 and groups and sum(len(x) for x in groups[-1]) < 3:
-            groups[-1].extend(current)
+        if len(current) == 1 and groups and sum(len(x) for x in groups[-1]) < 3:            groups[-1].extend(current)
         else:
             groups.append(current)
 
@@ -431,6 +435,54 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     # Require an athletic adult man/woman opening; following clips must match the topic.
     opening_found = False
 
+    # Pexels first: official API results are licensed for commercial use under the Pexels License.
+    # Keep the asset page URL and creator in the credit log; never scrape the website.
+    pexels_key = os.getenv("PEXELS_API_KEY", "").strip()
+    if pexels_key and len(clips) < count:
+        for query_index, query in enumerate(query_terms):
+            if len(clips) >= count:
+                break
+            if opening_found and query_index == 0:
+                continue
+            try:
+                response = session.get(
+                    "https://api.pexels.com/videos/search",
+                    headers={"Authorization": pexels_key},
+                    params={"query": query, "per_page": 20, "orientation": "portrait"},
+                    timeout=35,
+                )
+                response.raise_for_status()
+                for item in response.json().get("videos", []):
+                    creator = str((item.get("user") or {}).get("name", "Pexels contributor"))
+                    page_url = str(item.get("url", ""))
+                    title_text = str(item.get("alt", "")) + " " + creator
+                    asset_id = f"pexels:{item.get('id', '')}" if item.get("id") else None
+                    if already_used(asset_id, page_url):
+                        continue
+                    if not relevant_metadata(title_text, query):
+                        continue
+                    files = sorted(
+                        [f for f in item.get("video_files", []) if f.get("link")],
+                        key=lambda f: (f.get("quality") == "hd", f.get("width", 0) * f.get("height", 0)),
+                        reverse=True,
+                    )
+                    if not files:
+                        continue
+                    try:
+                        render_video(files[0]["link"], len(clips) + 1, "Pexels",
+                                     "Pexels License (commercial use permitted; restrictions apply)",
+                                     page_url, creator)
+                        remember_asset(asset_id, page_url, files[0]["link"])
+                        if query_index == 0 and len(clips) == 1:
+                            opening_found = True
+                            print(f"Accepted required opening from Pexels: {page_url}")
+                    except Exception as exc:
+                        print(f"Skipping Pexels video: {type(exc).__name__}: {exc}")
+                    if len(clips) >= (1 if query_index < 3 else count):
+                        break
+            except Exception as exc:
+                print(f"Pexels search failed for '{query}': {type(exc).__name__}: {exc}")
+
     # Pixabay stock video is accepted only when its tags explicitly match the subject/query.
     pixabay_key = os.getenv("PIXABAY_API_KEY")
     if pixabay_key and len(clips) < count:
@@ -447,8 +499,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
                 for item in response.json().get("hits", []):
                     tags = item.get("tags", "")
                     asset_id = f"pixabay:{item.get('id', '')}" if item.get("id") else None
-                    page_url = item.get("pageURL", "")
-                    video_url = ((item.get("videos", {}).get("large") or
+                    page_url = item.get("pageURL", "")                    video_url = ((item.get("videos", {}).get("large") or
                                   item.get("videos", {}).get("medium") or
                                   item.get("videos", {}).get("small") or {}).get("url", ""))
                     if already_used(asset_id, page_url, video_url):
@@ -697,8 +748,7 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
 
     filters = []
     labels = []
-    for i in range(len(clips)):
-        clip_duration = segment_durations[i]
+    for i in range(len(clips)):        clip_duration = segment_durations[i]
         filters.append(
             f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
             f"crop=1080:1920,trim=duration={clip_duration:.3f},"
