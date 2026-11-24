@@ -1,0 +1,43 @@
+name: Render Mirror Cat Short
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_zip_url:
+        description: "Direct-download URL for the ZIP containing the five Google Flow MP4 clips"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install FFmpeg and dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+          python -m pip install --upgrade pip
+          pip install edge-tts
+
+      - name: Render the Short
+        run: |
+          python render_mirror_cat.py --zip-url "${{ inputs.source_zip_url }}" --output mirror_cat_short.mp4
+
+      - name: Upload rendered video
+        uses: actions/upload-artifact@v4
+        with:
+          name: mirror-cat-short
+          path: mirror_cat_short.mp4
+          retention-days: 7
