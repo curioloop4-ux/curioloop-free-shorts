@@ -96,7 +96,7 @@ def fetch_trending_candidates(limit=20):
         return []
 
 
-def make_script(previous_titles=None, featured_gender="woman"):
+def make_script(previous_titles=None, featured_gender="woman", retry_instruction=None):
     """Generate Shorts with relevant licensed visuals."""
     api_key = required("GEMINI_API_KEY")
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.5-flash-lite").strip()
@@ -221,10 +221,12 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
             "and build a fresh script, not a paraphrase. Previously used scripts (title | theme | opening): "
             + " || ".join(previous_titles[-30:])
         )
+    if retry_instruction:
+        prompt += "\n\nMANDATORY REGENERATION INSTRUCTION:\n" + retry_instruction + "\nThe previous candidate was rejected. Do not paraphrase it, do not reuse its title, central topic, main claim, examples, or narration structure. Produce a genuinely different Short while following all channel and visual rules above.\n"
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     print(f"Generating general-knowledge CurioLoop Short with Gemini model: {model}")
     payload = {"contents":[{"parts":[{"text":prompt}]}],
-               "generationConfig":{"temperature":0.85,"responseMimeType":"application/json"}}
+               "generationConfig":{"temperature":0.95,"topP":0.95,"responseMimeType":"application/json"}}
     response = None
     retryable_statuses = {429, 500, 502, 503, 504}
     for attempt in range(1, 6):
@@ -1108,8 +1110,13 @@ def main():
             featured_gender = "woman" if os.getenv("CONTENT_MODE", "general").lower() == "fitness_recovery" else ("man" if last_featured == "fit adult woman" else "woman")
             print(f"Featured subject rotation: adult {featured_gender}")
             script = None
-            for attempt in range(3):
-                candidate = make_script(recent_prompts, featured_gender=featured_gender)
+            retry_instruction = None
+            for attempt in range(5):
+                candidate = make_script(
+                    recent_prompts,
+                    featured_gender=featured_gender,
+                    retry_instruction=retry_instruction,
+                )
                 candidate_key = re.sub(r"[^a-z0-9 ]", "", candidate["title"].lower()).strip()
                 if candidate_key not in duplicate_title_keys:
                     script = candidate
@@ -1117,6 +1124,16 @@ def main():
                 print(f"Duplicate title returned; requesting a fresh script ({attempt + 1}/3): {candidate['title']}")
                 recent_prompts.append(
                     "REJECTED DUPLICATE: " + candidate["title"] + " | Do not reuse this topic or angle."
+                )
+                retry_instruction = (
+                    "The title below is already used and MUST NOT appear again: "
+                    + repr(candidate["title"])
+                    + ". Generate a different subject and a different factual takeaway. "
+                    "Do not write about male attractiveness, confidence, body language, or first impressions. "
+                    "Choose a clearly distinct, useful topic from everyday science, nature, history, technology, "
+                    "or practical human behavior. Make the narration and visual queries specific to that new topic. "
+                    "Avoid all previously used titles and topics listed in the conversation context. "
+                    "Retry number " + str(attempt + 1) + ". Variation token: " + str(time.time_ns())
                 )
             if script is None:
                 raise RuntimeError("Gemini returned duplicate titles three times; refusing to reuse a script.")
