@@ -24,6 +24,11 @@ on:
         required: true
         type: boolean
         default: false
+      shorts_count:
+        description: "Number of Shorts to create (1-3)"
+        required: true
+        type: number
+        default: 1
       start_short:
         description: "Start Shorts batch at this number (1-3)"
         required: true
@@ -88,6 +93,7 @@ jobs:
           MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
           MONEY_TOPIC_MODE: ${{ inputs.topic_mode }}
           MONEY_START_SHORT: ${{ inputs.start_short }}
+          MONEY_SHORTS_COUNT: ${{ inputs.shorts_count }}
           OUTPUT_ONLY: ${{ inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: python money_channel.py
