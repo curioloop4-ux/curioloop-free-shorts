@@ -39,7 +39,7 @@ def generate_content(topic=None, topic_category='经济'):
         if topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理"}:
             prompt = f"""请创作一条面向简体中文观众的经济知识Shorts。主题：{topic}。解释具体可信的经济或金钱心理观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
         else:
-            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须精准对应本条主题，优先呈现成年男女进行与主题直接相关的真实活动；人物脸部清楚，优先全身或腰部以上中景，人物占画面主体。场景可为街拍穿搭、健身训练、护肤、发型整理、镜前准备或社交互动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
+            prompt = f"""请创作一条面向简体中文观众的高吸引力Shorts。类别：{topic_category}。主题：{topic}。内容围绕时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、魅力心理或自我管理，必须与主题一致。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场。若主题类别为美容与形象，后续搜索词优先安排professional facial massage、adult woman scalp massage、spa skincare treatment、shoulder massage等真实按摩与护肤场景，至少3个搜索词明确包含massage或spa，并确保画面中成年顾客和/或专业理疗师清楚可见。其他主题则使用与主题直接相关的成年人物活动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL}:generateContent"
     payload = {
         "contents": [{"parts": [{"text": prompt}]}],
@@ -276,7 +276,7 @@ def download_relevant_clips(queries):
                 people_terms = (
                     "person", "people", "woman", "women", "man", "men", "female", "male",
                     "businesswoman", "businessman", "employee", "customer", "couple",
-                    "entrepreneur", "worker", "model", "portrait", "fashion", "fitness"
+                    "entrepreneur", "worker", "model", "portrait", "fashion", "fitness", "massage", "spa", "therapist", "skincare", "facial", "beauty", "salon", "scalp"
                 )
                 if not any(term in searchable for term in people_terms):
                     continue
@@ -498,25 +498,27 @@ def reserve_topics(count=3):
         response.raise_for_status()
 
     recent_ids = history.get("recent_ids", [])
-    available = [item for item in TOPIC_BANK if item[0] not in recent_ids]
+    topic_mode = os.getenv("MONEY_TOPIC_MODE", "economy").lower()
+    topic_pool = APPEARANCE_TOPIC_BANK if topic_mode == "beauty" else TOPIC_BANK
+    available = [item for item in topic_pool if item[0] not in recent_ids]
     if len(available) < count:
-        available = TOPIC_BANK[:]
+        available = topic_pool[:]
     import random
     random.shuffle(available)
     selected = available[:count]
 
-    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(TOPIC_BANK):]
+    history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(topic_pool):]
     history["recent_topics"] = (history.get("recent_topics", []) +
         [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-len(TOPIC_BANK):]
     encoded = __import__("base64").b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
-    payload = {"message": "Track recent Chinese economy and business topics",
+    payload = {"message": "Track recent Chinese content topics",
                "content": encoded, "branch": branch}
     if file_sha:
         payload["sha"] = file_sha
     saved_response = requests.put(api, headers=headers, json=payload, timeout=30)
     saved_response.raise_for_status()
-    print("Reserved Chinese economy/business topics:")
+    print(f"Reserved Chinese {topic_mode} topics:")
     for item in selected:
         print(f" - [{item[1]}] {item[2]}")
     return [(item[1], item[2]) for item in selected]
