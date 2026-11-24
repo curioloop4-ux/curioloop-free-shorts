@@ -126,7 +126,7 @@ second and third for the actual topic/action. featured_person must be exactly "f
 Return valid JSON only."""
     if previous_titles:
         prompt += (
-            "\\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
+            "\nSTRICT ORIGINALITY: Do not reuse the same central fact, topic angle, example, "
             "or narrative structure from any item below. Choose a clearly different subject "
             "and build a fresh script, not a paraphrase. Previously used scripts (title | theme | opening): "
             + " || ".join(previous_titles[-30:])
@@ -697,7 +697,7 @@ def main():
             # Keep a rolling record of the 300 most recent generated scripts.
             script_history["scripts"] = prior_scripts[-300:]
             script_history_path.write_text(
-                json.dumps(script_history, ensure_ascii=False, indent=2) + "\\n",
+                json.dumps(script_history, ensure_ascii=False, indent=2) + "\n",
                 encoding="utf-8"
             )
             print("Selected:", script["title"])
