@@ -7,6 +7,7 @@ out of Git history and leaves the existing main.py pipeline untouched.
 import argparse
 import asyncio
 import os
+import subprocess
 import tempfile
 import zipfile
 from pathlib import Path
@@ -68,18 +69,20 @@ def main():
             "".join("file '" + str(p).replace("'", "'\\''") + "'\n" for p in clips),
             encoding="utf-8"
         )
-        silent = work / "joined.mp4"
-        os.system(
-            "ffmpeg -y -f concat -safe 0 -i " + shlex_quote(str(concat_file)) +
-            " -an -c:v libx264 -preset veryfast -crf 20 -pix_fmt yuv420p " +
-            shlex_quote(str(silent)) + " >/dev/null 2>&1"
-        )
-        if not silent.exists() or silent.stat().st_size == 0:
+        joined = work / "joined.mp4"
+        subprocess.run([
+            "ffmpeg", "-y", "-f", "concat", "-safe", "0", "-i", str(concat_file),
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", str(joined)
+        ], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+        if not joined.exists() or joined.stat().st_size == 0:
             raise RuntimeError("FFmpeg could not concatenate the source clips.")
 
-        narration = " ".join(line for _, line in ORDER_HINTS)
-        voice = work / "voice.mp3"
-        asyncio.run(make_voice(narration, voice))
+        voice_files = []
+        for i, (_, line) in enumerate(ORDER_HINTS):
+            voice_file = work / f"voice_{i}.mp3"
+            asyncio.run(make_voice(line, voice_file))
+            voice_files.append(voice_file)
 
         # Captions are distributed across the five source scenes.
         ass = work / "captions.ass"
@@ -99,28 +102,34 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
         events = []
         for i, (_, line) in enumerate(ORDER_HINTS):
-            start = i * 7.93
-            end = min((i + 1) * 7.93, 39.65)
+            start = i * 7.93 + 0.45
+            end = min(i * 7.93 + 6.5, 39.65)
             events.append(f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Default,,0,0,0,,{line}")
         ass.write_text(header + "\n".join(events) + "\n", encoding="utf-8")
 
-        # Keep original scene audio muted; use clean narration over the montage.
-        cmd = (
-            "ffmpeg -y -i " + shlex_quote(str(silent)) +
-            " -i " + shlex_quote(str(voice)) +
-            " -vf " + shlex_quote("subtitles=" + str(ass).replace("\\", "/")) +
-            " -map 0:v:0 -map 1:a:0 -c:v libx264 -preset veryfast -crf 21 "
-            "-c:a aac -b:a 160k -movflags +faststart " + shlex_quote(str(out)) +
-            " >/dev/null 2>&1"
-        )
-        os.system(cmd)
+        # Preserve original clip audio quietly and mix in five brief narration lines.
+        cmd = ["ffmpeg", "-y", "-i", str(joined)]
+        for voice_file in voice_files:
+            cmd += ["-i", str(voice_file)]
+        filters = ["[0:a]volume=0.35[base]"]
+        mix_inputs = ["[base]"]
+        for i in range(len(voice_files)):
+            delay_ms = int((i * 7.93 + 0.55) * 1000)
+            filters.append(f"[{i + 1}:a]adelay={delay_ms}|{delay_ms},volume=1.0[v{i}]")
+            mix_inputs.append(f"[v{i}]")
+        filters.append("".join(mix_inputs) + f"amix=inputs={len(mix_inputs)}:duration=first:dropout_transition=0[aout]")
+        subtitle_filter = "subtitles=" + str(ass).replace("\\", "/")
+        cmd += [
+            "-filter_complex", ";".join(filters),
+            "-vf", subtitle_filter,
+            "-map", "0:v:0", "-map", "[aout]",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "21",
+            "-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", str(out)
+        ]
+        subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
         if not out.exists() or out.stat().st_size == 0:
             raise RuntimeError("Final render failed.")
         print(f"Rendered {out} ({out.stat().st_size} bytes)")
-
-def shlex_quote(value):
-    import shlex
-    return shlex.quote(value)
 
 if __name__ == "__main__":
     main()
