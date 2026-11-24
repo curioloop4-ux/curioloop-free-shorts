@@ -21,7 +21,7 @@ on:
         description: "Create MP4 files only; skip YouTube upload"
         required: true
         type: boolean
-        default: true
+        default: false
       content_mode:
         description: "Choose the next Short topic style"
         required: true
