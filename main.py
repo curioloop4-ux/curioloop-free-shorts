@@ -294,8 +294,8 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
     generated_terms = [str(q).strip() for q in (visual_queries or []) if str(q).strip()]
     opening_queries = [generated_terms[0]] if generated_terms else ["adult woman workout outfit gym stretching fitness full body video"]
     glamour_queries = [
-        "adult woman stylish fashion elegant fitted outfit confident full body video",
-        "adult woman fitness fashion stylish outfit confident movement video",
+        "professional adult woman massage therapist giving shoulder massage spa wellness video",
+        "adult woman fitness workout gym stretching full body exercise video",
     ]
     topic_queries = generated_terms[1:5] if len(generated_terms) > 1 else [title.strip(), visual_theme]
     query_terms = list(dict.fromkeys([*opening_queries, *glamour_queries, *topic_queries, title.strip(), visual_theme]))
@@ -656,7 +656,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
 
     # Reserve the first 2.5 seconds for the signature shot; divide the remaining runtime
     # evenly across the topic-related clips.
-    opening_duration = min(2.5, max(1.5, duration * 0.12))
+    # Give the opening person-led workout/massage footage a longer screen presence.
+    opening_duration = min(6.0, max(5.0, duration * 0.25))
     topic_segment = (duration - opening_duration) / (len(clips) - 1)
     segment_durations = [opening_duration] + [topic_segment] * (len(clips) - 1)
     cmd = ["ffmpeg", "-y"]
