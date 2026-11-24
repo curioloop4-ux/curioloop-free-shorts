@@ -1,0 +1,40 @@
+name: Upload Approved CurioLoop Pilot
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "UPLOAD_APPROVED_PILOT.trigger"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  upload:
+    if: github.event.head_commit.message == 'Upload approved CurioLoop pilot'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Download approved MP4 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: curioloop-dating-culture-pilot
+          path: pilot_artifact
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.repository }}
+          run-id: 45414323732
+      - name: Upload approved Short publicly
+        env:
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_PRIVACY_STATUS: public
+        run: python upload_pilot.py
