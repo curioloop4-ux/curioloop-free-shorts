@@ -579,7 +579,12 @@ def make_mascot():
 def render(title, hook_text, voice, captions, duration, visual_theme, visual_queries, featured_person):
     output = WORK / f"curioloop_short_{__import__('time').strftime('%Y%m%d_%H%M%S')}.mp4"
     title_path = WORK / "title.txt"
-    # Keep the on-screen title inside the Shorts safe area: wrap to two lines.\n    clean_title = re.sub(r"\\s+", " ", title.replace("\\\\n", " ").replace("\\n", " ")).strip()\n    title_lines = textwrap.wrap(clean_title, width=22, break_long_words=True, break_on_hyphens=False)\n    if len(title_lines) > 2:\n        title_lines = [title_lines[0], textwrap.shorten(" ".join(title_lines[1:]), width=22, placeholder="…")]\n    title_path.write_text("\\n".join(title_lines), encoding="utf-8")
+    # Keep the on-screen title inside the Shorts safe area: wrap to two lines.
+    clean_title = re.sub(r"\s+", " ", title.replace("\\n", " ").replace("\n", " ")).strip()
+    title_lines = textwrap.wrap(clean_title, width=22, break_long_words=True, break_on_hyphens=False)
+    if len(title_lines) > 2:
+        title_lines = [title_lines[0], textwrap.shorten(" ".join(title_lines[1:]), width=22, placeholder="…")]
+    title_path.write_text("\n".join(title_lines), encoding="utf-8")
     hook_path = WORK / "hook.txt"
     hook_path.write_text(hook_text.replace("\\n", " ").strip(), encoding="utf-8")
     clips, credits = fetch_video_clips(title, visual_theme, visual_queries, featured_person, count=5)
