@@ -102,7 +102,7 @@ Cover accurate general knowledge: science, psychology, history, animals, nature,
 technology, everyday mysteries. No Korean entertainment news.
 Return ONLY JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries.
 Choose one specific verified fact; never invent statistics or studies. Avoid medical/financial advice.
-20-35 seconds; narration 60-85 natural English words; title under 65 characters;
+20-35 seconds; narration 60-85 natural English words; title 35-45 characters maximum, concise and punchy;
 hook_text 3-6 words; immediate curiosity hook that follows the casual opening.
 NARRATION OPENING RULES:
 Start with a relatable everyday-life observation, familiar habit, small frustration, or casual question.
