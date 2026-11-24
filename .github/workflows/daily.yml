@@ -27,6 +27,7 @@ on:
         required: true
         type: choice
         options:
+          - fitness_recovery
           - mixed
           - beauty
           - general
