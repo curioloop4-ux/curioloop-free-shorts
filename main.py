@@ -769,7 +769,8 @@ def render(title, hook_text, voice, captions, duration, visual_theme, visual_que
 
     filters = []
     labels = []
-    for i in range(len(clips)):        clip_duration = segment_durations[i]
+    for i in range(len(clips)):
+        clip_duration = segment_durations[i]
         filters.append(
             f"[{i}:v]fps=30,scale=1080:1920:force_original_aspect_ratio=increase,"
             f"crop=1080:1920,trim=duration={clip_duration:.3f},"
