@@ -78,7 +78,7 @@ jobs:
           YOUTUBE_PRIVACY_STATUS: public
           OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
-          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || 'general' }}
+          CONTENT_MODE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_mode || 'mixed' }}
           SHORTS_COUNT: ${{ github.event_name == 'workflow_dispatch' && inputs.shorts_count || 1 }}
         run: python main.py
 
