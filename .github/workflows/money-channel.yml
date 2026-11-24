@@ -1,9 +1,6 @@
 name: Youqian Research Institute Chinese Channel
 
 on:
-  schedule:
-    # Daily Chinese channel batch at 10:00 Korea Standard Time (01:00 UTC).
-    - cron: "0 1 * * *"
   workflow_dispatch:
     inputs:
       content_type:
@@ -79,10 +76,10 @@ jobs:
           MONEY_YOUTUBE_CLIENT_ID: ${{ secrets.MONEY_YOUTUBE_CLIENT_ID }}
           MONEY_YOUTUBE_CLIENT_SECRET: ${{ secrets.MONEY_YOUTUBE_CLIENT_SECRET }}
           MONEY_YOUTUBE_REFRESH_TOKEN: ${{ secrets.MONEY_YOUTUBE_REFRESH_TOKEN }}
-          MONEY_YOUTUBE_PRIVACY_STATUS: ${{ github.event_name == 'workflow_dispatch' && inputs.privacy_status || 'public' }}
-          MONEY_CONTENT_TYPE: ${{ github.event_name == 'workflow_dispatch' && inputs.content_type || 'shorts' }}
-          MONEY_START_SHORT: ${{ github.event_name == 'workflow_dispatch' && inputs.start_short || '1' }}
-          OUTPUT_ONLY: ${{ github.event_name == 'workflow_dispatch' && inputs.output_only || 'false' }}
+          MONEY_YOUTUBE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
+          MONEY_CONTENT_TYPE: ${{ inputs.content_type }}
+          MONEY_START_SHORT: ${{ inputs.start_short }}
+          OUTPUT_ONLY: ${{ inputs.output_only }}
           GEMINI_MODEL: ${{ vars.GEMINI_MODEL }}
         run: python money_channel.py
 
