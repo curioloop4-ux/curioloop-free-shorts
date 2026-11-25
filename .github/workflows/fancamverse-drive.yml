@@ -17,11 +17,6 @@ on:
           - private
           - public
         default: unlisted
-      max_files:
-        description: "Maximum number of new Drive videos to process (1-5)"
-        required: true
-        type: number
-        default: 1
 
 permissions:
   contents: write
@@ -66,7 +61,6 @@ jobs:
           FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
-          FANCAMVERSE_MAX_FILES: ${{ inputs.max_files }}
         run: python fancamverse.py
 
       - name: Save rendered videos for review
