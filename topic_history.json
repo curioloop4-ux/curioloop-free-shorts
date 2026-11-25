@@ -5,7 +5,10 @@
     "business_01",
     "massage_02",
     "massage_03",
-    "massage_04"
+    "massage_04",
+    "animal_07",
+    "animal_08",
+    "animal_06"
   ],
   "recent_topics": [
     {
@@ -67,6 +70,21 @@
       "id": "massage_04",
       "category": "按摩与放松",
       "topic": "为什么专业SPA护理通常强调轻柔手法？"
+    },
+    {
+      "id": "animal_07",
+      "category": "动物趣事",
+      "topic": "猫咪和纸箱之间有什么奇妙的吸引力？"
+    },
+    {
+      "id": "animal_08",
+      "category": "动物趣事",
+      "topic": "狗狗发现自己尾巴时会发生什么？"
+    },
+    {
+      "id": "animal_06",
+      "category": "动物趣事",
+      "topic": "兔子突然蹦跳时到底在表达什么？"
     }
   ],
   "mix_position": 6
