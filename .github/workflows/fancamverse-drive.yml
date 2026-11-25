@@ -73,7 +73,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: fancamverse-test-videos
-          path: work_fancamverse/*.mp4
+          path: work_fancamverse/*_short_*.mp4
           if-no-files-found: ignore
           retention-days: 7
 
