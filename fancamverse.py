@@ -297,7 +297,12 @@ def main():
     print(f"Round-robin source: {item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}")
     source = download_video(drive, item)
     duration = probe_duration(source)
-    clips = analyze_highlights(source, duration, item["name"])
+    saved_clips = source_state.get(item["id"], {}).get("clips")
+    if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
+        clips = saved_clips
+        print("Using the previously selected four highlight windows for consistent rotation.")
+    else:
+        clips = analyze_highlights(source, duration, item["name"])
     clip = clips[selected_index - 1]
     rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1)
     path, clip = rendered[0]
@@ -312,7 +317,8 @@ def main():
     source_state[item["id"]] = {
         "name": item["name"],
         "next_clip": selected_index + 1,
-        "complete": selected_index >= SHORTS_PER_SOURCE
+        "complete": selected_index >= SHORTS_PER_SOURCE,
+        "clips": clips
     }
     history["last_source_id"] = item["id"]
     history["sources"] = source_state
