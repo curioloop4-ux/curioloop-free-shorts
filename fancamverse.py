@@ -269,18 +269,38 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
 def render_clips(source, clips, source_stem, index_offset=0):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    source_label = str(source_stem).casefold()
+    is_chaewon_smart = ("김채원" in source_label and "smart" in source_label) or (
+        "kim chaewon" in source_label and "smart" in source_label
+    )
+
+    # Only the Kim Chaewon "Smart" source uses 3:4. All other sources remain 9:16.
+    if is_chaewon_smart:
+        output_w, output_h = 1080, 1440
+        crop_note = "3:4"
+    else:
+        output_w, output_h = 1080, 1920
+        crop_note = "9:16"
+    print(f"Render aspect ratio for {source_stem}: {crop_note}")
+
+    import textwrap
     for position, clip in enumerate(clips, 1):
         index = position + index_offset
         output = WORK / f"{source_stem}_short_{index}.mp4"
         hook_file = WORK / f"hook_{index}.txt"
-        hook_file.write_text(clip["hook"], encoding="utf-8")
+        raw_hook = re.sub(r"\\s+", " ", str(clip.get("hook", "A Must-Watch Stage Moment"))).strip()
+        # Keep intro text compact and wrap it before it reaches the screen edges.
+        wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
+        hook_file.write_text(wrapped_hook, encoding="utf-8")
+
+        # Fill the requested frame while keeping the title inside generous safe margins.
         vf = (
-            "scale=1080:1920:force_original_aspect_ratio=increase,"
-            "crop=1080:1920,"
+            f"scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
+            f"crop={output_w}:{output_h},"
             f"drawtext=fontfile={fontfile}:textfile={hook_file}:reload=0:"
-            "fontcolor=white:fontsize=58:borderw=3:bordercolor=black:"
-            "box=1:boxcolor=black@0.48:boxborderw=22:"
-            "x=(w-text_w)/2:y=h*0.13:"
+            "fontcolor=white:fontsize=46:borderw=3:bordercolor=black:"
+            "box=1:boxcolor=black@0.50:boxborderw=18:"
+            "x=(w-text_w)/2:y=h*0.085:"
             "enable='between(t,0,2.7)'"
         )
         run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
