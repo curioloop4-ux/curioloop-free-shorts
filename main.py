@@ -137,8 +137,11 @@ Prefer ideas with a clear curiosity gap, relatable situation and practical or su
 Return ONLY valid JSON keys: title, hook_text, narration, visual_theme, featured_person, visual_queries, seo_tags.
 20-35 seconds; narration 55-80 natural English words; hook_text 3-6 words; title concise and curiosity-driven.
 Use an immediate relatable question or observation, then deliver a clear insight and finish with a natural viewer question or memorable takeaway.
-Visuals: real licensed stock VIDEO of clearly adult people and couples, natural candid interactions matching each narration beat. Avoid burned-in subtitles, logos, watermarks, unrelated gym/massage/beauty footage, and any source video not licensed for reuse. Do not portray ethnicity as determining behavior.
-Return exactly 5 English stock-video search queries that directly depict the specific narration scenes, in narrative order. featured_person should describe the actual main subject (for example "adult couple" or "adult woman") and remain consistent with all five queries.
+VISUAL CAST PRIORITY — IMPORTANT:
+The channel's visual identity is women-focused. Adult women must be the dominant on-screen subjects in at least 4 of the 5 scenes. Prefer attractive, confident adult women with natural expressions and stylish, tasteful everyday, fashion, fitness or social outfits; fully clothed and non-sexualized.
+Do NOT alternate male and female leads. Do NOT make men the main subject. Men may appear only when a specific dating scene genuinely requires a second person, and should remain secondary; otherwise show women alone or with other women.
+The first 3 visual queries MUST explicitly request real licensed stock VIDEO featuring a clearly adult woman as the visible main subject, in a natural scene relevant to the narration. Queries 4 and 5 must also prioritize adult women wherever the topic allows. Do not use generic "people" or "couple" queries that can return male-led footage.
+Return exactly 5 English stock-video search queries in narrative order. featured_person must be exactly "adult woman". Each query must describe a distinct, relevant scene, not generic glamour footage. Avoid burned-in subtitles, logos, watermarks, unrelated footage, and any source video not licensed for reuse. All people must be clearly adults, fully clothed and non-explicit.
 seo_tags must be 8-15 specific tags for the exact topic. Return valid JSON only."""
         prompt = prompt.replace("{previous_titles}", ", ".join(previous_titles[-20:]) or "none")
     if os.getenv("CONTENT_MODE", "general").lower() == "animal_comedy":
@@ -1090,10 +1093,10 @@ def main():
                 re.sub(r"[^a-z0-9 ]", "", title.lower()).strip()
                 for title in used_titles
             }
-            # Alternate female-focused and male-focused videos across batches using saved script history.
-            last_featured = prior_scripts[-1].get("featured_person", "") if prior_scripts else ""
-            featured_gender = "woman" if os.getenv("CONTENT_MODE", "general").lower() == "fitness_recovery" else ("man" if last_featured == "fit adult woman" else "woman")
-            print(f"Featured subject rotation: adult {featured_gender}")
+            # CurioLoop is women-focused: keep adult women as the lead subject every run.
+            # Dating-attraction visuals are explicitly constrained to at least 4 woman-led scenes.
+            featured_gender = "woman"
+            print("Featured subject priority: adult woman (women-led visuals)")
             script = None
             retry_instruction = None
             for attempt in range(5):
