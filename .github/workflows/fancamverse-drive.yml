@@ -61,9 +61,9 @@ jobs:
           FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
           FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
           FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
-          FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only }}
+          FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
           FANCAMVERSE_UPLOADS_PER_RUN: "3"
-          FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
+          FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status || 'private' }}
         run: python fancamverse.py
 
       - name: Save rendered videos for review
