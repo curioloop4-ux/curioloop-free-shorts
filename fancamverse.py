@@ -403,16 +403,35 @@ def main():
 
     selected = None
     selected_index = None
+    skipped_sources = []
     for offset in range(len(files)):
         idx = (start_at + offset) % len(files)
         item = files[idx]
+        source_name = item.get("name", "").casefold()
+        # The user explicitly requested a different source: skip the repeatedly
+        # selected Kim Chaewon "Smart" file and continue to the next Drive video.
+        is_chaewon_smart = (
+            ("김채원" in source_name and "smart" in source_name)
+            or ("kim chaewon" in source_name and "smart" in source_name)
+        )
+        if is_chaewon_smart:
+            skipped_sources.append(item.get("name", item["id"]))
+            continue
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         next_clip = int(state.get("next_clip", 1))
         if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
             selected, selected_index = item, next_clip
             break
 
+    if skipped_sources:
+        print("Excluded requested previous source(s): " + " | ".join(skipped_sources))
+
     if selected is None:
+        if skipped_sources:
+            raise RuntimeError(
+                "No eligible non-Chaewon source remains in the Drive folder. "
+                "Add another source video or check the file names."
+            )
         print("All current Drive source videos have contributed four Shorts.")
         return
 
