@@ -269,20 +269,11 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
 def render_clips(source, clips, source_stem, index_offset=0):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    source_label = str(source_stem).casefold()
-    is_chaewon_smart = ("김채원" in source_label and "smart" in source_label) or (
-        "kim chaewon" in source_label and "smart" in source_label
-    )
-
-    # Only the Kim Chaewon "Smart" source is cropped vertically to 4:6.
-    # For a 9:16 source, this trims the top and bottom evenly; other sources remain 9:16.
-    if is_chaewon_smart:
-        output_w, output_h = 1080, 1620
-        crop_note = "4:6"
-    else:
-        output_w, output_h = 1080, 1920
-        crop_note = "9:16"
-    print(f"Render aspect ratio for {source_stem}: {crop_note}")
+    # Apply the same 4:6 portrait crop to EVERY source, not just a named video.
+    # For standard 9:16 portrait footage, preserve the full width and trim equal
+    # amounts from the top and bottom to reach 4:6.
+    output_w, output_h = 1080, 1620
+    print(f"Render aspect ratio for {source_stem}: 4:6 (top/bottom center crop)")
 
     import textwrap
     for position, clip in enumerate(clips, 1):
