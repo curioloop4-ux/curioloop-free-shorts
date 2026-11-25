@@ -528,37 +528,6 @@ def main():
         terms = [term.casefold() for term in raw_terms]
         files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
         if not files:
-            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
-            files = search_drive_target_videos(drive, raw_terms)
-            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
-        print(f"Manual source filter matched {len(files)} Drive video(s): " +
-              ", ".join(item["name"] for item in files))
-        required_artists = {x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()}
-        if required_artists:
-            found_artists = {identify_artist(item["name"])[0] for item in files}
-            missing = required_artists - found_artists
-            if missing:
-                raise RuntimeError(f"Missing requested source artist(s): {', '.join(sorted(missing))}.")
-            ordered = []
-            for artist in [x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()]:
-                ordered.append(next(item for item in files if identify_artist(item["name"])[0] == artist))
-            files = ordered
-    if not files:
-            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
-            files = search_drive_target_videos(drive, raw_terms)
-            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
-        print(f"Manual source filter matched {len(files)} Drive video(s): " +
-              ", ".join(item["name"] for item in files))
-        if len(files) < 2:
-            raise RuntimeError("Manual target run requires both Wonyoung and Natty source videos. Check Drive filenames and source_filter.")
-        artist_hits = {identify_artist(item["name"])[0] for item in files}
-        if not {"WONYOUNG", "NATTY"}.issubset(artist_hits):
-            raise RuntimeError("Manual target run did not find both WONYOUNG and NATTY. No upload was made.")
-        # Process one source per artist in a deterministic order.
-        wonyoung_file = next(item for item in files if identify_artist(item["name"])[0] == "WONYOUNG")
-        natty_file = next(item for item in files if identify_artist(item["name"])[0] == "NATTY")
-        files = [wonyoung_file, natty_file]
-    if not files:
         print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
 
