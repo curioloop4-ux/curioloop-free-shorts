@@ -15,7 +15,7 @@ ROOT = Path(__file__).parent
 WORK = ROOT / "work_fancamverse"
 WORK.mkdir(exist_ok=True)
 HISTORY = ROOT / "history" / "fancamverse_processed.json"
-SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/youtube.upload"]
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
 SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
 SHORTS_PER_SOURCE = 4
 MIN_SHORT_SECONDS = 15
@@ -45,6 +45,26 @@ def make_services():
         client_id=required("FANCAMVERSE_CLIENT_ID"), client_secret=required("FANCAMVERSE_CLIENT_SECRET"),
         scopes=SCOPES)
     return build("drive", "v3", credentials=creds), build("youtube", "v3", credentials=creds)
+
+def verify_upload_channel(youtube):
+    expected_id = required("FANCAMVERSE_YOUTUBE_CHANNEL_ID")
+    response = youtube.channels().list(part="id,snippet", mine=True).execute()
+    channels = response.get("items", [])
+    if len(channels) != 1:
+        raise RuntimeError(
+            f"OAuth channel verification failed: expected one authorized channel, found {len(channels)}. "
+            "No videos were uploaded."
+        )
+    channel = channels[0]
+    actual_id = channel.get("id", "")
+    title = channel.get("snippet", {}).get("title", "(unknown)")
+    print(f"OAuth upload channel: {title} ({actual_id})")
+    if actual_id != expected_id:
+        raise RuntimeError(
+            f"Wrong YouTube channel authorized. Expected {expected_id}, got {actual_id} ({title}). "
+            "No videos were uploaded."
+        )
+    print("FANCAMVERSE channel ID verified.")
 
 def load_history():
     if not HISTORY.exists():
