@@ -4,3 +4,4 @@ Retry with Drive-wide artist filename search.
 Retry with support for source clips shorter than 15 seconds.
 Retry after user moved both requested source videos into the inbox.
 Render-only retry to create both edited videos; YouTube upload quota currently blocks publishing.
+Retry: use complete source clips directly; do not call Gemini highlight analysis.
