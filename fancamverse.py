@@ -266,7 +266,7 @@ Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event de
         raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 5 are required. No upload was made.")
     return distinct
 
-def render_clips(source, clips, source_stem, index_offset=0):
+def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
     # Apply the same 4:6 portrait crop to EVERY source, not just a named video.
@@ -282,13 +282,13 @@ def render_clips(source, clips, source_stem, index_offset=0):
         raw_hook = re.sub(r"\\s+", " ", str(clip.get("hook", "A Must-Watch Stage Moment"))).strip()
         wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
 
-        # Full-frame transparent overlay: each title line is independently centered.
-        overlay_path = WORK / f"title_overlay_{index}.png"
-        overlay = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-        title_font = ImageFont.truetype(fontfile, 46)
+        # Intro hook: centered for 2.7 seconds, then disappears.
+        intro_path = WORK / f"intro_overlay_{index}.png"
+        intro = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(intro)
+        intro_font = ImageFont.truetype(fontfile, 46)
         lines = wrapped_hook.splitlines() or [wrapped_hook]
-        line_boxes = [draw.textbbox((0, 0), line, font=title_font, stroke_width=3) for line in lines]
+        line_boxes = [draw.textbbox((0, 0), line, font=intro_font, stroke_width=3) for line in lines]
         line_heights = [box[3] - box[1] for box in line_boxes]
         line_widths = [box[2] - box[0] for box in line_boxes]
         line_gap = 10
@@ -298,20 +298,33 @@ def render_clips(source, clips, source_stem, index_offset=0):
         box_w, box_h = text_w + pad_x * 2, text_h + pad_y * 2
         box_x = (output_w - box_w) // 2
         box_y = (output_h - box_h) // 2
-        draw.rounded_rectangle(
-            (box_x, box_y, box_x + box_w, box_y + box_h),
-            radius=16, fill=(0, 0, 0, 128)
-        )
+        draw.rounded_rectangle((box_x, box_y, box_x + box_w, box_y + box_h),
+                               radius=16, fill=(0, 0, 0, 145))
         current_y = box_y + pad_y
         for line, bbox, line_w, line_h in zip(lines, line_boxes, line_widths, line_heights):
             line_x = (output_w - line_w) // 2
-            draw.text(
-                (line_x - bbox[0], current_y - bbox[1]), line,
-                font=title_font, fill=(255, 255, 255, 255),
-                stroke_width=3, stroke_fill=(0, 0, 0, 255)
-            )
+            draw.text((line_x - bbox[0], current_y - bbox[1]), line,
+                      font=intro_font, fill=(255, 255, 255, 255),
+                      stroke_width=3, stroke_fill=(0, 0, 0, 255))
             current_y += line_h + line_gap
-        overlay.save(overlay_path)
+        intro.save(intro_path)
+
+        # Persistent artist name at the top center.
+        name_path = WORK / f"name_overlay_{index}.png"
+        name_overlay = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        if display_name:
+            name_draw = ImageDraw.Draw(name_overlay)
+            name_font = ImageFont.truetype(fontfile, 48)
+            name_bbox = name_draw.textbbox((0, 0), display_name, font=name_font, stroke_width=2)
+            name_w, name_h = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
+            px, py = 24, 14
+            bx, by = (output_w - name_w - px * 2) // 2, 92
+            name_draw.rounded_rectangle((bx, by, bx + name_w + px * 2, by + name_h + py * 2),
+                                        radius=14, fill=(0, 0, 0, 125))
+            name_draw.text((bx + px - name_bbox[0], by + py - name_bbox[1]), display_name,
+                           font=name_font, fill=(255, 255, 255, 255),
+                           stroke_width=2, stroke_fill=(0, 0, 0, 255))
+        name_overlay.save(name_path)
 
         base_filter = (
             f"scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
@@ -319,11 +332,14 @@ def render_clips(source, clips, source_stem, index_offset=0):
         )
         filter_complex = (
             f"[0:v]{base_filter}[base];"
-            f"[1:v]format=rgba[title];"
-            f"[base][title]overlay=0:0:enable='between(t,0,2.7)'[v]"
+            f"[1:v]format=rgba[name];"
+            f"[2:v]format=rgba[intro];"
+            f"[base][name]overlay=0:0[namebase];"
+            f"[namebase][intro]overlay=0:0:enable='between(t,0,2.7)'[v]"
         )
         run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
-            "-loop", "1", "-i", str(overlay_path),
+            "-loop", "1", "-i", str(name_path),
+            "-loop", "1", "-i", str(intro_path),
             "-t", f"{clip['end'] - clip['start']:.3f}",
             "-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
@@ -332,9 +348,37 @@ def render_clips(source, clips, source_stem, index_offset=0):
         outputs.append((output, clip))
     return outputs
 
+def identify_artist(filename):
+    value = filename.casefold()
+    if any(token in value for token in ("장원영", "wonyoung", "won young")):
+        return "WONYOUNG", "IVE", [
+            "Wonyoung", "IVE Wonyoung", "Wonyoung fancam", "IVE fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Wonyoung performance", "FANCAMVERSE", "Shorts"
+        ]
+    if any(token in value for token in ("나띠", "natty")):
+        return "NATTY", "KISS OF LIFE", [
+            "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
+            "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
+            "Korean idol", "female idol", "FANCAMVERSE", "Shorts"
+        ]
+    return "", "", []
+
 def generate_metadata(filename, hook, index):
-    model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
-    prompt = f"""Create YouTube Shorts metadata for FANCAMVERSE, an English-language K-pop fan-cam channel targeting US viewers.
+    artist, group, fixed_tags = identify_artist(filename)
+    if artist == "WONYOUNG":
+        title = "WONYOUNG (IVE) ✨ | Charismatic K-Pop Fancam #Shorts"
+        description = ("WONYOUNG of IVE ✨ Enjoy this fan-captured performance and her "
+                       "stage presence.\n\nFan-captured footage. FANCAMVERSE.")
+        tags = fixed_tags
+    elif artist == "NATTY":
+        title = "NATTY (KISS OF LIFE) 🔥 | K-Pop Fancam #Shorts"
+        description = ("NATTY of KISS OF LIFE 🔥 Enjoy this fan-captured performance and "
+                       "her stage presence.\n\nFan-captured footage. FANCAMVERSE.")
+        tags = fixed_tags
+    else:
+        model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
+        prompt = f"""Create YouTube Shorts metadata for FANCAMVERSE, an English-language K-pop fan-cam channel targeting US viewers.
 Source filename: {filename!r}
 On-screen English hook: {hook!r}
 Clip number: {index}
@@ -343,26 +387,27 @@ Return valid JSON only with keys title, description, tags.
 title: concise natural English, maximum 90 characters, searchable and engaging.
 description: one or two short English sentences; identify this as fan-captured footage. No official affiliation claim.
 tags: 8 to 12 relevant English tags; no unrelated trending tags."""
-    response = gemini_generate_with_fallback(
-        model, required("GEMINI_API_KEY"),
-        {"contents": [{"parts": [{"text": prompt}]}],
-         "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
-        timeout=90, task_name="metadata generation"
-    )
-    data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
-    title = str(data.get("title", "")).strip()[:100]
-    description = str(data.get("description", "")).strip()
-    tags = data.get("tags", [])
-    if not title or not isinstance(tags, list):
-        raise RuntimeError("Gemini returned invalid upload metadata.")
+        response = gemini_generate_with_fallback(
+            model, required("GEMINI_API_KEY"),
+            {"contents": [{"parts": [{"text": prompt}]}],
+             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
+            timeout=90, task_name="metadata generation"
+        )
+        data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+        title = str(data.get("title", "")).strip()[:100]
+        description = str(data.get("description", "")).strip()
+        tags = data.get("tags", [])
+        if not title or not isinstance(tags, list):
+            raise RuntimeError("Gemini returned invalid upload metadata.")
+
     clean, seen = [], set()
     for tag in ["FANCAMVERSE", "K-pop", "K-pop fancam", "Shorts"] + tags:
         tag = re.sub(r"\s+", " ", str(tag)).strip().lstrip("#")
         key = tag.casefold()
         if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
             clean.append(tag); seen.add(key)
-    hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:4])
-    description = (description + "\n\n" if description else "") + "Fan-captured performance footage. FANCAMVERSE.\n\n" + hashtags
+    hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:6])
+    description = (description + "\n\n" if description else "") + hashtags
     return title, description[:5000], clean
 
 def upload(youtube, path, title, description, tags, privacy):
@@ -388,6 +433,17 @@ def main():
     last_source_id = history.get("last_source_id")
 
     files = list_source_videos(drive, folder_id)
+    source_filter = os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip()
+    if source_filter:
+        terms = [term.strip().casefold() for term in re.split(r"[,;]", source_filter) if term.strip()]
+        files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        print(f"Manual source filter matched {len(files)} Drive video(s): " +
+              ", ".join(item["name"] for item in files))
+        if len(files) < 2:
+            raise RuntimeError("Manual target run requires both Wonyoung and Natty source videos. Check Drive filenames and source_filter.")
+        artist_hits = {identify_artist(item["name"])[0] for item in files}
+        if not {"WONYOUNG", "NATTY"}.issubset(artist_hits):
+            raise RuntimeError("Manual target run did not find both WONYOUNG and NATTY. No upload was made.")
     if not files:
         print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
@@ -450,7 +506,9 @@ def main():
 
         source, clips = source_cache[item["id"]]
         clip = clips[selected_index - 1]
-        rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1)
+        artist_name, _, _ = identify_artist(item["name"])
+        rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1,
+                                display_name=artist_name)
         path, clip = rendered[0]
         title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
         print(
