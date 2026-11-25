@@ -1,0 +1,76 @@
+name: FANCAMVERSE Wonyoung + Natty Shorts
+
+on:
+  push:
+    paths:
+      - "dispatch/fancamverse-wonyoung-natty.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fancamverse-targeted-pair
+  cancel-in-progress: false
+
+jobs:
+  render-and-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate FANCAMVERSE pipeline
+        run: python -m py_compile fancamverse.py
+
+      - name: Render and upload one Short per artist
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
+          FANCAMVERSE_OUTPUT_ONLY: "false"
+          FANCAMVERSE_SOURCE_FILTER: "장원영,나띠,WONYOUNG,NATTY"
+          FANCAMVERSE_UPLOADS_PER_RUN: "2"
+          FANCAMVERSE_PRIVACY_STATUS: "public"
+        run: python fancamverse.py
+
+      - name: Save rendered videos for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fancamverse-wonyoung-natty-shorts
+          path: work_fancamverse/*_short_*.mp4
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Persist successful upload progress
+        if: always()
+        run: |
+          if [ -f history/fancamverse_processed.json ] && ! git diff --quiet -- history/fancamverse_processed.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add history/fancamverse_processed.json
+            git commit -m "Record targeted Wonyoung and Natty Shorts"
+            git push
+          else
+            echo "No successfully uploaded target videos to record."
+          fi
