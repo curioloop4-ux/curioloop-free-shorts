@@ -57,6 +57,12 @@ def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
                 f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s."
             )
             time.sleep(delay)
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else "unknown"
+            detail = (exc.response.text or "")[:1200] if exc.response is not None else str(exc)
+            raise RuntimeError(
+                f"Gemini {task_name} returned non-retryable HTTP {status}: {detail}"
+            ) from exc
         except requests.RequestException as exc:
             if attempt == max_attempts:
                 raise RuntimeError(
