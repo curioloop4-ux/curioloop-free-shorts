@@ -153,12 +153,44 @@ def load_history():
     return data
 
 def list_source_videos(drive, folder_id):
-    result = drive.files().list(q=f"'{folder_id}' in parents and trashed = false",
-        pageSize=100, orderBy="createdTime",
-        fields="files(id,name,mimeType,createdTime,size)",
-        supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
-    candidates = [f for f in result.get("files", []) if f.get("mimeType") in SUPPORTED]
+    # Search the inbox recursively so files placed in artist subfolders are included.
+    pending = [folder_id]
+    visited = set()
+    candidates = []
+    while pending:
+        parent_id = pending.pop(0)
+        if parent_id in visited:
+            continue
+        visited.add(parent_id)
+        page_token = None
+        while True:
+            params = {
+                "q": f"'{parent_id}' in parents and trashed = false",
+                "pageSize": 100,
+                "orderBy": "createdTime",
+                "fields": "nextPageToken,files(id,name,mimeType,createdTime,size)",
+                "supportsAllDrives": True,
+                "includeItemsFromAllDrives": True
+            }
+            if page_token:
+                params["pageToken"] = page_token
+            result = drive.files().list(**params).execute()
+            for item in result.get("files", []):
+                if item.get("mimeType") == "application/vnd.google-apps.folder":
+                    pending.append(item["id"])
+                elif item.get("mimeType") in SUPPORTED:
+                    candidates.append(item)
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
     candidates.sort(key=lambda f: (f.get("createdTime", ""), f.get("id", "")))
+    print(f"Drive inbox scan: {len(candidates)} supported video(s) found across {len(visited)} folder(s).")
+    if not candidates:
+        folder = drive.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
+        print(f"Configured Drive inbox: {folder.get('name')} ({folder.get('id')})")
+    else:
+        for item in candidates:
+            print(f"Drive source: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
     return candidates
 
 def download_video(drive, item):
