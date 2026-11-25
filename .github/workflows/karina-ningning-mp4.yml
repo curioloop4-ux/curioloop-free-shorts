@@ -1,0 +1,58 @@
+name: Karina + Ningning MP4 Preview Export
+
+on:
+  push:
+    paths:
+      - "dispatch/karina-ningning-mp4.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: karina-ningning-mp4-export
+  cancel-in-progress: false
+
+jobs:
+  render-previews:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Validate renderer
+        run: python -m py_compile fancamverse.py
+      - name: Render two highlights for Karina and Ningning
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
+          FANCAMVERSE_OUTPUT_ONLY: "true"
+          FANCAMVERSE_SOURCE_FILTER: "카리나,KARINA,닝닝,NINGNING"
+          FANCAMVERSE_REQUIRED_ARTISTS: "KARINA,NINGNING"
+          FANCAMVERSE_UPLOADS_PER_RUN: "4"
+          FANCAMVERSE_PRIVACY_STATUS: "private"
+        run: python fancamverse.py
+      - name: Save MP4 previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: karina-ningning-mp4-previews
+          path: work_fancamverse/*_short_*.mp4
+          if-no-files-found: error
+          retention-days: 7
