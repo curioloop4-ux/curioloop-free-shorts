@@ -472,13 +472,21 @@ def upload_video(path, data, credits):
     elif data.get("source_english_title"):
         description += "\n\n本视频为英文原视频的简体中文本地化版本。"
     description += "\n\n视频素材来源\n" + visual_credits
-    description += "\n\n本视频仅用于知识分享，不构成个人投资建议。"
+    animal_mode = os.getenv("MONEY_TOPIC_MODE", "economy").lower() == "animals"
+    if animal_mode:
+        description += "\n\n本视频用于分享动物趣闻与科普内容，请勿模仿可能影响动物安全的行为。"
+        tags = ["有钱研究所", "可爱动物", "动物趣事", "萌宠", "猫咪", "狗狗", "动物世界", "Funny Animals"]
+        category_id = "15"
+    else:
+        description += "\n\n本视频仅用于知识分享，不构成个人投资建议。"
+        tags = ["有钱研究所", "财富知识", "金钱心理学", "富人习惯", "理财常识", "经济科普"]
+        category_id = "27"
     body = {
         "snippet": {
             "title": data["title"][:100],
             "description": description[:4900],
-            "tags": ["有钱研究所", "财富知识", "金钱心理学", "富人习惯", "理财常识", "经济科普"],
-            "categoryId": "27",
+            "tags": tags,
+            "categoryId": category_id,
         },
         "status": {"privacyStatus": os.getenv("MONEY_YOUTUBE_PRIVACY_STATUS", "unlisted"),
                    "selfDeclaredMadeForKids": False},
