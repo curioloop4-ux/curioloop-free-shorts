@@ -300,7 +300,7 @@ def render_clips(source, clips, source_stem, index_offset=0):
             f"drawtext=fontfile={fontfile}:textfile={hook_file}:reload=0:"
             "fontcolor=white:fontsize=46:borderw=3:bordercolor=black:"
             "box=1:boxcolor=black@0.50:boxborderw=18:"
-            "x=(w-text_w)/2:y=h*0.085:"
+            "x=(w-text_w)/2:y=(h-text_h)/2:"
             "enable='between(t,0,2.7)'"
         )
         run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
