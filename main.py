@@ -253,22 +253,6 @@ All people must be clearly adults and fully clothed. No nudity, lingerie, sexual
     if response is None:
         raise RuntimeError("Gemini request failed without a response after retries.")
     data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
-    if os.getenv("CONTENT_MODE", "general").lower() == "dating_attraction":
-        # Lock this one-off pilot to the approved topic/script so the model cannot drift.
-        data.update({
-            "title": "Why Is Dating in Korea So Different From Dating in America?",
-            "hook_text": "DATING CULTURE SHOCK",
-            "narration": "Ever noticed how dating can feel like a different game in Korea and the U.S.? In Korea, some couples put more emphasis on becoming an official couple and marking relationship milestones. In the U.S., some people are comfortable dating casually before defining things. Texting expectations can differ too—but there's no single rule in either country. The real secret? Ask, don't assume.",
-            "visual_theme": "Modern cross-cultural dating and everyday adult couple interactions",
-            "featured_person": "adult couple",
-            "visual_queries": [
-                "adult couple having coffee date cafe conversation video",
-                "adult couple texting smartphones relationship communication video",
-                "adult couple walking together holding hands city street video",
-                "adult couple discussing relationship at cafe video",
-                "adult couple laughing romantic dinner date video"
-            ]
-        })
     for key in ("title","hook_text","narration","visual_theme"):
         if not isinstance(data.get(key),str) or not data[key].strip():
             raise ValueError(f"Gemini response missing {key}")
@@ -1122,7 +1106,7 @@ def main():
                 if candidate_key not in duplicate_title_keys:
                     script = candidate
                     break
-                print(f"Duplicate title returned; requesting a fresh script ({attempt + 1}/3): {candidate['title']}")
+                print(f"Duplicate title returned; requesting a fresh script ({attempt + 1}/5): {candidate['title']}")
                 recent_prompts.append(
                     "REJECTED DUPLICATE: " + candidate["title"] + " | Do not reuse this topic or angle."
                 )
@@ -1143,7 +1127,7 @@ def main():
                     + "Retry number " + str(attempt + 1) + ". Variation token: " + str(time.time_ns())
                 )
             if script is None:
-                raise RuntimeError("Gemini returned duplicate titles three times; refusing to reuse a script.")
+                raise RuntimeError("Gemini returned duplicate titles after five attempts; refusing to reuse a script.")
             used_titles.append(script["title"])
             recent_prompts.append(" | ".join([
                 str(script.get("title", "")),
