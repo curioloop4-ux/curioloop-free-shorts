@@ -595,7 +595,11 @@ def main():
         source, clips = source_cache[item["id"]]
         clip = clips[selected_index - 1]
         artist_name, _, _ = identify_artist(item["name"])
-        rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1,
+        # Use the artist name for unique artifact filenames. Korean Drive filenames
+        # are sanitized to the same fallback stem ("mp4"), which would overwrite
+        # the first artist's rendered file when both are processed in one run.
+        output_stem = artist_name or source.stem
+        rendered = render_clips(source, [clip], output_stem, index_offset=selected_index - 1,
                                 display_name=artist_name)
         path, clip = rendered[0]
         title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
