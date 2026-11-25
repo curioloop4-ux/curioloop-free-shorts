@@ -288,6 +288,13 @@ def make_contact_sheets(source, duration):
     return sheets, start
 
 def analyze_highlights(source, duration, filename):
+    # Dedicated Wonyoung/Natty request: these are already short source clips.
+    # Use each complete source as one Short and avoid Gemini quota/rate-limit
+    # failures or fabricated five-window selections.
+    if os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip():
+        print(f"Targeted source detected ({duration:.1f}s); using the complete clip as one Short without Gemini analysis.")
+        return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
+
     # For a short user-supplied clip under 15 seconds, preserve the full moment
     # as one Short instead of rejecting it or trying to invent five segments.
     if duration < MIN_SHORT_SECONDS:
