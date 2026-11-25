@@ -144,7 +144,7 @@ def make_contact_sheets(source, duration):
 
 def analyze_highlights(source, duration, filename):
     sheets, first_allowed = make_contact_sheets(source, duration)
-    model = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
     prompt = f"""You are selecting compelling moments from a user-recorded K-pop concert fancam for YouTube Shorts.
 Source filename: {filename}
 Full duration: {duration:.1f} seconds. The opening/intro before {first_allowed:.1f}s must be excluded.
@@ -214,7 +214,7 @@ def render_clips(source, clips, source_stem, index_offset=0):
     return outputs
 
 def generate_metadata(filename, hook, index):
-    model = (os.getenv("GEMINI_MODEL") or "gemini-2.5-flash").strip()
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
     prompt = f"""Create YouTube Shorts metadata for FANCAMVERSE, an English-language K-pop fan-cam channel targeting US viewers.
 Source filename: {filename!r}
 On-screen English hook: {hook!r}
