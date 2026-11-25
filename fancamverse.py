@@ -288,11 +288,9 @@ def make_contact_sheets(source, duration):
     return sheets, start
 
 def analyze_highlights(source, duration, filename):
-    # Dedicated Wonyoung/Natty request: these are already short source clips.
-    # Use each complete source as one Short and avoid Gemini quota/rate-limit
-    # failures or fabricated five-window selections.
-    if os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip():
-        print(f"Targeted source detected ({duration:.1f}s); using the complete clip as one Short without Gemini analysis.")
+    # Full-source mode is opt-in; artist filtering alone still runs highlight analysis.
+    if os.getenv("FANCAMVERSE_USE_FULL_SOURCE", "").strip().lower() in {"1", "true", "yes"}:
+        print(f"Full-source mode enabled ({duration:.1f}s).")
         return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
 
     # For a short user-supplied clip under 15 seconds, preserve the full moment
@@ -441,6 +439,18 @@ def identify_artist(filename):
             "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
             "Korean idol", "female idol", "FANCAMVERSE", "Shorts"
         ]
+    if any(token in value for token in ("카리나", "karina")):
+        return "KARINA", "aespa", [
+            "Karina", "aespa Karina", "Karina fancam", "aespa fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Karina performance", "Shorts"
+        ]
+    if any(token in value for token in ("닝닝", "ningning")):
+        return "NINGNING", "aespa", [
+            "Ningning", "aespa Ningning", "Ningning fancam", "aespa fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Ningning performance", "Shorts"
+        ]
     return "", "", []
 
 def generate_metadata(filename, hook, index):
@@ -518,6 +528,22 @@ def main():
         terms = [term.casefold() for term in raw_terms]
         files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
         if not files:
+            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
+            files = search_drive_target_videos(drive, raw_terms)
+            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        print(f"Manual source filter matched {len(files)} Drive video(s): " +
+              ", ".join(item["name"] for item in files))
+        required_artists = {x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()}
+        if required_artists:
+            found_artists = {identify_artist(item["name"])[0] for item in files}
+            missing = required_artists - found_artists
+            if missing:
+                raise RuntimeError(f"Missing requested source artist(s): {', '.join(sorted(missing))}.")
+            ordered = []
+            for artist in [x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()]:
+                ordered.append(next(item for item in files if identify_artist(item["name"])[0] == artist))
+            files = ordered
+    if not files:
             print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
             files = search_drive_target_videos(drive, raw_terms)
             files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
