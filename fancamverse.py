@@ -274,10 +274,11 @@ def render_clips(source, clips, source_stem, index_offset=0):
         "kim chaewon" in source_label and "smart" in source_label
     )
 
-    # Only the Kim Chaewon "Smart" source uses 3:4. All other sources remain 9:16.
+    # Only the Kim Chaewon "Smart" source is cropped vertically to 4:6.
+    # For a 9:16 source, this trims the top and bottom evenly; other sources remain 9:16.
     if is_chaewon_smart:
-        output_w, output_h = 1080, 1440
-        crop_note = "3:4"
+        output_w, output_h = 1080, 1620
+        crop_note = "4:6"
     else:
         output_w, output_h = 1080, 1920
         crop_note = "9:16"
