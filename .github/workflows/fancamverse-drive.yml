@@ -1,0 +1,91 @@
+name: FANCAMVERSE Drive Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      output_only:
+        description: "Render and inspect only; do not upload"
+        required: true
+        type: boolean
+        default: true
+      privacy_status:
+        description: "YouTube visibility when upload is enabled"
+        required: true
+        type: choice
+        options:
+          - unlisted
+          - private
+          - public
+        default: unlisted
+      max_files:
+        description: "Maximum number of new Drive videos to process (1-5)"
+        required: true
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fancamverse-drive-upload
+  cancel-in-progress: false
+
+jobs:
+  process-drive-inbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate FANCAMVERSE pipeline
+        run: python -m py_compile fancamverse.py
+
+      - name: Process Google Drive inbox
+        env:
+          GEMINI_API_KEY: \${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: \${{ vars.GEMINI_MODEL }}
+          FANCAMVERSE_CLIENT_ID: \${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: \${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: \${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: \${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          FANCAMVERSE_OUTPUT_ONLY: \${{ inputs.output_only }}
+          FANCAMVERSE_PRIVACY_STATUS: \${{ inputs.privacy_status }}
+          FANCAMVERSE_MAX_FILES: \${{ inputs.max_files }}
+        run: python fancamverse.py
+
+      - name: Save rendered videos for review
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fancamverse-test-videos
+          path: work_fancamverse/*.mp4
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Persist successfully uploaded Drive file IDs
+        if: success()
+        run: |
+          if [ -f history/fancamverse_processed.json ] && ! git diff --quiet -- history/fancamverse_processed.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add history/fancamverse_processed.json
+            git commit -m "Record FANCAMVERSE processed Drive videos"
+            git push
+          else
+            echo "No successfully uploaded Drive videos to record."
+          fi
