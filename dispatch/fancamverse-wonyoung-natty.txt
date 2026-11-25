@@ -1,2 +1,3 @@
 Run the dedicated FANCAMVERSE workflow for one Wonyoung Short and one Natty Short.
 Retry after enabling recursive Drive folder scan.
+Retry with Drive-wide artist filename search.
