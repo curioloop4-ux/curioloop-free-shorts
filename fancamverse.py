@@ -528,6 +528,20 @@ def main():
         terms = [term.casefold() for term in raw_terms]
         files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
         if not files:
+            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
+            files = search_drive_target_videos(drive, raw_terms)
+            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        print(f"Manual source filter matched {len(files)} Drive video(s): " +
+              ", ".join(item["name"] for item in files))
+        required_order = [x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()]
+        if required_order:
+            found_artists = {identify_artist(item["name"])[0] for item in files}
+            missing = set(required_order) - found_artists
+            if missing:
+                raise RuntimeError(f"Missing requested source artist(s): {', '.join(sorted(missing))}.")
+            files = [next(item for item in files if identify_artist(item["name"])[0] == artist)
+                     for artist in required_order]
+    if not files:
         print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
 
