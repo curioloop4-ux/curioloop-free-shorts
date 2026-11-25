@@ -33,7 +33,7 @@ def required(name):
 def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
     """Retry transient Gemini API failures with exponential backoff."""
     retryable_statuses = {408, 429, 500, 502, 503, 504}
-    max_attempts = 6
+    max_attempts = 3
     for attempt in range(1, max_attempts + 1):
         try:
             response = requests.post(
@@ -74,6 +74,37 @@ def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
                 f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s: {exc}"
             )
             time.sleep(delay)
+
+def gemini_generate_with_fallback(primary_model, api_key, payload, timeout, task_name):
+    """Try the primary model, then a lighter supported model after capacity errors."""
+    fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+    models = list(dict.fromkeys([primary_model, fallback_model]))
+    last_error = None
+    for index, model in enumerate(models):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            if index:
+                print(f"Gemini {task_name}: switching to fallback model {model}.")
+            else:
+                print(f"Gemini {task_name}: using model {model}.")
+            return gemini_post_with_retry(
+                url, api_key, payload, timeout, task_name
+            )
+        except RuntimeError as exc:
+            last_error = exc
+            message = str(exc)
+            transient = any(
+                f"HTTP {status}" in message
+                for status in (408, 429, 500, 502, 503, 504)
+            ) or "request failed after" in message
+            if not transient or index == len(models) - 1:
+                raise
+            print(
+                f"Gemini {task_name}: primary model {model} unavailable; "
+                f"trying fallback model {fallback_model}."
+            )
+    raise last_error
+
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -207,9 +238,8 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
     for path in sheets:
         parts.append({"inline_data": {"mime_type": "image/jpeg",
             "data": base64.b64encode(path.read_bytes()).decode("ascii")}})
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    response = gemini_post_with_retry(
-        url, required("GEMINI_API_KEY"),
+    response = gemini_generate_with_fallback(
+        model, required("GEMINI_API_KEY"),
         {"contents": [{"parts": parts}],
          "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}},
         timeout=180, task_name="highlight analysis"
@@ -272,9 +302,8 @@ Return valid JSON only with keys title, description, tags.
 title: concise natural English, maximum 90 characters, searchable and engaging.
 description: one or two short English sentences; identify this as fan-captured footage. No official affiliation claim.
 tags: 8 to 12 relevant English tags; no unrelated trending tags."""
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    response = gemini_post_with_retry(
-        url, required("GEMINI_API_KEY"),
+    response = gemini_generate_with_fallback(
+        model, required("GEMINI_API_KEY"),
         {"contents": [{"parts": [{"text": prompt}]}],
          "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
         timeout=90, task_name="metadata generation"
