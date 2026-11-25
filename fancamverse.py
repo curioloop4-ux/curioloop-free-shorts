@@ -193,6 +193,40 @@ def list_source_videos(drive, folder_id):
             print(f"Drive source: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
     return candidates
 
+
+def search_drive_target_videos(drive, terms):
+    clauses = []
+    for term in terms:
+        escaped = term.replace("\\", "\\\\").replace("'", "\\'")
+        clauses.append(f"name contains '{escaped}'")
+    query = "trashed = false and (" + " or ".join(clauses) + ")"
+    results = []
+    page_token = None
+    while True:
+        params = {
+            "q": query,
+            "pageSize": 100,
+            "orderBy": "createdTime",
+            "fields": "nextPageToken,files(id,name,mimeType,createdTime,size,parents)",
+            "supportsAllDrives": True,
+            "includeItemsFromAllDrives": True,
+            "corpora": "allDrives"
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        response = drive.files().list(**params).execute()
+        results.extend(item for item in response.get("files", [])
+                       if item.get("mimeType") in SUPPORTED)
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+    unique = {item["id"]: item for item in results}
+    found = sorted(unique.values(), key=lambda item: (item.get("createdTime", ""), item.get("id", "")))
+    print(f"Drive-wide filename search found {len(found)} supported video(s).")
+    for item in found:
+        print(f"Drive match: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
+    return found
+
 def download_video(drive, item):
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["name"]).strip("._") or "fancam_video"
     source = WORK / safe_name
@@ -467,8 +501,13 @@ def main():
     files = list_source_videos(drive, folder_id)
     source_filter = os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip()
     if source_filter:
-        terms = [term.strip().casefold() for term in re.split(r"[,;]", source_filter) if term.strip()]
+        raw_terms = [term.strip() for term in re.split(r"[,;]", source_filter) if term.strip()]
+        terms = [term.casefold() for term in raw_terms]
         files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        if not files:
+            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
+            files = search_drive_target_videos(drive, raw_terms)
+            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
         print(f"Manual source filter matched {len(files)} Drive video(s): " +
               ", ".join(item["name"] for item in files))
         if len(files) < 2:
@@ -476,8 +515,7 @@ def main():
         artist_hits = {identify_artist(item["name"])[0] for item in files}
         if not {"WONYOUNG", "NATTY"}.issubset(artist_hits):
             raise RuntimeError("Manual target run did not find both WONYOUNG and NATTY. No upload was made.")
-        # A dedicated run always processes one Wonyoung source and one Natty source,
-        # in that order, even if several matching files exist in the Drive folder.
+        # Process one source per artist in a deterministic order.
         wonyoung_file = next(item for item in files if identify_artist(item["name"])[0] == "WONYOUNG")
         natty_file = next(item for item in files if identify_artist(item["name"])[0] == "NATTY")
         files = [wonyoung_file, natty_file]
