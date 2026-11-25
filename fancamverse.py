@@ -109,12 +109,13 @@ def gemini_generate_with_fallback(primary_model, api_key, payload, timeout, task
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, check=True)
 
-def probe_duration(source):
+def probe_duration(source, allow_short=False):
     result = run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
         "-of", "default=noprint_wrappers=1:nokey=1", str(source)])
     duration = float(result.stdout.strip())
-    if duration < MIN_SHORT_SECONDS:
-        raise RuntimeError(f"Source video is too short ({duration:.1f}s).")
+    minimum = 3 if allow_short else MIN_SHORT_SECONDS
+    if duration < minimum:
+        raise RuntimeError(f"Source video is too short ({duration:.1f}s; minimum {minimum}s).")
     return duration
 
 def make_services():
@@ -287,6 +288,11 @@ def make_contact_sheets(source, duration):
     return sheets, start
 
 def analyze_highlights(source, duration, filename):
+    # For a short user-supplied clip under 15 seconds, preserve the full moment
+    # as one Short instead of rejecting it or trying to invent five segments.
+    if duration < MIN_SHORT_SECONDS:
+        print(f"Short source detected ({duration:.1f}s); using the complete clip as one Short.")
+        return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
     sheets, first_allowed = make_contact_sheets(source, duration)
     model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
     prompt = f"""You are selecting compelling moments from a user-recorded K-pop concert fancam for YouTube Shorts.
@@ -570,7 +576,7 @@ def main():
 
         if item["id"] not in source_cache:
             source = download_video(drive, item)
-            duration = probe_duration(source)
+            duration = probe_duration(source, allow_short=bool(source_filter))
             saved_clips = source_state.get(item["id"], {}).get("clips")
             if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
                 clips = saved_clips
@@ -601,7 +607,7 @@ def main():
         source_state[item["id"]] = {
             "name": item["name"],
             "next_clip": selected_index + 1,
-            "complete": selected_index >= SHORTS_PER_SOURCE,
+            "complete": selected_index >= len(clips),
             "clips": clips
         }
         history["last_source_id"] = item["id"]
