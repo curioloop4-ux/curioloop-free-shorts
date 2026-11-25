@@ -15,10 +15,20 @@ on:
         required: true
         type: choice
         options:
+          - public
           - unlisted
           - private
-          - public
-        default: private
+        default: public
+      source_filter:
+        description: "Optional Drive filename filters, comma-separated (e.g. 장원영,나띠,WONYOUNG,NATTY)"
+        required: false
+        type: string
+        default: ""
+      uploads_per_run:
+        description: "Number of Shorts to process in this manual run"
+        required: true
+        type: number
+        default: 2
 
 permissions:
   contents: write
@@ -62,7 +72,8 @@ jobs:
           FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
           FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
-          FANCAMVERSE_UPLOADS_PER_RUN: "3"
+          FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
+          FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '3' }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status || 'private' }}
         run: python fancamverse.py
 
