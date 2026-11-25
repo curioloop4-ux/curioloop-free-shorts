@@ -74,15 +74,14 @@ def load_history():
         raise RuntimeError("history/fancamverse_processed.json has an invalid format.")
     return data
 
-def list_new_videos(drive, folder_id, processed, limit):
+def list_source_videos(drive, folder_id):
     result = drive.files().list(q=f"'{folder_id}' in parents and trashed = false",
         pageSize=100, orderBy="createdTime",
         fields="files(id,name,mimeType,createdTime,size)",
         supportsAllDrives=True, includeItemsFromAllDrives=True).execute()
-    candidates = [f for f in result.get("files", [])
-        if f.get("mimeType") in SUPPORTED and f.get("id") not in processed]
-    candidates.sort(key=lambda f: f.get("createdTime", ""))
-    return candidates[:limit]
+    candidates = [f for f in result.get("files", []) if f.get("mimeType") in SUPPORTED]
+    candidates.sort(key=lambda f: (f.get("createdTime", ""), f.get("id", "")))
+    return candidates
 
 def download_video(drive, item):
     safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["name"]).strip("._") or "fancam_video"
@@ -180,10 +179,11 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
         raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 4 are required. No upload was made.")
     return distinct
 
-def render_clips(source, clips, source_stem):
+def render_clips(source, clips, source_stem, index_offset=0):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    for index, clip in enumerate(clips, 1):
+    for position, clip in enumerate(clips, 1):
+        index = position + index_offset
         output = WORK / f"{source_stem}_short_{index}.mp4"
         hook_file = WORK / f"hook_{index}.txt"
         hook_file.write_text(clip["hook"], encoding="utf-8")
@@ -254,35 +254,73 @@ def main():
     drive, youtube = make_services()
     folder_id = required("FANCAMVERSE_DRIVE_FOLDER_ID")
     history = load_history()
-    processed = set(history["processed"])
-    limit = max(1, min(int(os.getenv("FANCAMVERSE_MAX_FILES", "1")), 5))
-    files = list_new_videos(drive, folder_id, processed, limit)
+    source_state = history.setdefault("sources", {})
+    # Backward compatibility: sources in the old processed list are already complete.
+    for old_id in history.get("processed", []):
+        source_state.setdefault(old_id, {"next_clip": SHORTS_PER_SOURCE + 1, "complete": True})
+    last_source_id = history.get("last_source_id")
+
+    files = list_source_videos(drive, folder_id)
     if not files:
-        print("No new supported videos found in the FANCAMVERSE Drive inbox.")
+        print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
+
+    # Rotate through Drive files: source 1, 2, 3, 4, then back to source 1.
+    start_at = 0
+    if last_source_id:
+        for i, item in enumerate(files):
+            if item["id"] == last_source_id:
+                start_at = (i + 1) % len(files)
+                break
+
+    selected = None
+    selected_index = None
+    for offset in range(len(files)):
+        idx = (start_at + offset) % len(files)
+        item = files[idx]
+        state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
+        next_clip = int(state.get("next_clip", 1))
+        if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
+            selected, selected_index = item, next_clip
+            break
+
+    if selected is None:
+        print("All current Drive source videos have contributed four Shorts.")
+        return
+
     output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "true").lower() in {"1", "true", "yes"}
-    privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "unlisted").lower()
-    completed = 0
-    for item in files:
-        print(f"Processing long-form source: {item['name']} ({item['id']})")
-        source = download_video(drive, item)
-        duration = probe_duration(source)
-        clips = analyze_highlights(source, duration, item["name"])
-        rendered = render_clips(source, clips, source.stem)
-        for index, (path, clip) in enumerate(rendered, 1):
-            title, description, tags = generate_metadata(item["name"], clip["hook"], index)
-            print(f"Short {index}: {clip['start']:.1f}-{clip['end']:.1f}s | {title}")
-            if output_only:
-                print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped.")
-                continue
-            upload(youtube, path, title, description, tags, privacy)
-        if not output_only:
-            history["processed"].append(item["id"])
-            history["processed"] = history["processed"][-2000:]
-            HISTORY.parent.mkdir(parents=True, exist_ok=True)
-            HISTORY.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-            completed += 1
-    print(f"FANCAMVERSE finished: {completed} source video(s) fully processed.")
+    privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
+    if not output_only:
+        verify_upload_channel(youtube)
+
+    item = selected
+    print(f"Round-robin source: {item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}")
+    source = download_video(drive, item)
+    duration = probe_duration(source)
+    clips = analyze_highlights(source, duration, item["name"])
+    clip = clips[selected_index - 1]
+    rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1)
+    path, clip = rendered[0]
+    title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
+    print(f"Selected Short {selected_index}: {clip['start']:.1f}-{clip['end']:.1f}s | {title}")
+
+    if output_only:
+        print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped. Round-robin progress was not changed.")
+        return
+
+    upload(youtube, path, title, description, tags, privacy)
+    source_state[item["id"]] = {
+        "name": item["name"],
+        "next_clip": selected_index + 1,
+        "complete": selected_index >= SHORTS_PER_SOURCE
+    }
+    history["last_source_id"] = item["id"]
+    history["sources"] = source_state
+    history["processed"] = [sid for sid, state in source_state.items() if state.get("complete")]
+    history["processed"] = history["processed"][-2000:]
+    HISTORY.parent.mkdir(parents=True, exist_ok=True)
+    HISTORY.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    print("FANCAMVERSE uploaded exactly one Short. Next run rotates to the next source video.")
 
 if __name__ == "__main__":
     main()
