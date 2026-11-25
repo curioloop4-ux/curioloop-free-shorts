@@ -3,6 +3,8 @@ import json
 import os
 import re
 import subprocess
+import time
+import random
 from pathlib import Path
 
 import requests
@@ -27,6 +29,45 @@ def required(name):
     if not value:
         raise RuntimeError(f"Missing required GitHub secret/environment variable: {name}")
     return value
+
+def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
+    """Retry transient Gemini API failures with exponential backoff."""
+    retryable_statuses = {408, 429, 500, 502, 503, 504}
+    max_attempts = 6
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.post(
+                url,
+                params={"key": api_key},
+                json=payload,
+                timeout=timeout
+            )
+            if response.status_code not in retryable_statuses:
+                response.raise_for_status()
+                return response
+            if attempt == max_attempts:
+                detail = (response.text or "")[:1200]
+                raise RuntimeError(
+                    f"Gemini {task_name} failed after {max_attempts} attempts "
+                    f"(HTTP {response.status_code}): {detail}"
+                )
+            delay = min(60, 5 * (2 ** (attempt - 1))) + random.uniform(0, 2)
+            print(
+                f"Gemini {task_name} returned HTTP {response.status_code}; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s."
+            )
+            time.sleep(delay)
+        except requests.RequestException as exc:
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"Gemini {task_name} request failed after {max_attempts} attempts: {exc}"
+                ) from exc
+            delay = min(60, 5 * (2 ** (attempt - 1))) + random.uniform(0, 2)
+            print(
+                f"Gemini {task_name} network error; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s: {exc}"
+            )
+            time.sleep(delay)
 
 def run(cmd):
     return subprocess.run(cmd, capture_output=True, text=True, check=True)
@@ -161,11 +202,12 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
         parts.append({"inline_data": {"mime_type": "image/jpeg",
             "data": base64.b64encode(path.read_bytes()).decode("ascii")}})
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    response = requests.post(url, params={"key": required("GEMINI_API_KEY")},
-        json={"contents": [{"parts": parts}],
-              "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}},
-        timeout=180)
-    response.raise_for_status()
+    response = gemini_post_with_retry(
+        url, required("GEMINI_API_KEY"),
+        {"contents": [{"parts": parts}],
+         "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}},
+        timeout=180, task_name="highlight analysis"
+    )
     raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
     data = json.loads(raw)
     clips = data.get("clips", [])
@@ -225,11 +267,12 @@ title: concise natural English, maximum 90 characters, searchable and engaging.
 description: one or two short English sentences; identify this as fan-captured footage. No official affiliation claim.
 tags: 8 to 12 relevant English tags; no unrelated trending tags."""
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    response = requests.post(url, params={"key": required("GEMINI_API_KEY")},
-        json={"contents": [{"parts": [{"text": prompt}]}],
-              "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
-        timeout=90)
-    response.raise_for_status()
+    response = gemini_post_with_retry(
+        url, required("GEMINI_API_KEY"),
+        {"contents": [{"parts": [{"text": prompt}]}],
+         "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
+        timeout=90, task_name="metadata generation"
+    )
     data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
     title = str(data.get("title", "")).strip()[:100]
     description = str(data.get("description", "")).strip()
