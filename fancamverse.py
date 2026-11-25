@@ -19,7 +19,7 @@ WORK.mkdir(exist_ok=True)
 HISTORY = ROOT / "history" / "fancamverse_processed.json"
 SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
 SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
-SHORTS_PER_SOURCE = 4
+SHORTS_PER_SOURCE = 5
 MIN_SHORT_SECONDS = 15
 MAX_SHORT_SECONDS = 20
 INTRO_SKIP_SECONDS = 10
@@ -227,13 +227,13 @@ def analyze_highlights(source, duration, filename):
 Source filename: {filename}
 Full duration: {duration:.1f} seconds. The opening/intro before {first_allowed:.1f}s must be excluded.
 The attached contact sheets show sampled frames with their exact source timestamps.
-Choose exactly four DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
+Choose exactly five DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
 sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
 Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
 Each window must be 15 to 20 seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
 Use the timestamps on the images to estimate boundaries. Return JSON only:
 {{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
-Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
+Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
     parts = [{"text": prompt}]
     for path in sheets:
         parts.append({"inline_data": {"mime_type": "image/jpeg",
@@ -263,7 +263,7 @@ Exactly 4 clips. No markdown. Hooks must not invent names, song titles, event de
         if all(clip["start"] >= old["end"] or clip["end"] <= old["start"] for old in distinct):
             distinct.append(clip)
     if len(distinct) != SHORTS_PER_SOURCE:
-        raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 4 are required. No upload was made.")
+        raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 5 are required. No upload was made.")
     return distinct
 
 def render_clips(source, clips, source_stem, index_offset=0):
@@ -383,7 +383,6 @@ def main():
     folder_id = required("FANCAMVERSE_DRIVE_FOLDER_ID")
     history = load_history()
     source_state = history.setdefault("sources", {})
-    # Backward compatibility: sources in the old processed list are already complete.
     for old_id in history.get("processed", []):
         source_state.setdefault(old_id, {"next_clip": SHORTS_PER_SOURCE + 1, "complete": True})
     last_source_id = history.get("last_source_id")
@@ -393,7 +392,7 @@ def main():
         print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
 
-    # Rotate through Drive files: source 1, 2, 3, 4, then back to source 1.
+    # Keep all current source videos in a round-robin rotation.
     start_at = 0
     if last_source_id:
         for i, item in enumerate(files):
@@ -401,76 +400,93 @@ def main():
                 start_at = (i + 1) % len(files)
                 break
 
-    selected = None
-    selected_index = None
-    skipped_sources = []
-    for offset in range(len(files)):
-        idx = (start_at + offset) % len(files)
-        item = files[idx]
-        source_name = item.get("name", "").casefold()
-        # The user requested a different performer/source for this test.
-        # Skip any Drive source whose filename identifies Kim Chaewon.
-        is_chaewon_source = ("김채원" in source_name) or ("kim chaewon" in source_name)
-        if is_chaewon_source:
-            skipped_sources.append(item.get("name", item["id"]))
-            continue
-        state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
-        next_clip = int(state.get("next_clip", 1))
-        if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
-            selected, selected_index = item, next_clip
-            break
-
-    if skipped_sources:
-        print("Excluded requested previous source(s): " + " | ".join(skipped_sources))
-
-    if selected is None:
-        if skipped_sources:
-            raise RuntimeError(
-                "No eligible non-Kim-Chaewon source remains in the Drive folder. "
-                "Add another source video or check the file names."
-            )
-        print("All current Drive source videos have contributed four Shorts.")
-        return
-
-    output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "true").lower() in {"1", "true", "yes"}
+    batch_size = int(os.getenv("FANCAMVERSE_UPLOADS_PER_RUN", "3"))
+    output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
     if not output_only:
         verify_upload_channel(youtube)
 
-    item = selected
-    print(f"Round-robin source: {item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}")
-    source = download_video(drive, item)
-    duration = probe_duration(source)
-    saved_clips = source_state.get(item["id"], {}).get("clips")
-    if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
-        clips = saved_clips
-        print("Using the previously selected four highlight windows for consistent rotation.")
-    else:
-        clips = analyze_highlights(source, duration, item["name"])
-    clip = clips[selected_index - 1]
-    rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1)
-    path, clip = rendered[0]
-    title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
-    print(f"Selected Short {selected_index}: {clip['start']:.1f}-{clip['end']:.1f}s | {title}")
+    source_cache = {}
+    uploaded_count = 0
+    cursor = start_at
+
+    for batch_number in range(1, batch_size + 1):
+        selected = None
+        selected_index = None
+        selected_file_index = None
+
+        for offset in range(len(files)):
+            idx = (cursor + offset) % len(files)
+            item = files[idx]
+            state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
+            next_clip = int(state.get("next_clip", 1))
+            if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
+                selected = item
+                selected_index = next_clip
+                selected_file_index = idx
+                break
+
+        if selected is None:
+            print("No more unprocessed Shorts remain in the current Drive source videos.")
+            break
+
+        item = selected
+        cursor = (selected_file_index + 1) % len(files)
+        print(
+            f"Batch {batch_number}/{batch_size} | Round-robin source: "
+            f"{item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}"
+        )
+
+        if item["id"] not in source_cache:
+            source = download_video(drive, item)
+            duration = probe_duration(source)
+            saved_clips = source_state.get(item["id"], {}).get("clips")
+            if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
+                clips = saved_clips
+                print("Using the saved five highlight windows for this source.")
+            else:
+                clips = analyze_highlights(source, duration, item["name"])
+            source_cache[item["id"]] = (source, clips)
+
+        source, clips = source_cache[item["id"]]
+        clip = clips[selected_index - 1]
+        rendered = render_clips(source, [clip], source.stem, index_offset=selected_index - 1)
+        path, clip = rendered[0]
+        title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
+        print(
+            f"Selected Short {selected_index}: {clip['start']:.1f}-{clip['end']:.1f}s | {title}"
+        )
+
+        if output_only:
+            print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped.")
+            # Preview mode does not consume a clip or advance rotation history.
+            continue
+
+        video_id = upload(youtube, path, title, description, tags, privacy)
+        uploaded_count += 1
+
+        source_state[item["id"]] = {
+            "name": item["name"],
+            "next_clip": selected_index + 1,
+            "complete": selected_index >= SHORTS_PER_SOURCE,
+            "clips": clips
+        }
+        history["last_source_id"] = item["id"]
+        history["sources"] = source_state
+        history["processed"] = [
+            sid for sid, state in source_state.items() if state.get("complete")
+        ][-2000:]
+        HISTORY.parent.mkdir(parents=True, exist_ok=True)
+        HISTORY.write_text(
+            json.dumps(history, ensure_ascii=False, indent=2) + "\\n",
+            encoding="utf-8"
+        )
+        print(f"Recorded successful upload {video_id}; progress saved immediately.")
 
     if output_only:
-        print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped. Round-robin progress was not changed.")
-        return
-
-    upload(youtube, path, title, description, tags, privacy)
-    source_state[item["id"]] = {
-        "name": item["name"],
-        "next_clip": selected_index + 1,
-        "complete": selected_index >= SHORTS_PER_SOURCE,
-        "clips": clips
-    }
-    history["last_source_id"] = item["id"]
-    history["sources"] = source_state
-    history["processed"] = [sid for sid, state in source_state.items() if state.get("complete")]
-    history["processed"] = history["processed"][-2000:]
-    HISTORY.parent.mkdir(parents=True, exist_ok=True)
-    HISTORY.write_text(json.dumps(history, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print("FANCAMVERSE uploaded exactly one Short. Next run rotates to the next source video.")
+        print("OUTPUT_ONLY run finished; no uploads or progress changes were made.")
+    else:
+        print(f"FANCAMVERSE batch complete: {uploaded_count}/{batch_size} Shorts uploaded.")
 
 if __name__ == "__main__":
     main()
