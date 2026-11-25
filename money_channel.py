@@ -88,9 +88,10 @@ def generate_content(topic=None, topic_category='经济'):
         if not isinstance(data.get("narration"), str) or not (60 <= len(data["narration"]) <= 220):
             raise ValueError("Chinese narration should be short enough for a 20-30 second Short.")
         if not isinstance(data.get("visual_queries"), list) or len(data["visual_queries"]) < 5:
-            raise ValueError("Five visual search queries are required, including the fixed adult-woman fitness opening.")
+            raise ValueError("Five topic-matched visual search queries are required.")
         data["visual_queries"] = [str(query).strip() for query in data["visual_queries"][:5]]
-        data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
+        if topic_category != "动物趣事":
+            data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
     if not isinstance(data.get("sources"), list):
         raise ValueError("Sources must be returned as a list.")
     if topic_category != "动物趣事" and len(data["sources"]) < 2:
