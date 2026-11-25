@@ -288,25 +288,54 @@ def render_clips(source, clips, source_stem, index_offset=0):
     for position, clip in enumerate(clips, 1):
         index = position + index_offset
         output = WORK / f"{source_stem}_short_{index}.mp4"
-        hook_file = WORK / f"hook_{index}.txt"
         raw_hook = re.sub(r"\\s+", " ", str(clip.get("hook", "A Must-Watch Stage Moment"))).strip()
-        # Keep intro text compact and wrap it before it reaches the screen edges.
         wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
-        hook_file.write_text(wrapped_hook, encoding="utf-8")
 
-        # Fill the requested frame while keeping the title inside generous safe margins.
-        vf = (
+        # Full-frame transparent overlay: each title line is independently centered.
+        overlay_path = WORK / f"title_overlay_{index}.png"
+        overlay = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(overlay)
+        title_font = ImageFont.truetype(fontfile, 46)
+        lines = wrapped_hook.splitlines() or [wrapped_hook]
+        line_boxes = [draw.textbbox((0, 0), line, font=title_font, stroke_width=3) for line in lines]
+        line_heights = [box[3] - box[1] for box in line_boxes]
+        line_widths = [box[2] - box[0] for box in line_boxes]
+        line_gap = 10
+        text_w = max(line_widths)
+        text_h = sum(line_heights) + line_gap * (len(lines) - 1)
+        pad_x, pad_y = 28, 20
+        box_w, box_h = text_w + pad_x * 2, text_h + pad_y * 2
+        box_x = (output_w - box_w) // 2
+        box_y = (output_h - box_h) // 2
+        draw.rounded_rectangle(
+            (box_x, box_y, box_x + box_w, box_y + box_h),
+            radius=16, fill=(0, 0, 0, 128)
+        )
+        current_y = box_y + pad_y
+        for line, bbox, line_w, line_h in zip(lines, line_boxes, line_widths, line_heights):
+            line_x = (output_w - line_w) // 2
+            draw.text(
+                (line_x - bbox[0], current_y - bbox[1]), line,
+                font=title_font, fill=(255, 255, 255, 255),
+                stroke_width=3, stroke_fill=(0, 0, 0, 255)
+            )
+            current_y += line_h + line_gap
+        overlay.save(overlay_path)
+
+        base_filter = (
             f"scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
-            f"crop={output_w}:{output_h},"
-            f"drawtext=fontfile={fontfile}:textfile={hook_file}:reload=0:"
-            "fontcolor=white:fontsize=46:borderw=3:bordercolor=black:"
-            "box=1:boxcolor=black@0.50:boxborderw=18:"
-            "x=(w-text_w)/2:y=(h-text_h)/2:"
-            "enable='between(t,0,2.7)'"
+            f"crop={output_w}:{output_h}"
+        )
+        filter_complex = (
+            f"[0:v]{base_filter}[base];"
+            f"[1:v]format=rgba[title];"
+            f"[base][title]overlay=0:0:enable='between(t,0,2.7)'[v]"
         )
         run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
-            "-t", f"{clip['end'] - clip['start']:.3f}", "-map", "0:v:0", "-map", "0:a?",
-            "-vf", vf, "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-loop", "1", "-i", str(overlay_path),
+            "-t", f"{clip['end'] - clip['start']:.3f}",
+            "-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart", str(output)])
         outputs.append((output, clip))
