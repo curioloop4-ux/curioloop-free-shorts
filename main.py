@@ -439,6 +439,7 @@ def fetch_video_clips(title, visual_theme, visual_queries, featured_person, coun
             "professional sports massage adult man athlete recovery video",
             "adult man fitness workout gym stretching full body exercise video",
         ]
+        topic_queries = generated_terms[3:5] if len(generated_terms) > 3 else [title.strip(), visual_theme]
     else:
         opening_queries = ["adult woman sweating after cardio workout gym fitness full body video"]
         glamour_queries = [
