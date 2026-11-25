@@ -124,7 +124,8 @@ def main():
     drive, youtube = make_services()
     channel_result = youtube.channels().list(part="snippet", mine=True).execute()
     channels = channel_result.get("items", [])
-    if len(channels) != 1 or channels[0].get("snippet", {}).get("title", "").strip().casefold() != "fancamverse":
+    matching = [item for item in channels if item.get("snippet", {}).get("title", "").strip().casefold() == "fancamverse"]
+    if not matching:
         found = [item.get("snippet", {}).get("title", "(unnamed)") for item in channels]
         raise RuntimeError(f"OAuth token is not connected to the FANCAMVERSE YouTube channel. Detected channel(s): {found}")
     print("YouTube channel verified: FANCAMVERSE")
