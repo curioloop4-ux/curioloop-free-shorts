@@ -1,6 +1,8 @@
 name: FANCAMVERSE Drive Upload
 
 on:
+  schedule:
+    - cron: "0 0 * * *" # 7 PM US Eastern (EST) / 8 PM (EDT)
   workflow_dispatch:
     inputs:
       output_only:
@@ -60,6 +62,7 @@ jobs:
           FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
           FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only }}
+          FANCAMVERSE_UPLOADS_PER_RUN: "3"
           FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status }}
         run: python fancamverse.py
 
@@ -72,8 +75,8 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Persist successfully uploaded Drive file IDs
-        if: success()
+      - name: Persist successful upload progress
+        if: always()
         run: |
           if [ -f history/fancamverse_processed.json ] && ! git diff --quiet -- history/fancamverse_processed.json; then
             git config user.name "github-actions[bot]"
