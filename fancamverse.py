@@ -478,7 +478,7 @@ def main():
         ][-2000:]
         HISTORY.parent.mkdir(parents=True, exist_ok=True)
         HISTORY.write_text(
-            json.dumps(history, ensure_ascii=False, indent=2) + "\\n",
+            json.dumps(history, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8"
         )
         print(f"Recorded successful upload {video_id}; progress saved immediately.")
