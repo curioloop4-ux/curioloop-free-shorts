@@ -4,18 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       source_video_url:
-        description: "Optional published English Short URL to mirror into Chinese"
+        description: "Optional published English Short URL to mirror into Chinese; leave blank for topic-based Shorts"
         required: false
         type: string
-        default: "https://youtube.com/shorts/vMAgY8eRwLA"
+        default: ""
       topic_mode:
-        description: "Choose economy or beauty/massage Shorts"
+        description: "Choose economy, beauty/massage, or funny animal Shorts"
         required: true
         type: choice
         options:
           - beauty
           - economy
-        default: beauty
+          - animals
+        default: animals
       content_type:
         description: "Choose Shorts or long-form documentary"
         required: true
