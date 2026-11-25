@@ -7,7 +7,7 @@ on:
         description: "Render and inspect only; do not upload"
         required: true
         type: boolean
-        default: true
+        default: false
       privacy_status:
         description: "YouTube visibility when upload is enabled"
         required: true
@@ -16,7 +16,7 @@ on:
           - unlisted
           - private
           - public
-        default: unlisted
+        default: private
 
 permissions:
   contents: write
