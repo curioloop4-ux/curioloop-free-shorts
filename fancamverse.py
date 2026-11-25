@@ -444,13 +444,18 @@ def main():
         artist_hits = {identify_artist(item["name"])[0] for item in files}
         if not {"WONYOUNG", "NATTY"}.issubset(artist_hits):
             raise RuntimeError("Manual target run did not find both WONYOUNG and NATTY. No upload was made.")
+        # A dedicated run always processes one Wonyoung source and one Natty source,
+        # in that order, even if several matching files exist in the Drive folder.
+        wonyoung_file = next(item for item in files if identify_artist(item["name"])[0] == "WONYOUNG")
+        natty_file = next(item for item in files if identify_artist(item["name"])[0] == "NATTY")
+        files = [wonyoung_file, natty_file]
     if not files:
         print("No supported videos found in the FANCAMVERSE Drive inbox.")
         return
 
     # Keep all current source videos in a round-robin rotation.
     start_at = 0
-    if last_source_id:
+    if last_source_id and not source_filter:
         for i, item in enumerate(files):
             if item["id"] == last_source_id:
                 start_at = (i + 1) % len(files)
