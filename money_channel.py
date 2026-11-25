@@ -36,7 +36,9 @@ def generate_content(topic=None, topic_category='经济'):
         prompt = """请制作一部面向简体中文成年男性观众的YouTube纪录片，受众对女性魅力、时尚美容、第一印象、两性沟通和关系心理感兴趣。主题可结合女性时尚与美容趋势、吸引力心理、约会沟通、社交行为、个人形象及相关消费文化；保持尊重、客观，不物化女性、不宣扬操控技巧、不制造性别对立。若选择经济主题，应从男性观众关心的消费、形象产业和社会趋势切入。禁止投资标的推荐、买卖指令、保证收益、虚构故事和伪造数据。只返回JSON：title, description, sections, sources。sections恰好5段，每段包含heading, narration, visual_queries，使用自然简体中文。每段提供2个英文Coverr或Pixabay视频搜索词，必须是与旁白直接对应的真实人物场景。画面优先出现外形出众、气质自信、穿着得体时尚的成年女性；需要时搭配成年男性互动场景。优先全身镜头或腰部以上中景，人物完整清晰、脸部可见、主体居中。明确避免手部特写、被裁掉的头部或半截身体、远处小人物、背影遮挡和模糊人物。禁止用无关风景或抽象图形充当主体。数据必须有可靠来源，不确定就不写。sources提供2至5个真实官方来源URL，不得编造。"""
     else:
         topic = topic or "为什么有些人越来越有钱？"
-        if topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理", "按摩与放松"}:
+        if topic_category == "动物趣事":
+            prompt = f"""请创作一条面向简体中文观众的轻松、有趣、适合YouTube Shorts的动物短视频解说。主题：{topic}。内容聚焦真实可爱动物的意外行为、滑稽反应、奇怪睡姿、贪吃瞬间、动物之间的有趣互动或令人意外的小习惯。语气活泼、有反差感，但不嘲笑、不伤害动物；不编造动物行为事实，不安排危险挑战，不使用虐待、惊吓或不安全互动素材。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过22个汉字，开头2秒用一句短钩子，旁白约70至110字，句子短、节奏快，适合约20至30秒。visual_queries提供5个英文视频搜索词，全部必须是对应主题的真实动物画面，优先可爱、滑稽、意外动作和清晰近中景；每条搜索词明确写出动物种类和动作，禁止人物健身、人物按摩、无关风景、动物受伤、被困或受惊画面。sources可提供真实动物科普来源；没有可靠来源时返回空数组，不得编造URL。"""
+        elif topic_category not in {"时尚穿搭", "美容与形象", "健身与自我管理", "魅力与心理", "按摩与放松"}:
             prompt = f"""请创作一条面向简体中文成年男性观众的Shorts。受众对女性魅力、时尚美容、第一印象和关系心理感兴趣。主题：{topic}。优先从男性观众关注的女性消费趋势、时尚美容产业、社交心理或关系中的金钱心理切入，保持尊重客观，不物化女性。解释具体可信的观点。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，开头2秒有强钩子，旁白约90至130字。不得虚构统计或收益承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场：真实授权素材中的成年女性穿着得体运动服，进行自然的健身热身、拉伸或运动，全身或中景，脸部清楚。第2至5个必须对应本条经济主题，优先出现成年男女在工作、购物、创业、消费或讨论预算的真实场景；全身或腰部以上中景，人物清楚并占画面主体。排除手部特写、无人物风景、钞票硬币特写及未成年人。sources提供2至3个真实可信来源URL，不得编造。"""
         else:
             prompt = f"""请创作一条面向简体中文成年男性观众的高吸引力Shorts。受众对女性外形、时尚美容、魅力心理、第一印象和两性沟通感兴趣。类别：{topic_category}。主题：{topic}。从男性观众好奇的问题切入，内容围绕女性时尚穿搭、发型、护肤、健身塑形、个人形象、第一印象、吸引力心理、约会沟通或自我管理，必须与主题一致。尊重女性，不物化、不刻板化、不提供操控或骚扰建议。开头2秒用反差问题或强钩子吸引观看。只返回JSON：title, hook_text, narration, description, visual_queries, sources。全部使用自然简体中文。标题不超过45字，旁白约90至130字。不得虚构研究、数据或效果承诺。visual_queries提供5个英文视频搜索词。第1个必须为“adult woman workout outfit gym stretching fitness full body video”，作为固定开场。若主题类别为美容与形象或按摩与放松，后续搜索词优先安排professional facial massage、adult woman scalp massage、spa skincare treatment、shoulder massage等真实按摩与护肤场景，至少3个搜索词明确包含massage或spa，并确保画面中成年顾客和/或专业理疗师清楚可见。其他主题则使用与主题直接相关的成年人物活动。禁止未成年人、裸露色情、手部特写、无人物风景。sources提供2至3个真实可信来源URL；健康知识优先专业机构来源，不得编造。"""
@@ -89,7 +91,9 @@ def generate_content(topic=None, topic_category='经济'):
             raise ValueError("Five visual search queries are required, including the fixed adult-woman fitness opening.")
         data["visual_queries"] = [str(query).strip() for query in data["visual_queries"][:5]]
         data["visual_queries"][0] = "adult woman workout outfit gym stretching fitness full body video"
-    if not isinstance(data.get("sources"), list) or len(data["sources"]) < 2:
+    if not isinstance(data.get("sources"), list):
+        raise ValueError("Sources must be returned as a list.")
+    if topic_category != "动物趣事" and len(data["sources"]) < 2:
         raise ValueError("At least two reference sources are required.")
     return data
 
@@ -204,9 +208,9 @@ def make_subtitles(text, duration):
     groups = []
     for segment in segments:
         segment = segment.strip()
-        while len(segment) > 8:
-            groups.append(segment[:8])
-            segment = segment[8:]
+        while len(segment) > 6:
+            groups.append(segment[:6])
+            segment = segment[6:]
         if segment:
             groups.append(segment)
     if not groups:
@@ -228,7 +232,7 @@ def make_subtitles(text, duration):
         f"PlayResX: {WIDTH}", f"PlayResY: {HEIGHT}", "",
         "[V4+ Styles]",
         "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-        f"Style: Default,Noto Sans CJK SC,{72 if IS_LONG else 74},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,120,120,{390 if not IS_LONG else 180},1",
+        f"Style: Default,Noto Sans CJK SC,{72 if IS_LONG else 64},&H0000D7FF,&H00FFFFFF,&H00101010,&H80000000,1,0,1,5,2,2,{140 if not IS_LONG else 120},{140 if not IS_LONG else 120},{440 if not IS_LONG else 180},1",
         "", "[Events]", "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text"
     ]
     cursor = 0.0
@@ -264,7 +268,8 @@ def download_relevant_clips(queries):
     # Use topic-specific search phrases from the generated script.
     queries = [str(query).strip() for query in queries if str(query).strip()]
     clips, credits, seen = [], [], set()
-    opening_found = IS_LONG
+    animal_mode = os.getenv("MONEY_TOPIC_MODE", "economy").lower() == "animals"
+    opening_found = IS_LONG or animal_mode
 
     def normalize_download(url, number):
         raw = WORK / f"raw_{number}.mp4"
@@ -337,9 +342,9 @@ def download_relevant_clips(queries):
         for query_index, query in enumerate(queries):
             if len(clips) >= target:
                 break
-            if not IS_LONG and query_index == 0 and opening_found:
+            if not IS_LONG and not animal_mode and query_index == 0 and opening_found:
                 continue
-            if not IS_LONG and query_index > 0 and not opening_found:
+            if not IS_LONG and not animal_mode and query_index > 0 and not opening_found:
                 continue
             try:
                 hits = search_coverr(query) if source == "Coverr" else search_pixabay(query)
@@ -358,20 +363,28 @@ def download_relevant_clips(queries):
                     tag_text = str(tags).lower()
                 title_desc = " ".join(str(item.get(k, "")) for k in ("title", "description")).lower()
                 searchable = f"{tag_text} {title_desc}"
-                # Keep human-centered footage only. Topic matching is intentionally not required:
-                # the user prefers attractive, fit adult men/women as visual hooks across topics.
-                people_terms = (
-                    "person", "people", "woman", "women", "man", "men", "female", "male",
-                    "businesswoman", "businessman", "employee", "customer", "couple",
-                    "entrepreneur", "worker", "model", "portrait", "fashion", "fitness", "massage", "spa", "therapist", "skincare", "facial", "beauty", "salon", "scalp"
-                )
-                if not any(term in searchable for term in people_terms):
-                    continue
-                if not IS_LONG and query_index == 0:
-                    woman_terms = ("woman", "women", "female", "girl")
-                    fitness_terms = ("fitness", "workout", "gym", "stretch", "yoga", "exercise", "training", "athletic")
-                    if not any(term in searchable for term in woman_terms) or not any(term in searchable for term in fitness_terms):
+                if animal_mode:
+                    animal_terms = (
+                        "cat", "kitten", "dog", "puppy", "hamster", "rabbit", "bunny",
+                        "panda", "otter", "penguin", "monkey", "squirrel", "duck", "goat",
+                        "horse", "elephant", "raccoon", "fox", "bear", "parrot", "bird",
+                        "turtle", "meerkat", "capybara", "animal", "wildlife", "pet"
+                    )
+                    if not any(term in searchable for term in animal_terms):
                         continue
+                else:
+                    people_terms = (
+                        "person", "people", "woman", "women", "man", "men", "female", "male",
+                        "businesswoman", "businessman", "employee", "customer", "couple",
+                        "entrepreneur", "worker", "model", "portrait", "fashion", "fitness", "massage", "spa", "therapist", "skincare", "facial", "beauty", "salon", "scalp"
+                    )
+                    if not any(term in searchable for term in people_terms):
+                        continue
+                    if not IS_LONG and query_index == 0:
+                        woman_terms = ("woman", "women", "female", "girl")
+                        fitness_terms = ("fitness", "workout", "gym", "stretch", "yoga", "exercise", "training", "athletic")
+                        if not any(term in searchable for term in woman_terms) or not any(term in searchable for term in fitness_terms):
+                            continue
                 bad_terms = (
                     "hand close up", "hands close up", "finger close up", "fingers close up",
                     "hand closeup", "finger closeup", "isolated hand", "desert", "sand dune",
@@ -401,7 +414,7 @@ def download_relevant_clips(queries):
                     print(f"Could not process {source} clip {item_id}: {exc}")
                     continue
                 clips.append(normalized)
-                if not IS_LONG and query_index == 0 and not opening_found:
+                if not IS_LONG and not animal_mode and query_index == 0 and not opening_found:
                     opening_found = True
                     print("Accepted fixed adult-woman fitness opening.")
                 seen.add(item_id)
@@ -411,7 +424,7 @@ def download_relevant_clips(queries):
                     credits.append(f"Pixabay: {creator} | {page_url} | Check current Pixabay Content License")
                 print(f"Selected {source} clip {item_id}: {item.get('title', query)}")
                 break  # at most one clip per query
-    if not IS_LONG and not opening_found:
+    if not IS_LONG and not animal_mode and not opening_found:
         raise RuntimeError("Required adult-woman fitness opening was not found in licensed stock video; refusing to use unrelated footage.")
     if len(clips) < minimum:
         raise RuntimeError(
@@ -565,6 +578,20 @@ APPEARANCE_TOPIC_BANK = [
 ]
 
 
+ANIMAL_TOPIC_BANK = [
+    ("animal_01", "动物趣事", "猫咪为什么总能做出让人意想不到的动作？"),
+    ("animal_02", "动物趣事", "狗狗听到奇怪声音时会有什么搞笑反应？"),
+    ("animal_03", "动物趣事", "仓鼠把食物塞满脸颊的样子有多夸张？"),
+    ("animal_04", "动物趣事", "水獭为什么总喜欢抱着东西睡觉？"),
+    ("animal_05", "动物趣事", "企鹅走路摇摇晃晃的样子为什么这么可爱？"),
+    ("animal_06", "动物趣事", "兔子突然蹦跳时到底在表达什么？"),
+    ("animal_07", "动物趣事", "猫咪和纸箱之间有什么奇妙的吸引力？"),
+    ("animal_08", "动物趣事", "狗狗发现自己尾巴时会发生什么？"),
+    ("animal_09", "动物趣事", "小动物吃东西时有哪些意外的可爱瞬间？"),
+    ("animal_10", "动物趣事", "动物们睡觉时会出现哪些奇怪姿势？"),
+]
+
+
 MASSAGE_TOPIC_BANK = [
     ("massage_01", "按摩与放松", "面部按摩时有哪些温和且安全的注意事项？"),
     ("massage_02", "按摩与放松", "头皮按摩为什么会让人感觉放松？"),
@@ -597,7 +624,12 @@ def reserve_topics(count=3):
 
     recent_ids = history.get("recent_ids", [])
     topic_mode = os.getenv("MONEY_TOPIC_MODE", "economy").lower()
-    topic_pool = MASSAGE_TOPIC_BANK if topic_mode == "beauty" else TOPIC_BANK
+    if topic_mode == "beauty":
+        topic_pool = MASSAGE_TOPIC_BANK
+    elif topic_mode == "animals":
+        topic_pool = ANIMAL_TOPIC_BANK
+    else:
+        topic_pool = TOPIC_BANK
     available = [item for item in topic_pool if item[0] not in recent_ids]
     if len(available) < count:
         available = topic_pool[:]
@@ -607,7 +639,7 @@ def reserve_topics(count=3):
 
     history["recent_ids"] = (recent_ids + [item[0] for item in selected])[-len(topic_pool):]
     history["recent_topics"] = (history.get("recent_topics", []) +
-        [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-len(TOPIC_BANK):]
+        [{"id": item[0], "category": item[1], "topic": item[2]} for item in selected])[-max(len(TOPIC_BANK), len(ANIMAL_TOPIC_BANK), len(MASSAGE_TOPIC_BANK)):]
     encoded = __import__("base64").b64encode(
         json.dumps(history, ensure_ascii=False, indent=2).encode("utf-8")).decode("ascii")
     payload = {"message": "Track recent Chinese content topics",
