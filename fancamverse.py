@@ -101,7 +101,10 @@ def download_video(drive, item):
 def make_contact_sheets(source, duration):
     # Sample the entire performance sparsely, while excluding the opening section.
     start = min(INTRO_SKIP_SECONDS, max(3, duration * 0.08))
-    usable = max(1, duration - start)
+    # Never sample exactly at EOF: ffmpeg commonly exits with code 234 there.
+    # Keep a one-second safety margin and skip isolated frames that cannot be decoded.
+    last_sample = max(start, duration - 1.0)
+    usable = max(1, last_sample - start)
     count = min(80, max(12, int(usable / 3)))
     times = [start + (usable * i / max(1, count - 1)) for i in range(count)]
     frames_dir = WORK / "analysis_frames"
@@ -109,11 +112,17 @@ def make_contact_sheets(source, duration):
     frames = []
     for i, stamp in enumerate(times):
         path = frames_dir / f"frame_{i:03d}.jpg"
-        subprocess.run(["ffmpeg", "-y", "-ss", f"{stamp:.2f}", "-i", str(source),
-            "-frames:v", "1", "-vf", "scale=240:-1", "-q:v", "5", str(path)],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         if path.exists():
+            path.unlink()
+        result = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{stamp:.2f}", "-i", str(source),
+            "-frames:v", "1", "-vf", "scale=240:-1", "-q:v", "5", str(path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if result.returncode == 0 and path.exists() and path.stat().st_size > 0:
             frames.append((stamp, Image.open(path).convert("RGB")))
+        else:
+            detail = (result.stderr or "").strip().splitlines()
+            print(f"Skipping unreadable analysis frame at {stamp:.2f}s" +
+                  (f": {detail[-1][:240]}" if detail else ""))
     if not frames:
         raise RuntimeError("Could not sample frames for highlight analysis.")
     sheets = []
