@@ -1,4 +1,5 @@
 import asyncio,json,os,re,subprocess,textwrap,math,struct,wave
+import unicodedata
 from datetime import datetime,timezone
 from pathlib import Path
 import requests,edge_tts,time
@@ -290,7 +291,11 @@ def render(src,p,hist):
   for sentence,seconds in zip(sentences,durations):
    # Keep each caption to at most two short lines. Long sentences are
    # split into consecutive cues and timed by their spoken word counts.
-   clean_caption=re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0000FE0F\U0000200D]","",sentence).strip()
+   # Normalize to supported Latin glyphs so unsupported symbols cannot render as empty squares.
+   clean_caption=unicodedata.normalize("NFKD",sentence)
+   clean_caption=clean_caption.translate(str.maketrans({"’":"'","‘":"'","“":'"',"”":'"',"–":"-","—":"-","…":"...","•":"-"," ":" ","‐":"-","‑":"-"}))
+   clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
+   clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
    wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
