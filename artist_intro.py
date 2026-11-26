@@ -513,7 +513,7 @@ def profile(filename, target_hint=""):
  for sentence in intro_facts:
   add_if_fits(sentence)
  if news_fact:
-  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",news_fact) if x.strip()]
+  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",news_fact) if x.strip()]
   # Keep the main issue and its key verified explanation ahead of secondary profile trivia.
   compact_news=" ".join(news_sentences[:2])
   if not add_if_fits(compact_news):
