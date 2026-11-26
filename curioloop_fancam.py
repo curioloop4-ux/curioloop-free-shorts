@@ -122,6 +122,24 @@ def probe_duration(source, allow_short=False):
         raise RuntimeError(f"Source video is too short ({duration:.1f}s; minimum {minimum}s).")
     return duration
 
+def verify_vertical_output(path):
+    """Fail closed unless the rendered MP4 is exactly 1080x1920."""
+    result = run([
+        "ffprobe", "-v", "error", "-select_streams", "v:0",
+        "-show_entries", "stream=width,height", "-of", "json", str(path)
+    ])
+    streams = json.loads(result.stdout).get("streams", [])
+    if not streams:
+        raise RuntimeError(f"Rendered video has no video stream: {path.name}")
+    width = int(streams[0].get("width", 0))
+    height = int(streams[0].get("height", 0))
+    if (width, height) != (1080, 1920):
+        raise RuntimeError(
+            f"Refusing upload: {path.name} is {width}x{height}, expected 1080x1920 (9:16)."
+        )
+    print(f"Verified vertical output: {path.name} | {width}x{height} | 9:16")
+
+
 def make_services():
     drive_creds = Credentials(None, refresh_token=required("FANCAMVERSE_REFRESH_TOKEN"),
         token_uri="https://oauth2.googleapis.com/token",
@@ -410,6 +428,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
             "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
             "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
             "-movflags", "+faststart", str(output)])
+        verify_vertical_output(output)
         outputs.append((output, clip))
     return outputs
 
