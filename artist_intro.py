@@ -453,7 +453,7 @@ def render(src,p,hist):
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
  if has_source_audio:
-  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.18,apad,atrim=duration={length:.3f}[original];"
+  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.30,apad,atrim=duration={length:.3f}[original];"
   fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
  else:
   fc+="[voice]anull[a]"
