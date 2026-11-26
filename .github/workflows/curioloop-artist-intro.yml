@@ -83,8 +83,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+      - name: Upload exact intro-to-fancam handoff
+        if: always() && hashFiles('history/artist_intro_fancam_queue.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-artist-intro-handoff
+          path: history/artist_intro_fancam_queue.json
+          retention-days: 7
+
       - name: Persist successful upload history
         if: always()
+        continue-on-error: true
         run: |
           if [ -f history/artist_intro_processed.json ] || [ -f history/artist_intro_fancam_queue.json ]; then
             git config user.name "github-actions[bot]"
