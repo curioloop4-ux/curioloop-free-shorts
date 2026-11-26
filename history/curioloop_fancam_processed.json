@@ -65,7 +65,42 @@
       "used_clip_indices": [
         4
       ]
+    },
+    "1DMZ0CxlNGd1XGJY2mI6HeaSsnyVleQiV": {
+      "name": "LE SSERAFIM KAZUHA  르세라핌 카즈하 FANCAM 직캠 Ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 45.0,
+          "end": 71.0,
+          "hook": "Energetic choreography and dynamic stage presence"
+        },
+        {
+          "start": 105.0,
+          "end": 131.0,
+          "hook": "Powerful moves and captivating performance"
+        },
+        {
+          "start": 145.0,
+          "end": 171.0,
+          "hook": "Stunning visuals and expressive stage moments"
+        },
+        {
+          "start": 212.0,
+          "end": 238.0,
+          "hook": "High energy performance in full swing"
+        },
+        {
+          "start": 268.0,
+          "end": 294.0,
+          "hook": "Unstoppable rhythm and intense delivery"
+        }
+      ],
+      "used_clip_indices": [
+        4
+      ]
     }
   },
-  "last_source_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs"
+  "last_source_id": "1DMZ0CxlNGd1XGJY2mI6HeaSsnyVleQiV"
 }
