@@ -596,6 +596,12 @@ def identify_artist(filename):
             "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
             "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
         ]
+    if any(token in value for token in ("제니", "jennie")):
+        return "JENNIE", "BLACKPINK", [
+            "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Jennie performance", CHANNEL_BRAND, "Shorts"
+        ]
     if any(token in value for token in ("카리나", "karina")):
         return "KARINA", "aespa", [
             "Karina", "aespa Karina", "Karina fancam", "aespa fancam",
@@ -636,6 +642,11 @@ def generate_metadata(filename, hook, index):
         title = "KISS OF LIFE / NATTY 🔥 | K-Pop Fancam #Shorts"
         description = ("NATTY of KISS OF LIFE 🔥 Enjoy this fan-captured performance and "
                        f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "JENNIE":
+        title = "BLACKPINK / JENNIE 🖤 | K-Pop Fancam #Shorts"
+        description = ("JENNIE of BLACKPINK 🖤 Enjoy this fan-captured performance and "
+                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "KARINA":
         title = "aespa / KARINA ✨ | K-Pop Fancam #Shorts"
