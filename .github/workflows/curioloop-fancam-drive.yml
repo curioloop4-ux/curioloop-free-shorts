@@ -1,27 +1,9 @@
 name: CurioLoop Fancam Drive Upload
 
 on:
-  schedule:
-    # GitHub cron is UTC. Staggered triggers run 31–82 minutes before each Korea publication slot.
-    # KST publication slots: 01:00, 02:00, 03:00, 04:00, 05:00, 06:00,
-    # then every 2 hours from 08:00 through 00:00 (14 uploads daily).
-    # Stagger away from :00 UTC to reduce GitHub schedule congestion.
-    # Preserve daytime publication slots; publish hourly from 01:00 through 08:00 KST.
-    - cron: "7 0 * * *"
-    - cron: "13 2 * * *"
-    - cron: "19 4 * * *"
-    - cron: "23 6 * * *"
-    - cron: "29 8 * * *"
-    - cron: "11 10 * * *"
-    - cron: "17 12 * * *"
-    - cron: "23 14 * * *"
-    - cron: "7 15 * * *"
-    - cron: "13 16 * * *"
-    - cron: "19 17 * * *"
-    - cron: "23 18 * * *"
-    - cron: "29 19 * * *"
-    - cron: "11 20 * * *"
-    - cron: "17 22 * * *"
+  workflow_run:
+    workflows: ["CurioLoop Artist Intro"]
+    types: [completed]
   workflow_dispatch:
     inputs:
       output_only:
@@ -58,6 +40,7 @@ concurrency:
 
 jobs:
   process-drive-inbox:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'schedule')
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
@@ -69,6 +52,18 @@ jobs:
         with:
           python-version: "3.11"
           cache: "pip"
+
+      - name: Wait five minutes after the artist intro
+        if: github.event_name == 'workflow_run'
+        run: sleep 300
+
+      - name: Load the exact source selected for the artist intro
+        if: github.event_name == 'workflow_run'
+        run: |
+          test -f history/artist_intro_fancam_queue.json
+          SOURCE_ID="$(jq -r '.drive_file_id // empty' history/artist_intro_fancam_queue.json)"
+          test -n "$SOURCE_ID"
+          echo "FANCAMVERSE_COORDINATED_SOURCE_ID=$SOURCE_ID" >> "$GITHUB_ENV"
 
       - name: Install FFmpeg
         run: |
@@ -99,7 +94,7 @@ jobs:
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
           FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
           FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
-          FANCAMVERSE_PRIVACY_STATUS: ${{ github.event_name == 'schedule' && 'public' || inputs.privacy_status || 'private' }}
+          FANCAMVERSE_PRIVACY_STATUS: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_run') && 'public' || inputs.privacy_status || 'private' }}
           FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '7 0 * * *' && '10:00' || (github.event.schedule == '13 2 * * *' && '12:00' || (github.event.schedule == '19 4 * * *' && '14:00' || (github.event.schedule == '23 6 * * *' && '16:00' || (github.event.schedule == '29 8 * * *' && '18:00' || (github.event.schedule == '11 10 * * *' && '20:00' || (github.event.schedule == '17 12 * * *' && '22:00' || (github.event.schedule == '23 14 * * *' && '00:00' || (github.event.schedule == '7 15 * * *' && '01:00' || (github.event.schedule == '13 16 * * *' && '02:00' || (github.event.schedule == '19 17 * * *' && '03:00' || (github.event.schedule == '23 18 * * *' && '04:00' || (github.event.schedule == '29 19 * * *' && '05:00' || (github.event.schedule == '11 20 * * *' && '06:00' || (github.event.schedule == '17 22 * * *' && '08:00' || ''))))))))))))))) }}
         run: python curioloop_fancam.py
 
@@ -111,6 +106,10 @@ jobs:
           path: work_curioloop_fancam/*_short_*.mp4
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Clear the coordinated source after successful follow-up
+        if: success() && github.event_name == 'workflow_run'
+        run: rm -f history/artist_intro_fancam_queue.json
 
       - name: Persist CurioLoop upload progress
         if: always()
