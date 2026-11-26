@@ -986,6 +986,27 @@ def main():
 
         used_indices = set(int(x) for x in state.get("used_clip_indices", []))
         available_indices = [i for i in range(1, len(clips) + 1) if i not in used_indices]
+        intro_start = os.getenv("FANCAMVERSE_INTRO_SOURCE_START", "").strip()
+        intro_end = os.getenv("FANCAMVERSE_INTRO_SOURCE_END", "").strip()
+        if intro_start and intro_end:
+            intro_start_s, intro_end_s = float(intro_start), float(intro_end)
+            if intro_end_s <= intro_start_s:
+                raise RuntimeError("Invalid artist-intro source segment boundaries.")
+            before = len(available_indices)
+            available_indices = [
+                i for i in available_indices
+                if clips[i - 1]["end"] <= intro_start_s
+                or clips[i - 1]["start"] >= intro_end_s
+            ]
+            print(
+                f"Artist-intro footage exclusion: {intro_start_s:.1f}-{intro_end_s:.1f}s; "
+                f"removed {before - len(available_indices)} overlapping fancam highlight(s)."
+            )
+            if not available_indices:
+                raise RuntimeError(
+                    "Every unused fancam highlight overlaps the artist-intro footage. "
+                    "Refusing to publish a duplicate segment."
+                )
         if is_standard_sakura_source(item["name"]):
             sakura_priority = [
                 i for i in available_indices
