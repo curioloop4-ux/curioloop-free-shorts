@@ -350,6 +350,34 @@ def profile(filename, target_hint=""):
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
  personality=labeled_value(["성격","특징","매력 포인트"])
+ # Extract concrete career/episode details from the resolved NamuWiki article.
+ # Prefer narrative sections over infoboxes; translate Korean source text for the English voice-over.
+ article_highlights=[]
+ if raw:
+  section_parts=re.split(r"(?m)^={2,}\s*(.*?)\s*={2,}\s*$",raw)
+  wanted_sections=re.compile(r"활동|경력|데뷔|음악|방송|출연|여담|특징|개인",re.I)
+  for section_index in range(1,len(section_parts),2):
+   heading=plain(section_parts[section_index])
+   if not wanted_sections.search(heading):continue
+   body=section_parts[section_index+1]
+   for line in re.split(r"(?m)^\s*(?:\*+|#+)\s*",body):
+    candidate=plain(line)
+    if len(candidate)<45 or len(candidate)>280:continue
+    if candidate in article_highlights:continue
+    if re.search(r"나무위키|편집|문서|분류|각주|출처|틀:",candidate):continue
+    article_highlights.append(candidate)
+    if len(article_highlights)>=5:break
+   if len(article_highlights)>=5:break
+ translated_highlights=[]
+ for detail in article_highlights:
+  try:
+   tr=session.get("https://translate.googleapis.com/translate_a/single",params={"client":"gtx","sl":"ko","tl":"en","dt":"t","q":detail[:900]},timeout=12)
+   tr.raise_for_status()
+   translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
+   if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
+  except Exception as e:print("NamuWiki highlight translation unavailable:",type(e).__name__)
+  if len(translated_highlights)>=3:break
+ print("NamuWiki article highlights extracted:",len(translated_highlights),"from section text")
  print("PROFILE RESEARCH RESULT")
  print("Artist:",artist,"| Group:",group)
  print("Birth:",birth or "not verified","| Height:",height or "not verified","| Weight:",weight or "not verified")
@@ -380,6 +408,8 @@ def profile(filename, target_hint=""):
  if nickname:facts.append(f"Fans also call her {nickname}.")
  if hobby:facts.append(f"Outside performing, she enjoys {hobby}.")
  if personality:facts.append(f"Her profile describes her as {personality}.")
+ for detail in translated_highlights:
+  facts.append("Her biography also notes that "+detail+".")
  def relevant(title,description):
   blob=(title+" "+description).casefold()
   # Reject obvious same-name collisions before accepting a news result.
@@ -522,7 +552,7 @@ def profile(filename, target_hint=""):
  intro_facts=base_facts[:5]
  extra_facts=base_facts[5:]
  narration_parts=[]
- word_budget=72
+ word_budget=125
  def add_if_fits(sentence, force=False):
   candidate=" ".join(narration_parts+[sentence])
   if len(candidate.split())<=word_budget or (force and not narration_parts):
@@ -544,6 +574,8 @@ def profile(filename, target_hint=""):
  for sentence in extra_facts:
   add_if_fits(sentence)
  narration=" ".join(narration_parts)
+ if len(narration.split())<95:
+  raise RuntimeError(f"Research produced only {len(narration.split())} narration words; refusing to publish an under-researched short intro (minimum 95 words).")
  print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  sources=[]
  if source_base and raw:
@@ -694,7 +726,7 @@ def render(src,p,hist):
  asyncio.run(make_voice_and_subtitles())
  # Runtime follows spoken content: title + narration + brief ending.
  voice_seconds=dur(audio)
- length=min(50.0,max(10.0,intro+voice_seconds+1.5))
+ length=min(65.0,max(10.0,intro+voice_seconds+1.5))
  footage=length-intro
  if source_len<footage+1:
   raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least {footage+1:.1f}s for this {length:.1f}s intro")
