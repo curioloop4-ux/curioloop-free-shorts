@@ -24,8 +24,8 @@ DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
 YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
 SHORTS_PER_SOURCE = 5
-MIN_SHORT_SECONDS = 15
-MAX_SHORT_SECONDS = 20
+MIN_SHORT_SECONDS = 25
+MAX_SHORT_SECONDS = 26
 INTRO_SKIP_SECONDS = 10
 
 def required(name):
