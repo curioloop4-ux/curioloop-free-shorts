@@ -376,7 +376,7 @@ def profile(filename, target_hint=""):
  if not article_highlights:
   for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
    detail=plain(document.get("text",""))
-   if len(detail)<90 or target.casefold() not in (document.get("title","")+" "+detail).casefold():
+   if len(detail)<90 or not any(name.casefold() in (document.get("title","")+" "+detail).casefold() for name in (target,artist)):
     continue
    detail=re.sub(r"^(?:프로필|공식 홈페이지|공식 프로필|profile|biography)\\s*[:：-]?\\s*","",detail,flags=re.I)
    if len(detail)>=90 and detail not in article_highlights:
