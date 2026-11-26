@@ -252,6 +252,10 @@ def profile(filename, target_hint=""):
       if value:
        return re.sub(r"\s+","",value)
    return None
+  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
+  waist=labelled_number(["허리둘레","허리 사이즈","허리"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+  shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈"],r"\d{2}(?:\.5)?\s*(?:mm|cm)")
  def labeled_value(labels):
   # NamuWiki profile tables commonly store a label and value in adjacent
   # ||-separated cells. Also support simple "label: value" text.
