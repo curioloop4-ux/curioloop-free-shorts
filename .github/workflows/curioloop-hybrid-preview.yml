@@ -1,0 +1,52 @@
+name: CurioLoop Hybrid Analysis Preview
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: curioloop-hybrid-preview
+  cancel-in-progress: false
+
+jobs:
+  create-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create one hybrid analysis Short from Google Drive
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+        run: python curioloop_hybrid_preview.py
+
+      - name: Upload preview artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-hybrid-analysis-preview
+          path: hybrid_preview/
+          if-no-files-found: error
+          retention-days: 7
