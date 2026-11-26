@@ -529,29 +529,33 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                            stroke_width=2, stroke_fill=(0, 0, 0, 255))
         name_overlay.save(name_path)
 
-        # Elegant end-card CTA: ask viewers to choose the next idol and subscribe.
+        # Transparent typographic CTA overlay: top prompt + bottom subscription line.
         cta_path = WORK / f"cta_overlay_{index}.png"
         cta = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
         cta_draw = ImageDraw.Draw(cta)
-        cta_font = ImageFont.truetype(fontfile, 38)
-        cta_bold = ImageFont.truetype(fontfile, 46)
-        panel = (58, 1325, 1022, 1695)
-        cta_draw.rounded_rectangle(panel, radius=38, fill=(12, 17, 34, 224),
-                                   outline=(255, 255, 255, 95), width=3)
-        cta_draw.rounded_rectangle((94, 1358, 986, 1370), radius=6,
-                                   fill=(90, 220, 255, 245))
-        def centered_cta(text, y, font, fill):
-            box = cta_draw.textbbox((0, 0), text, font=font)
-            cta_draw.text(((output_w - (box[2] - box[0])) / 2, y), text,
-                          font=font, fill=fill)
-        centered_cta("WHO SHOULD WE FEATURE NEXT?", 1400, cta_font,
-                     (205, 220, 255, 255))
-        centered_cta("COMMENT YOUR PICK", 1460, cta_bold,
-                     (255, 255, 255, 255))
-        centered_cta("SUBSCRIBE FOR MORE K-POP", 1538, cta_font,
-                     (110, 225, 255, 255))
-        centered_cta("NEW K-POP SHORTS EVERY DAY", 1610,
-                     ImageFont.truetype(fontfile, 23), (185, 195, 215, 255))
+        cta_font = ImageFont.truetype(fontfile, 42)
+        cta_bold = ImageFont.truetype(fontfile, 54)
+
+        def draw_cta_line(text, y, font, fill):
+            box = cta_draw.textbbox((0, 0), text, font=font, stroke_width=3)
+            text_w = box[2] - box[0]
+            pad_x, pad_y = 28, 18
+            left = (output_w - text_w) // 2 - pad_x
+            top = y - pad_y
+            right = (output_w + text_w) // 2 + pad_x
+            bottom = y + (box[3] - box[1]) + pad_y
+            cta_draw.rounded_rectangle((left, top, right, bottom), radius=24,
+                                       fill=(5, 8, 20, 155))
+            cta_draw.text(((output_w - text_w) / 2, y - box[1]), text,
+                          font=font, fill=fill, stroke_width=3,
+                          stroke_fill=(5, 5, 12, 255))
+
+        draw_cta_line("WHO SHOULD WE FEATURE NEXT?", 220, cta_font,
+                      (255, 88, 202, 255))
+        draw_cta_line("COMMENT BELOW!", 292, cta_bold,
+                      (255, 226, 75, 255))
+        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1535, cta_bold,
+                      (75, 224, 255, 255))
         cta.save(cta_path)
 
         # Convert every source orientation to a full-frame 9:15 Short.
