@@ -1,12 +1,624 @@
-            print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped.")
-            # Advance only the in-memory cursor so this preview run can render
-            # multiple distinct clips per artist without persisting upload history.
-            source_state[item["id"]] = {
-                "name": item["name"],
-                "next_clip": selected_index + 1,
-                "complete": selected_index >= len(clips),
-                "clips": clips
+import base64
+import json
+import os
+import re
+import subprocess
+import time
+import random
+from pathlib import Path
+
+import requests
+from PIL import Image, ImageDraw, ImageFont
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
+from googleapiclient.http import MediaFileUpload, MediaIoBaseDownload
+
+ROOT = Path(__file__).parent
+WORK = ROOT / "work_fancamverse"
+WORK.mkdir(exist_ok=True)
+HISTORY = ROOT / "history" / "fancamverse_processed.json"
+SCOPES = ["https://www.googleapis.com/auth/drive.readonly", "https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
+SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
+SHORTS_PER_SOURCE = 5
+MIN_SHORT_SECONDS = 15
+MAX_SHORT_SECONDS = 20
+INTRO_SKIP_SECONDS = 10
+
+def required(name):
+    value = os.getenv(name, "").strip()
+    if not value:
+        raise RuntimeError(f"Missing required GitHub secret/environment variable: {name}")
+    return value
+
+def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
+    """Retry transient Gemini API failures with exponential backoff."""
+    retryable_statuses = {408, 429, 500, 502, 503, 504}
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.post(
+                url,
+                params={"key": api_key},
+                json=payload,
+                timeout=timeout
+            )
+            if response.status_code not in retryable_statuses:
+                response.raise_for_status()
+                return response
+            if attempt == max_attempts:
+                detail = (response.text or "")[:1200]
+                raise RuntimeError(
+                    f"Gemini {task_name} failed after {max_attempts} attempts "
+                    f"(HTTP {response.status_code}): {detail}"
+                )
+            delay = min(60, 5 * (2 ** (attempt - 1))) + random.uniform(0, 2)
+            print(
+                f"Gemini {task_name} returned HTTP {response.status_code}; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s."
+            )
+            time.sleep(delay)
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else "unknown"
+            detail = (exc.response.text or "")[:1200] if exc.response is not None else str(exc)
+            raise RuntimeError(
+                f"Gemini {task_name} returned non-retryable HTTP {status}: {detail}"
+            ) from exc
+        except requests.RequestException as exc:
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"Gemini {task_name} request failed after {max_attempts} attempts: {exc}"
+                ) from exc
+            delay = min(60, 5 * (2 ** (attempt - 1))) + random.uniform(0, 2)
+            print(
+                f"Gemini {task_name} network error; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s: {exc}"
+            )
+            time.sleep(delay)
+
+def gemini_generate_with_fallback(primary_model, api_key, payload, timeout, task_name):
+    """Try the primary model, then a lighter supported model after capacity errors."""
+    fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+    models = list(dict.fromkeys([primary_model, fallback_model]))
+    last_error = None
+    for index, model in enumerate(models):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            if index:
+                print(f"Gemini {task_name}: switching to fallback model {model}.")
+            else:
+                print(f"Gemini {task_name}: using model {model}.")
+            return gemini_post_with_retry(
+                url, api_key, payload, timeout, task_name
+            )
+        except RuntimeError as exc:
+            last_error = exc
+            message = str(exc)
+            transient = any(
+                f"HTTP {status}" in message
+                for status in (408, 429, 500, 502, 503, 504)
+            ) or "request failed after" in message
+            if not transient or index == len(models) - 1:
+                raise
+            print(
+                f"Gemini {task_name}: primary model {model} unavailable; "
+                f"trying fallback model {fallback_model}."
+            )
+    raise last_error
+
+
+def run(cmd):
+    return subprocess.run(cmd, capture_output=True, text=True, check=True)
+
+def probe_duration(source, allow_short=False):
+    result = run(["ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(source)])
+    duration = float(result.stdout.strip())
+    minimum = 3 if allow_short else MIN_SHORT_SECONDS
+    if duration < minimum:
+        raise RuntimeError(f"Source video is too short ({duration:.1f}s; minimum {minimum}s).")
+    return duration
+
+def make_services():
+    creds = Credentials(None, refresh_token=required("FANCAMVERSE_REFRESH_TOKEN"),
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=required("FANCAMVERSE_CLIENT_ID"), client_secret=required("FANCAMVERSE_CLIENT_SECRET"),
+        scopes=SCOPES)
+    return build("drive", "v3", credentials=creds), build("youtube", "v3", credentials=creds)
+
+def verify_upload_channel(youtube):
+    expected_id = required("FANCAMVERSE_YOUTUBE_CHANNEL_ID")
+    response = youtube.channels().list(part="id,snippet", mine=True).execute()
+    channels = response.get("items", [])
+    if len(channels) != 1:
+        raise RuntimeError(
+            f"OAuth channel verification failed: expected one authorized channel, found {len(channels)}. "
+            "No videos were uploaded."
+        )
+    channel = channels[0]
+    actual_id = channel.get("id", "")
+    title = channel.get("snippet", {}).get("title", "(unknown)")
+    print(f"OAuth upload channel: {title} ({actual_id})")
+    if actual_id != expected_id:
+        raise RuntimeError(
+            f"Wrong YouTube channel authorized. Expected {expected_id}, got {actual_id} ({title}). "
+            "No videos were uploaded."
+        )
+    print("FANCAMVERSE channel ID verified.")
+
+def load_history():
+    if not HISTORY.exists():
+        return {"processed": []}
+    data = json.loads(HISTORY.read_text(encoding="utf-8"))
+    if not isinstance(data, dict) or not isinstance(data.get("processed"), list):
+        raise RuntimeError("history/fancamverse_processed.json has an invalid format.")
+    return data
+
+def list_source_videos(drive, folder_id):
+    # Search the inbox recursively so files placed in artist subfolders are included.
+    pending = [folder_id]
+    visited = set()
+    candidates = []
+    while pending:
+        parent_id = pending.pop(0)
+        if parent_id in visited:
+            continue
+        visited.add(parent_id)
+        page_token = None
+        while True:
+            params = {
+                "q": f"'{parent_id}' in parents and trashed = false",
+                "pageSize": 100,
+                "orderBy": "createdTime",
+                "fields": "nextPageToken,files(id,name,mimeType,createdTime,size)",
+                "supportsAllDrives": True,
+                "includeItemsFromAllDrives": True
             }
+            if page_token:
+                params["pageToken"] = page_token
+            result = drive.files().list(**params).execute()
+            for item in result.get("files", []):
+                if item.get("mimeType") == "application/vnd.google-apps.folder":
+                    pending.append(item["id"])
+                elif item.get("mimeType") in SUPPORTED:
+                    candidates.append(item)
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+    candidates.sort(key=lambda f: (f.get("createdTime", ""), f.get("id", "")))
+    print(f"Drive inbox scan: {len(candidates)} supported video(s) found across {len(visited)} folder(s).")
+    if not candidates:
+        folder = drive.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
+        print(f"Configured Drive inbox: {folder.get('name')} ({folder.get('id')})")
+    else:
+        for item in candidates:
+            print(f"Drive source: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
+    return candidates
+
+
+def search_drive_target_videos(drive, terms):
+    clauses = []
+    for term in terms:
+        escaped = term.replace("\\", "\\\\").replace("'", "\\'")
+        clauses.append(f"name contains '{escaped}'")
+    query = "trashed = false and (" + " or ".join(clauses) + ")"
+    results = []
+    page_token = None
+    while True:
+        params = {
+            "q": query,
+            "pageSize": 100,
+            "orderBy": "createdTime",
+            "fields": "nextPageToken,files(id,name,mimeType,createdTime,size,parents)",
+            "supportsAllDrives": True,
+            "includeItemsFromAllDrives": True,
+            "corpora": "allDrives"
+        }
+        if page_token:
+            params["pageToken"] = page_token
+        response = drive.files().list(**params).execute()
+        results.extend(item for item in response.get("files", [])
+                       if item.get("mimeType") in SUPPORTED)
+        page_token = response.get("nextPageToken")
+        if not page_token:
+            break
+    unique = {item["id"]: item for item in results}
+    found = sorted(unique.values(), key=lambda item: (item.get("createdTime", ""), item.get("id", "")))
+    print(f"Drive-wide filename search found {len(found)} supported video(s).")
+    for item in found:
+        print(f"Drive match: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
+    return found
+
+def download_video(drive, item):
+    safe_name = re.sub(r"[^A-Za-z0-9._-]+", "_", item["name"]).strip("._") or "fancam_video"
+    source = WORK / safe_name
+    request = drive.files().get_media(fileId=item["id"], supportsAllDrives=True)
+    with source.open("wb") as handle:
+        downloader = MediaIoBaseDownload(handle, request, chunksize=8 * 1024 * 1024)
+        done = False
+        while not done:
+            status, done = downloader.next_chunk()
+            if status:
+                print(f"Drive download: {int(status.progress() * 100)}%")
+    if source.stat().st_size == 0:
+        raise RuntimeError(f"Downloaded file is empty: {item['name']}")
+    return source
+
+def make_contact_sheets(source, duration):
+    # Sample the entire performance sparsely, while excluding the opening section.
+    start = min(INTRO_SKIP_SECONDS, max(3, duration * 0.08))
+    # Never sample exactly at EOF: ffmpeg commonly exits with code 234 there.
+    # Keep a one-second safety margin and skip isolated frames that cannot be decoded.
+    last_sample = max(start, duration - 1.0)
+    usable = max(1, last_sample - start)
+    count = min(80, max(12, int(usable / 3)))
+    times = [start + (usable * i / max(1, count - 1)) for i in range(count)]
+    frames_dir = WORK / "analysis_frames"
+    frames_dir.mkdir(exist_ok=True)
+    frames = []
+    for i, stamp in enumerate(times):
+        path = frames_dir / f"frame_{i:03d}.jpg"
+        if path.exists():
+            path.unlink()
+        result = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{stamp:.2f}", "-i", str(source),
+            "-frames:v", "1", "-vf", "scale=240:-1", "-q:v", "5", str(path)],
+            stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
+        if result.returncode == 0 and path.exists() and path.stat().st_size > 0:
+            frames.append((stamp, Image.open(path).convert("RGB")))
+        else:
+            detail = (result.stderr or "").strip().splitlines()
+            print(f"Skipping unreadable analysis frame at {stamp:.2f}s" +
+                  (f": {detail[-1][:240]}" if detail else ""))
+    if not frames:
+        raise RuntimeError("Could not sample frames for highlight analysis.")
+    sheets = []
+    font = ImageFont.load_default()
+    for page in range(0, len(frames), 20):
+        batch = frames[page:page + 20]
+        cell_w, cell_h, label_h = 240, 160, 24
+        sheet = Image.new("RGB", (cell_w * 4, (cell_h + label_h) * 5), "black")
+        draw = ImageDraw.Draw(sheet)
+        for j, (stamp, frame) in enumerate(batch):
+            x, y = (j % 4) * cell_w, (j // 4) * (cell_h + label_h)
+            frame.thumbnail((cell_w, cell_h))
+            sheet.paste(frame, (x, y))
+            draw.text((x + 5, y + cell_h + 4), f"{stamp:.1f}s", fill="white", font=font)
+        out = WORK / f"contact_{page // 20:02d}.jpg"
+        sheet.save(out, quality=82)
+        sheets.append(out)
+    return sheets, start
+
+def analyze_highlights(source, duration, filename):
+    # Full-source mode is opt-in; artist filtering alone still runs highlight analysis.
+    if os.getenv("FANCAMVERSE_USE_FULL_SOURCE", "").strip().lower() in {"1", "true", "yes"}:
+        print(f"Full-source mode enabled ({duration:.1f}s).")
+        return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
+
+    # For a short user-supplied clip under 15 seconds, preserve the full moment
+    # as one Short instead of rejecting it or trying to invent five segments.
+    if duration < MIN_SHORT_SECONDS:
+        print(f"Short source detected ({duration:.1f}s); using the complete clip as one Short.")
+        return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
+    sheets, first_allowed = make_contact_sheets(source, duration)
+    model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
+    prompt = f"""You are selecting compelling moments from a user-recorded K-pop concert fancam for YouTube Shorts.
+Source filename: {filename}
+Full duration: {duration:.1f} seconds. The opening/intro before {first_allowed:.1f}s must be excluded.
+The attached contact sheets show sampled frames with their exact source timestamps.
+Choose exactly five DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
+sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
+Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
+Each window must be 15 to 20 seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
+Use the timestamps on the images to estimate boundaries. Return JSON only:
+{{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
+Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
+    parts = [{"text": prompt}]
+    for path in sheets:
+        parts.append({"inline_data": {"mime_type": "image/jpeg",
+            "data": base64.b64encode(path.read_bytes()).decode("ascii")}})
+    response = gemini_generate_with_fallback(
+        model, required("GEMINI_API_KEY"),
+        {"contents": [{"parts": parts}],
+         "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}},
+        timeout=180, task_name="highlight analysis"
+    )
+    raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    data = json.loads(raw)
+    clips = data.get("clips", [])
+    valid = []
+    for clip in clips:
+        try:
+            start, end = float(clip["start"]), float(clip["end"])
+        except (KeyError, TypeError, ValueError):
+            continue
+        length = end - start
+        if start >= first_allowed and end <= duration and MIN_SHORT_SECONDS <= length <= MAX_SHORT_SECONDS:
+            valid.append({"start": start, "end": end,
+                "hook": re.sub(r"[^A-Za-z0-9 '!?-]", "", str(clip.get("hook", "A Must-Watch Stage Moment")))[:55]})
+    valid.sort(key=lambda x: x["start"])
+    distinct = []
+    for clip in valid:
+        if all(clip["start"] >= old["end"] or clip["end"] <= old["start"] for old in distinct):
+            distinct.append(clip)
+    if len(distinct) != SHORTS_PER_SOURCE:
+        raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 5 are required. No upload was made.")
+    return distinct
+
+def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
+    outputs = []
+    fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    # Apply the same 4:6 portrait crop to EVERY source, not just a named video.
+    # For standard 9:16 portrait footage, preserve the full width and trim equal
+    # amounts from the top and bottom to reach 4:6.
+    output_w, output_h = 1080, 1620
+    print(f"Render aspect ratio for {source_stem}: 4:6 (top/bottom center crop)")
+
+    import textwrap
+    for position, clip in enumerate(clips, 1):
+        index = position + index_offset
+        output = WORK / f"{source_stem}_short_{index}.mp4"
+        raw_hook = re.sub(r"\\s+", " ", str(clip.get("hook", "A Must-Watch Stage Moment"))).strip()
+        wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
+
+        # Intro hook: centered for 2.7 seconds, then disappears.
+        intro_path = WORK / f"intro_overlay_{index}.png"
+        intro = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(intro)
+        intro_font = ImageFont.truetype(fontfile, 46)
+        lines = wrapped_hook.splitlines() or [wrapped_hook]
+        line_boxes = [draw.textbbox((0, 0), line, font=intro_font, stroke_width=3) for line in lines]
+        line_heights = [box[3] - box[1] for box in line_boxes]
+        line_widths = [box[2] - box[0] for box in line_boxes]
+        line_gap = 10
+        text_w = max(line_widths)
+        text_h = sum(line_heights) + line_gap * (len(lines) - 1)
+        pad_x, pad_y = 28, 20
+        box_w, box_h = text_w + pad_x * 2, text_h + pad_y * 2
+        box_x = (output_w - box_w) // 2
+        box_y = (output_h - box_h) // 2
+        draw.rounded_rectangle((box_x, box_y, box_x + box_w, box_y + box_h),
+                               radius=16, fill=(0, 0, 0, 145))
+        current_y = box_y + pad_y
+        for line, bbox, line_w, line_h in zip(lines, line_boxes, line_widths, line_heights):
+            line_x = (output_w - line_w) // 2
+            draw.text((line_x - bbox[0], current_y - bbox[1]), line,
+                      font=intro_font, fill=(255, 255, 255, 255),
+                      stroke_width=3, stroke_fill=(0, 0, 0, 255))
+            current_y += line_h + line_gap
+        intro.save(intro_path)
+
+        # Persistent artist name at the top center.
+        name_path = WORK / f"name_overlay_{index}.png"
+        name_overlay = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        if display_name:
+            name_draw = ImageDraw.Draw(name_overlay)
+            name_font = ImageFont.truetype(fontfile, 48)
+            name_bbox = name_draw.textbbox((0, 0), display_name, font=name_font, stroke_width=2)
+            name_w, name_h = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
+            px, py = 24, 14
+            bx, by = (output_w - name_w - px * 2) // 2, 92
+            name_draw.rounded_rectangle((bx, by, bx + name_w + px * 2, by + name_h + py * 2),
+                                        radius=14, fill=(0, 0, 0, 125))
+            name_draw.text((bx + px - name_bbox[0], by + py - name_bbox[1]), display_name,
+                           font=name_font, fill=(255, 255, 255, 255),
+                           stroke_width=2, stroke_fill=(0, 0, 0, 255))
+        name_overlay.save(name_path)
+
+        base_filter = (
+            f"scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
+            f"crop={output_w}:{output_h}"
+        )
+        filter_complex = (
+            f"[0:v]{base_filter}[base];"
+            f"[1:v]format=rgba[name];"
+            f"[2:v]format=rgba[intro];"
+            f"[base][name]overlay=0:0[namebase];"
+            f"[namebase][intro]overlay=0:0:enable='between(t,0,2.7)'[v]"
+        )
+        run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
+            "-loop", "1", "-i", str(name_path),
+            "-loop", "1", "-i", str(intro_path),
+            "-t", f"{clip['end'] - clip['start']:.3f}",
+            "-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
+            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
+            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+            "-movflags", "+faststart", str(output)])
+        outputs.append((output, clip))
+    return outputs
+
+def identify_artist(filename):
+    value = filename.casefold()
+    if any(token in value for token in ("장원영", "wonyoung", "won young")):
+        return "WONYOUNG", "IVE", [
+            "Wonyoung", "IVE Wonyoung", "Wonyoung fancam", "IVE fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Wonyoung performance", "FANCAMVERSE", "Shorts"
+        ]
+    if any(token in value for token in ("나띠", "natty")):
+        return "NATTY", "KISS OF LIFE", [
+            "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
+            "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
+            "Korean idol", "female idol", "FANCAMVERSE", "Shorts"
+        ]
+    if any(token in value for token in ("카리나", "karina")):
+        return "KARINA", "aespa", [
+            "Karina", "aespa Karina", "Karina fancam", "aespa fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Karina performance", "Shorts"
+        ]
+    if any(token in value for token in ("닝닝", "ningning")):
+        return "NINGNING", "aespa", [
+            "Ningning", "aespa Ningning", "Ningning fancam", "aespa fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Ningning performance", "Shorts"
+        ]
+    return "", "", []
+
+def generate_metadata(filename, hook, index):
+    artist, group, fixed_tags = identify_artist(filename)
+    if artist == "WONYOUNG":
+        title = "WONYOUNG (IVE) ✨ | Charismatic K-Pop Fancam #Shorts"
+        description = ("WONYOUNG of IVE ✨ Enjoy this fan-captured performance and her "
+                       "stage presence.\n\nFan-captured footage. FANCAMVERSE.")
+        tags = fixed_tags
+    elif artist == "NATTY":
+        title = "NATTY (KISS OF LIFE) 🔥 | K-Pop Fancam #Shorts"
+        description = ("NATTY of KISS OF LIFE 🔥 Enjoy this fan-captured performance and "
+                       "her stage presence.\n\nFan-captured footage. FANCAMVERSE.")
+        tags = fixed_tags
+    else:
+        model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
+        prompt = f"""Create YouTube Shorts metadata for FANCAMVERSE, an English-language K-pop fan-cam channel targeting US viewers.
+Source filename: {filename!r}
+On-screen English hook: {hook!r}
+Clip number: {index}
+Use ONLY details clearly present in the filename and hook. Never guess an idol, group, song, event, or venue.
+Return valid JSON only with keys title, description, tags.
+title: concise natural English, maximum 90 characters, searchable and engaging.
+description: one or two short English sentences; identify this as fan-captured footage. No official affiliation claim.
+tags: 8 to 12 relevant English tags; no unrelated trending tags."""
+        response = gemini_generate_with_fallback(
+            model, required("GEMINI_API_KEY"),
+            {"contents": [{"parts": [{"text": prompt}]}],
+             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
+            timeout=90, task_name="metadata generation"
+        )
+        data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
+        title = str(data.get("title", "")).strip()[:100]
+        description = str(data.get("description", "")).strip()
+        tags = data.get("tags", [])
+        if not title or not isinstance(tags, list):
+            raise RuntimeError("Gemini returned invalid upload metadata.")
+
+    clean, seen = [], set()
+    for tag in ["FANCAMVERSE", "K-pop", "K-pop fancam", "Shorts"] + tags:
+        tag = re.sub(r"\s+", " ", str(tag)).strip().lstrip("#")
+        key = tag.casefold()
+        if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
+            clean.append(tag); seen.add(key)
+    hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:6])
+    description = (description + "\n\n" if description else "") + hashtags
+    return title, description[:5000], clean
+
+def upload(youtube, path, title, description, tags, privacy):
+    if privacy not in {"private", "unlisted", "public"}:
+        raise ValueError("Privacy must be private, unlisted, or public.")
+    body = {"snippet": {"title": title, "description": description, "tags": tags, "categoryId": "10"},
+        "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False}}
+    result = youtube.videos().insert(part="snippet,status", body=body,
+        media_body=MediaFileUpload(str(path), mimetype="video/mp4", resumable=True)).execute()
+    video_id = result.get("id")
+    if not video_id:
+        raise RuntimeError("YouTube upload completed without returning a video ID.")
+    print(f"Uploaded: https://www.youtube.com/shorts/{video_id} (privacy={privacy})")
+    return video_id
+
+def main():
+    drive, youtube = make_services()
+    folder_id = required("FANCAMVERSE_DRIVE_FOLDER_ID")
+    history = load_history()
+    source_state = history.setdefault("sources", {})
+    for old_id in history.get("processed", []):
+        source_state.setdefault(old_id, {"next_clip": SHORTS_PER_SOURCE + 1, "complete": True})
+    last_source_id = history.get("last_source_id")
+
+    files = list_source_videos(drive, folder_id)
+    source_filter = os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip()
+    if source_filter:
+        raw_terms = [term.strip() for term in re.split(r"[,;]", source_filter) if term.strip()]
+        terms = [term.casefold() for term in raw_terms]
+        files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        if not files:
+            print("Requested artists were not in the configured inbox; searching accessible Drive files by filename.")
+            files = search_drive_target_videos(drive, raw_terms)
+            files = [item for item in files if any(term in item["name"].casefold() for term in terms)]
+        print(f"Manual source filter matched {len(files)} Drive video(s): " +
+              ", ".join(item["name"] for item in files))
+        required_order = [x.strip().upper() for x in os.getenv("FANCAMVERSE_REQUIRED_ARTISTS", "").split(",") if x.strip()]
+        if required_order:
+            found_artists = {identify_artist(item["name"])[0] for item in files}
+            missing = set(required_order) - found_artists
+            if missing:
+                raise RuntimeError(f"Missing requested source artist(s): {', '.join(sorted(missing))}.")
+            files = [next(item for item in files if identify_artist(item["name"])[0] == artist)
+                     for artist in required_order]
+    if not files:
+        print("No supported videos found in the FANCAMVERSE Drive inbox.")
+        return
+
+    # Keep all current source videos in a round-robin rotation.
+    start_at = 0
+    if last_source_id and not source_filter:
+        for i, item in enumerate(files):
+            if item["id"] == last_source_id:
+                start_at = (i + 1) % len(files)
+                break
+
+    batch_size = int(os.getenv("FANCAMVERSE_UPLOADS_PER_RUN", "3"))
+    output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
+    privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
+    if not output_only:
+        verify_upload_channel(youtube)
+
+    source_cache = {}
+    uploaded_count = 0
+    cursor = start_at
+
+    for batch_number in range(1, batch_size + 1):
+        selected = None
+        selected_index = None
+        selected_file_index = None
+
+        for offset in range(len(files)):
+            idx = (cursor + offset) % len(files)
+            item = files[idx]
+            state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
+            next_clip = int(state.get("next_clip", 1))
+            if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
+                selected = item
+                selected_index = next_clip
+                selected_file_index = idx
+                break
+
+        if selected is None:
+            print("No more unprocessed Shorts remain in the current Drive source videos.")
+            break
+
+        item = selected
+        cursor = (selected_file_index + 1) % len(files)
+        print(
+            f"Batch {batch_number}/{batch_size} | Round-robin source: "
+            f"{item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}"
+        )
+
+        if item["id"] not in source_cache:
+            source = download_video(drive, item)
+            duration = probe_duration(source, allow_short=bool(source_filter))
+            saved_clips = source_state.get(item["id"], {}).get("clips")
+            if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
+                clips = saved_clips
+                print("Using the saved five highlight windows for this source.")
+            else:
+                clips = analyze_highlights(source, duration, item["name"])
+            source_cache[item["id"]] = (source, clips)
+
+        source, clips = source_cache[item["id"]]
+        clip = clips[selected_index - 1]
+        artist_name, _, _ = identify_artist(item["name"])
+        # Use the artist name for unique artifact filenames. Korean Drive filenames
+        # are sanitized to the same fallback stem ("mp4"), which would overwrite
+        # the first artist's rendered file when both are processed in one run.
+        output_stem = artist_name or source.stem
+        rendered = render_clips(source, [clip], output_stem, index_offset=selected_index - 1,
+                                display_name=artist_name)
+        path, clip = rendered[0]
+        title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
+        print(
+            f"Selected Short {selected_index}: {clip['start']:.1f}-{clip['end']:.1f}s | {title}"
+        )
+
+        if output_only:
+            print(f"OUTPUT_ONLY: preview ready at {path}; upload skipped.")
+            # Preview mode does not consume a clip or advance rotation history.
             continue
 
         video_id = upload(youtube, path, title, description, tags, privacy)
