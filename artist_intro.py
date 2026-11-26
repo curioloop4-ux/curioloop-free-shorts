@@ -373,8 +373,11 @@ def profile(filename, target_hint=""):
     news_url=lead["url"];news_date=lead["published"] or None;news_source=lead["publisher"]
     news_outlets=sorted({x["publisher"] for x in cluster})[:8];news_article_count=article_count
     sentences=[f"The most widely covered recent story about {artist} concerns {news_title.rstrip('. ')}."]
-    sentences.append(f"Coverage from {outlet_count} independent outlets reports that {re.split(r'(?<=[.!?])\\s+',details[0])[0][:230]}")
-    if len(details)>1:sentences.append(f"Other reporting also noted that {re.split(r'(?<=[.!?])\\s+',details[1])[0][:190]}")
+     detail1=re.split(r"(?<=[.!?])\s+",details[0])[0][:230]
+     sentences.append(f"Coverage from {outlet_count} independent outlets reports that {detail1}")
+     if len(details)>1:
+      detail2=re.split(r"(?<=[.!?])\s+",details[1])[0][:190]
+      sentences.append(f"Other reporting also noted that {detail2}")
     news_explanation=" ".join(sentences);facts.append(news_explanation)
   print(f"News research: collected={len(articles)}; top_issue={news_title or 'omitted'}; articles={news_article_count}; independent_outlets={len(news_outlets)}.")
   narration=" ".join(facts)
