@@ -57,6 +57,7 @@ def profile(filename, target_hint=""):
  # Keep requests polite and sequential (at least one second between requests).
  from html.parser import HTMLParser
  def plain(s):
+  if not isinstance(s,str):return ""
   s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
   s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
   s=re.sub(r"\[\[([^\]]+)\]\]",r"\1",s)
