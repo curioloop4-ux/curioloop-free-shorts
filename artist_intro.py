@@ -633,7 +633,7 @@ def profile(filename, target_hint=""):
  return {
   "artist":artist,"group":group,"narration":narration,
   "title":f"{artist} | {group} Artist Spotlight"[:85],
-  "tags":[x for x in ["K-pop",group.replace(" ",""),artist.replace(" ",""),"Artist Spotlight"] if x],
+  "tags":[x for x in ["K-pop","Kpop",group.replace(" ",""),group,artist.replace(" ",""),artist,"Artist Spotlight","K-pop idol profile","K-pop member profile","K-pop Shorts","Korean idol","아이돌 프로필","걸그룹 멤버","Shorts"] if x],
   "sources":sources,
   "recent_news":{"title":news_title,"url":news_url,"date":news_date,"publisher":news_source,"explanation":news_explanation,"article_count":news_article_count,"outlets":news_outlets},
   "research_queries":[target]
