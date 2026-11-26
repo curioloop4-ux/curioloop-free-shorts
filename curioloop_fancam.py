@@ -602,6 +602,51 @@ def identify_artist(filename):
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
             "female idol", "Jennie performance", CHANNEL_BRAND, "Shorts"
         ]
+    if any(token in value for token in ("우기", "yuqi")):
+        return "YUQI", "(G)I-DLE", [
+            "Yuqi", "(G)I-DLE Yuqi", "Yuqi fancam", "(G)I-DLE fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("엘라", "ella")):
+        return "ELLA", "MEOVV", [
+            "Ella", "MEOVV Ella", "Ella fancam", "MEOVV fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("카즈하", "kazuha")):
+        return "KAZUHA", "LE SSERAFIM", [
+            "Kazuha", "LE SSERAFIM Kazuha", "Kazuha fancam", "LE SSERAFIM fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("해린", "haerin")):
+        return "HAERIN", "NewJeans", [
+            "Haerin", "NewJeans Haerin", "Haerin fancam", "NewJeans fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("리사", "lisa")):
+        return "LISA", "BLACKPINK", [
+            "Lisa", "BLACKPINK Lisa", "Lisa fancam", "BLACKPINK fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("낸시", "nancy")):
+        return "NANCY", "MOMOLAND", [
+            "Nancy", "MOMOLAND Nancy", "Nancy fancam", "MOMOLAND fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("이지", "lee ji", "leeji")):
+        return "이지", "ICHILLIN", [
+            "ICHILLIN", "Leeji", "ICHILLIN Leeji", "Leeji fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("쯔위", "tzuyu")):
+        return "TZUYU", "TWICE", [
+            "Tzuyu", "TWICE Tzuyu", "Tzuyu fancam", "TWICE fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("제니", "jennie")):
+        return "JENNIE", "BLACKPINK", [
+            "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+        ]
     if any(token in value for token in ("카리나", "karina")):
         return "KARINA", "aespa", [
             "Karina", "aespa Karina", "Karina fancam", "aespa fancam",
@@ -646,6 +691,11 @@ def generate_metadata(filename, hook, index):
     elif artist == "JENNIE":
         title = "BLACKPINK / JENNIE 🖤 | K-Pop Fancam #Shorts"
         description = ("JENNIE of BLACKPINK 🖤 Enjoy this fan-captured performance and "
+                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist in {"YUQI", "ELLA", "KAZUHA", "HAERIN", "LISA", "NANCY", "TZUYU", "JENNIE"}:
+        title = f"{group} / {artist} ✨ | K-Pop Fancam #Shorts"
+        description = (f"{artist} of {group} ✨ Enjoy this fan-captured performance and "
                        f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "KARINA":
