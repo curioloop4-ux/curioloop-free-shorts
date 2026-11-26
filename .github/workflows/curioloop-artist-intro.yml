@@ -6,7 +6,7 @@ on:
       artist:
         description: '한글 아티스트 이름으로 Drive 검색 및 자료 조사 (예: 장원영)'
         required: false
-        default: '장원영'
+        default: ''
         type: string
       public_once:
         description: '이번 수동 실행 영상만 공개로 업로드'
