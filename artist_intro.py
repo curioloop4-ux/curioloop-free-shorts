@@ -52,13 +52,19 @@ Title max 85 chars. tags array 4-8 strings."""
  p=json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
  if p.get("artist")=="Unknown Artist" or len(p.get("narration","").split())<45:raise RuntimeError("Could not confidently identify artist from Drive filename: "+filename)
  return p
-def render(src,p):
+def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
  if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
  audio=W/"voice.mp3";vtt=W/"voice.vtt"
  asyncio.run(edge_tts.Communicate(p["narration"],"en-US-JennyNeural",rate="+2%").save(str(audio),str(vtt)))
- still=W/"opening.jpg";t=min(5.,max(.5,source_len*.12))
+ # Select a different still-frame timestamp for repeat appearances of the same artist.
+ used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
+ choices=[max(0.5,min(source_len-0.5,source_len*x)) for x in (0.08,0.18,0.30,0.43,0.57,0.70,0.82,0.92)]
+ choices=[round(x,2) for x in choices]
+ t=next((x for x in choices if x not in used),choices[len(used)%len(choices)])
+ still=W/"opening.jpg"
  run(["ffmpeg","-y","-ss",f"{t:.2f}","-i",str(src),"-frames:v","1","-q:v","2",str(still)])
+ hist["pending_opening_frame"]={"artist":p["artist"].casefold(),"timestamp":t}
  start=max(0,(source_len-footage)/2);name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
@@ -79,9 +85,10 @@ def publish(yt,out,p,source):
  c=ch[0];title=c.get("snippet",{}).get("title","");expected=os.getenv("YOUTUBE_CHANNEL_ID","").strip()
  if expected and c["id"]!=expected:raise RuntimeError("YouTube channel ID mismatch")
  if not expected and not any(x in title.casefold() for x in ("curioloop","dailyneedle")):raise RuntimeError("Unexpected YouTube channel "+title)
- body={"snippet":{"title":p["title"][:100],"description":f"Meet {p['artist']} from {p['group']}.\nArtist introduction and performance highlight.\nSource: {source}\n#Kpop #ArtistSpotlight #Shorts","tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":"public","selfDeclaredMadeForKids":False}}
+ privacy="public" if os.getenv("INTRO_PUBLICATION_APPROVED","false").lower() in {"1","true","yes"} else "private"
+ body={"snippet":{"title":p["title"][:100],"description":f"Meet {p['artist']} from {p['group']}.\nArtist introduction and performance highlight.\nSource: {source}\n#Kpop #ArtistSpotlight #Shorts","tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
- print("PUBLIC UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"]
+ print(f"{privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"],privacy
 def main():
  drive,yt=services();folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
@@ -89,9 +96,11 @@ def main():
  candidates=[x for x in scan(drive,folder) if x["id"] not in done]
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  item=candidates[0];print("Selected Drive source:",item["name"])
- src=download(drive,item);p=profile(item["name"]);out=render(src,p)
- if os.getenv("INTRO_OUTPUT_ONLY","false").lower() in {"1","true","yes"}:print("PREVIEW ONLY",out);return
- vid=publish(yt,out,p,item["name"])
- h["processed"].append({"drive_file_id":item["id"],"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"published_at":datetime.now(timezone.utc).isoformat()})
+ src=download(drive,item);p=profile(item["name"]);out=render(src,p,h)
+ vid,privacy=publish(yt,out,p,item["name"])
+ pending=h.pop("pending_opening_frame",None)
+ if pending:
+  h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
+ h["processed"].append({"drive_file_id":item["id"],"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"published_at":datetime.now(timezone.utc).isoformat()})
  H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
 if __name__=="__main__":main()
