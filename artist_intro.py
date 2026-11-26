@@ -211,6 +211,20 @@ def profile(filename, target_hint=""):
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
+ def labeled_value(labels):
+  # NamuWiki profile tables commonly store a label and value in adjacent
+  # ||-separated cells. Also support simple "label: value" text.
+  for label in labels:
+   escaped=re.escape(label)
+   m=re.search(r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*([^|\\n]{1,100})",raw,re.I)
+   if m:
+    value=plain(m.group(1))
+    if value:return value[:100]
+   m=re.search(r"(?:^|\\n)\\s*"+escaped+r"\\s*[:：]\\s*([^|\\n]{1,100})",raw,re.I)
+   if m:
+    value=plain(m.group(1))
+    if value:return value[:100]
+  return None
  birth_year=None
  if birth:
   year_match=re.search(r"(19|20)\d{2}",birth)
