@@ -220,6 +220,54 @@ def profile(filename, target_hint=""):
  if not group:
   group="Group affiliation not confirmed"
   group_year=None
+ # Search the open web for profile evidence instead of relying on the NamuWiki
+ # mirror's markup alone. Search snippets and fetched source pages are both parsed.
+ profile_documents=[{"title":"NamuWiki: "+chosen,"url":(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe=""),"text":raw,"priority":0}]
+ profile_queries=[
+  f'"{target}" "{group}" 프로필 키 몸무게 생년월일'.replace('"Group affiliation not confirmed"',"").strip(),
+  f'"{target}" "{group}" 신체사이즈 취미 특기'.replace('"Group affiliation not confirmed"',"").strip(),
+  f'"{artist}" {group} height weight birthday profile'.replace("Group affiliation not confirmed","").strip(),
+  f'site:namu.wiki "{target}" 키 몸무게 생년월일'
+ ]
+ class ProfilePageText(HTMLParser):
+  def __init__(self):
+   super().__init__();self.parts=[];self.meta=[];self.skip=0
+  def handle_starttag(self,tag,attrs):
+   a=dict(attrs)
+   if tag in ("script","style","noscript"):self.skip+=1
+   if tag=="meta" and (a.get("name","").casefold()=="description" or a.get("property","").casefold() in ("og:description","twitter:description")) and a.get("content"):self.meta.append(a["content"])
+  def handle_endtag(self,tag):
+   if tag in ("script","style","noscript") and self.skip:self.skip-=1
+  def handle_data(self,data):
+   if not self.skip and data.strip():self.parts.append(data.strip())
+ for query in profile_queries:
+  try:
+   search=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=18)
+   search.raise_for_status()
+   for node in ET.fromstring(search.content).findall(".//item"):
+    title=plain(node.findtext("title") or "")
+    url=(node.findtext("link") or "").strip()
+    snippet=plain(node.findtext("description") or "")
+    if not url.startswith("http") or not (target.casefold() in (title+" "+snippet).casefold() or artist.casefold() in (title+" "+snippet).casefold()):continue
+    if any(x["url"]==url for x in profile_documents):continue
+    document={"title":title[:180],"url":url,"text":snippet,"priority":2}
+    try:
+     page=session.get(url,timeout=14,headers={"User-Agent":"Mozilla/5.0"})
+     if page.ok and "html" in page.headers.get("content-type","").casefold():
+      parser=ProfilePageText();parser.feed(page.text[:500000])
+      page_text=plain(" ".join(parser.meta+parser.parts))
+      if len(page_text)>100:document["text"]=page_text[:30000]
+      domain=urlparse(url).netloc.casefold()
+      if any(x in domain for x in ("smtown.com","official","weverse.io")):document["priority"]=1
+    except Exception as e:print("Profile source fetch unavailable:",url,type(e).__name__)
+    profile_documents.append(document)
+    if len(profile_documents)>=13:break
+  except Exception as e:print("Profile web search unavailable:",type(e).__name__)
+  time.sleep(0.6)
+ # Keep a compact audit trail; the individual values are extracted below
+ # only when the source explicitly labels the relevant attribute.
+ web_facts=[{"title":x["title"],"url":x["url"]} for x in profile_documents[1:] if x.get("title") and x.get("url")]
+ print("Profile web research: queries=",len(profile_queries),"; source_pages=",len(profile_documents)-1)
  # Extract birth date only when it appears next to a biographical label.
  birth=None
  birth_patterns=[
@@ -246,7 +294,8 @@ def profile(filename, target_hint=""):
       match=re.search(unit_pattern,candidate,re.I)
       if match:
        return re.sub(r"\s+","",match.group(0))
-  for source in (raw,readable):
+  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
+   source=document["text"]
    for label in labels:
     escaped=re.escape(label)
     patterns=[
@@ -326,16 +375,7 @@ def profile(filename, target_hint=""):
   key=(title.casefold(),(publisher or "").casefold())
   if any((a["title"].casefold(),a["publisher"].casefold())==key for a in articles):return
   articles.append({"title":title[:220],"description":description[:600],"url":url,"publisher":publisher or "Unknown outlet","published":published or "","language":language})
- # Keep profile/interview research sources separate from spoken news.
- for query in [f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',"").strip(),f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',"").strip()]:
-  try:
-   rr=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=18);rr.raise_for_status()
-   for node in ET.fromstring(rr.content).findall(".//item"):
-    title=plain(node.findtext("title") or "");url=(node.findtext("link") or "").strip();desc=plain(node.findtext("description") or "")
-    if title and url and relevant(title,desc) and not any(x["url"]==url for x in web_facts):web_facts.append({"title":title[:180],"url":url})
-    if len(web_facts)>=6:break
-  except Exception as e:print("Profile web search unavailable:",type(e).__name__)
-  time.sleep(0.7)
+ # Profile links were collected and page text parsed above.
  # Search several distinct news angles in Korean and English. The wider
  # query set prevents a single narrow headline search from deciding the topic.
  group_query="" if group=="Group affiliation not confirmed" else group
