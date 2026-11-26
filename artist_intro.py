@@ -907,7 +907,9 @@ def publish(yt,out,p,source):
  print("One-time public approval:", "enabled" if approved_once else "disabled")
  research_links="\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
  description=f"Meet {p['artist']} from {p['group']}.\nArtist profile, career highlights, and recent update.\nOriginal footage source: {source}\nResearch sources:\n{research_links}\n#Kpop #ArtistSpotlight #Shorts"
- body={"snippet":{"title":p["title"][:100],"description":description[:4900],"tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
+ upload_stamp=datetime.now().strftime("%m%d-%H%M%S")
+ unique_title=f"{p['title']} | {upload_stamp}"[:100]
+ body={"snippet":{"title":unique_title,"description":description[:4900],"tags":[x for x in p.get("tags",[]) if "curioloop" not in str(x).casefold()]+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
  print(f"{privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"],privacy
 def main():
