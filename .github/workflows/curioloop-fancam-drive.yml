@@ -23,10 +23,10 @@ on:
           - public
         default: private
       source_filter:
-        description: "Optional filename filter (e.g. 카리나,닝닝,장원영,나띠)"
+        description: "Manual run: select Chaeryeong first; clear this field for automatic rotation"
         required: false
         type: string
-        default: ""
+        default: "채령"
       uploads_per_run:
         description: "Number of Shorts to process"
         required: true
