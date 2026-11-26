@@ -2,7 +2,7 @@ name: CurioLoop Fancam Drive Upload
 
 on:
   schedule:
-    # GitHub cron is UTC. Run 60 minutes before each Korea publication slot.
+    # GitHub cron is UTC. Staggered triggers run 31–82 minutes before each Korea publication slot.
     # KST publication slots: 01:00, 02:15, 03:30, 04:45, 06:00,
     # then every 2 hours from 08:00 through 00:00 (14 uploads daily).
     # Stagger away from :00 UTC to reduce GitHub schedule congestion.
