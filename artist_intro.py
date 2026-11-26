@@ -220,6 +220,8 @@ def profile(filename, target_hint=""):
  if not group:
   group="Group affiliation not confirmed"
   group_year=None
+ from xml.etree import ElementTree as ET
+ from urllib.parse import urlparse
  # Search the open web for profile evidence instead of relying on the NamuWiki
  # mirror's markup alone. Search snippets and fetched source pages are both parsed.
  profile_documents=[{"title":"NamuWiki: "+chosen,"url":(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe=""),"text":raw,"priority":0}]
@@ -274,9 +276,11 @@ def profile(filename, target_hint=""):
   r"(?:생년월일|출생일|출생)\s*(?:\|\|?|:|：|：)?\s*[^|]{0,100}?(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)",
   r"(?:생년월일|출생일|출생)[^0-9]{0,80}(\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"
  ]
- for pattern in birth_patterns:
-  m=re.search(pattern,raw,re.I)
-  if m:birth=re.sub(r"\s+","",m.group(1));break
+ for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
+  for pattern in birth_patterns:
+   m=re.search(pattern,document["text"],re.I)
+   if m:birth=re.sub(r"\\s+","",m.group(1));break
+  if birth:break
  if birth and re.fullmatch(r"\d{4}\.\d{1,2}\.\d{1,2}",birth):
   birth=birth.replace(".","-")
  # Extract physical profile data and personal characteristics only when explicitly labelled.
@@ -313,18 +317,19 @@ def profile(filename, target_hint=""):
  waist=labelled_number(["허리둘레","허리 사이즈","허리"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈"],r"\d{2}(?:\.5)?\s*(?:mm|cm)")
  def labeled_value(labels):
-  # NamuWiki profile tables commonly store a label and value in adjacent
-  # ||-separated cells. Also support simple "label: value" text.
-  for label in labels:
-   escaped=re.escape(label)
-   m=re.search(r"(?:^|\|\|)\s*"+escaped+r"\s*\|\|\s*([^|\n]{1,100})",raw,re.I)
-   if m:
-    value=plain(m.group(1))
-    if value:return value[:100]
-   m=re.search(r"(?:^|\n)\s*"+escaped+r"\s*[:：]\s*([^|\n]{1,100})",raw,re.I)
-   if m:
-    value=plain(m.group(1))
-    if value:return value[:100]
+  # Read explicitly labelled values from NamuWiki and discovered profile pages.
+  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
+   source=document["text"]
+   for label in labels:
+    escaped=re.escape(label)
+    m=re.search(r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*([^|\\n]{1,100})",source,re.I)
+    if m:
+     value=plain(m.group(1))
+     if value:return value[:100]
+    m=re.search(r"(?:^|\\n)\\s*"+escaped+r"\\s*[:：]\\s*([^|\\n]{1,100})",source,re.I)
+    if m:
+     value=plain(m.group(1))
+     if value:return value[:100]
   return None
  birth_year=None
  if birth:
@@ -340,7 +345,7 @@ def profile(filename, target_hint=""):
  from urllib.parse import urlparse
  news_title=None;news_url=None;news_date=None;news_source=None
  news_explanation=None;news_outlets=[];news_article_count=0
- web_facts=[];articles=[]
+ articles=[]
  facts=[f"Meet {artist}, a K-pop artist."]
  if group!="Group affiliation not confirmed":
   facts.append(f"{artist} is a member of {group}.")
