@@ -1,4 +1,4 @@
-name: CurioLoop Hybrid Analysis Preview
+name: CurioLoop Artist Spotlight Preview
 
 on:
   workflow_dispatch:
@@ -32,7 +32,7 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Create one hybrid analysis Short from Google Drive
+      - name: Create one artist spotlight Short from Google Drive
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.8-flash
@@ -46,7 +46,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: curioloop-hybrid-analysis-preview
+          name: curioloop-artist-spotlight-preview
           path: hybrid_preview/
           if-no-files-found: error
           retention-days: 7
