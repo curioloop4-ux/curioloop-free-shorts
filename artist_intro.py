@@ -414,7 +414,7 @@ def render(src,p,hist):
   print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
   print("Subtitle preview:",subtitle[:400].replace("\n"," | "))
  asyncio.run(make_voice_and_subtitles())
- # Runtime follows spoken content: title + narration + short musical ending.
+ # Runtime follows spoken content: title + narration + brief ending.
  voice_seconds=dur(audio)
  length=min(36.0,max(10.0,intro+voice_seconds+1.5))
  footage=length-intro
