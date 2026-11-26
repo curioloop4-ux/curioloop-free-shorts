@@ -529,6 +529,31 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                            stroke_width=2, stroke_fill=(0, 0, 0, 255))
         name_overlay.save(name_path)
 
+        # Elegant end-card CTA: ask viewers to choose the next idol and subscribe.
+        cta_path = WORK / f"cta_overlay_{index}.png"
+        cta = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
+        cta_draw = ImageDraw.Draw(cta)
+        cta_font = ImageFont.truetype(fontfile, 38)
+        cta_bold = ImageFont.truetype(fontfile, 46)
+        panel = (58, 1325, 1022, 1695)
+        cta_draw.rounded_rectangle(panel, radius=38, fill=(12, 17, 34, 224),
+                                   outline=(255, 255, 255, 95), width=3)
+        cta_draw.rounded_rectangle((94, 1358, 986, 1370), radius=6,
+                                   fill=(90, 220, 255, 245))
+        def centered_cta(text, y, font, fill):
+            box = cta_draw.textbbox((0, 0), text, font=font)
+            cta_draw.text(((output_w - (box[2] - box[0])) / 2, y), text,
+                          font=font, fill=fill)
+        centered_cta("WHO SHOULD WE FEATURE NEXT?", 1400, cta_font,
+                     (205, 220, 255, 255))
+        centered_cta("COMMENT YOUR PICK", 1460, cta_bold,
+                     (255, 255, 255, 255))
+        centered_cta("SUBSCRIBE FOR MORE K-POP", 1538, cta_font,
+                     (110, 225, 255, 255))
+        centered_cta("NEW K-POP SHORTS EVERY DAY", 1610,
+                     ImageFont.truetype(fontfile, 23), (185, 195, 215, 255))
+        cta.save(cta_path)
+
         # Convert every source orientation to a full-frame 9:15 Short.
         # Landscape sources are cropped symmetrically from the exact horizontal
         # center; portrait sources naturally have no horizontal excess after scaling.
@@ -540,11 +565,14 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
             f"[1:v]format=rgba[name];"
             f"[2:v]format=rgba[intro];"
             f"[base][name]overlay=0:0[namebase];"
-            f"[namebase][intro]overlay=0:0:enable='between(t,0,2.7)'[v]"
+            f"[namebase][intro]overlay=0:0:enable='between(t,0,2.7)'[withintro];"
+            f"[3:v]format=rgba,fade=t=in:st={max(0.0, clip['end'] - clip['start'] - 3.0):.3f}:d=0.4:alpha=1[cta];"
+            f"[withintro][cta]overlay=0:0:enable='between(t,{max(0.0, clip['end'] - clip['start'] - 3.0):.3f},{clip['end'] - clip['start']:.3f})'[v]"
         )
         run(["ffmpeg", "-y", "-ss", f"{clip['start']:.3f}", "-i", str(source),
             "-loop", "1", "-i", str(name_path),
             "-loop", "1", "-i", str(intro_path),
+            "-loop", "1", "-i", str(cta_path),
             "-t", f"{clip['end'] - clip['start']:.3f}",
             "-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
             "-c:v", "libx264", "-preset", "slow", "-crf", "16",
