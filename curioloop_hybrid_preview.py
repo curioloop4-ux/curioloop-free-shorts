@@ -7,6 +7,8 @@ import re
 import subprocess
 import time
 from pathlib import Path
+from html.parser import HTMLParser
+from urllib.parse import urljoin, urlparse
 
 import edge_tts
 import requests
@@ -168,58 +170,130 @@ def gemini_generate_with_fallback(primary_model, api_key, payload, timeout, task
     raise last_error
 
 def analyze(path, filename, total, sheet):
-    prompt = f"""Create an original, fact-grounded 30-second English K-pop performance analysis Short.
-Source filename: {filename!r}. Source duration: {total:.1f} seconds.
-Inspect the attached contact sheet. Do not infer an artist, group, song, event, or venue unless the filename or frames make it unambiguous.
-Select one visually clear, continuous clip 22 to 26 seconds long, fully within the source.
-Write original commentary that analyzes only observable performance elements (movement, timing, expression, stage presence, camera framing); avoid unsupported biography or superlatives.
-Return JSON only:
-{{"start":10.0,"end":34.0,"title":"Why This Performance Moment Works","hook":"LOOK AT THE TIMING","analysis":"40 to 50 word original voiceover script in natural English","summary":"A concise 8 to 12 word visual takeaway"}}
-No markdown. The analysis must be meaningful commentary, not a description of the footage alone."""
+    prompt = f"""Create a 30-second English K-pop ARTIST PROFILE Short, not a performance critique.
+Source filename: {filename!r}; source duration: {total:.1f}s.
+Inspect the contact sheet to identify the performer. Return JSON only with:
+{{"start":10.0,"end":15.0,"artist":"Ningning","group":"aespa","title":"Meet Ningning","hook":"MEET NINGNING","facts":[{{"label":"GROUP","value":"aespa"}},{{"label":"DEBUT","value":"2020"}},{{"label":"ROLE","value":"Vocalist"}}],"narration":"A natural 45-55 word English introduction based only on reliable, verifiable public facts.","profile_url":"https://official-agency-profile-page"}}
+Choose a compelling 4-6 second continuous highlight. Identify only when the filename or frames support it. Do not invent birth dates, roles, awards or biography. Facts must be independently verifiable from the artist's official agency profile or official group website. profile_url must be an official agency or artist website URL, not Wikipedia, fan sites, social aggregators or news sites. If identity or facts cannot be verified, return empty facts and empty profile_url and state only what is observable. No markdown."""
     payload={"contents":[{"parts":[{"text":prompt},{"inline_data":{"mime_type":"image/jpeg",
              "data":base64.b64encode(sheet.read_bytes()).decode("ascii")}}]}],
-             "generationConfig":{"temperature":0.25,"responseMimeType":"application/json"}}
+             "generationConfig":{"temperature":0.15,"responseMimeType":"application/json"}}
     model=os.getenv("GEMINI_MODEL","gemini-3.8-flash")
-    response=gemini_generate_with_fallback(
-        model, required("GEMINI_API_KEY"), payload, 180, "hybrid performance analysis"
-    )
+    response=gemini_generate_with_fallback(model,required("GEMINI_API_KEY"),payload,180,"artist profile research")
     data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
     start,end=float(data["start"]),float(data["end"])
-    if start < 0 or end > total or not 22 <= end-start <= 26:
-        raise RuntimeError(f"Gemini selected invalid clip window: {start:.1f}-{end:.1f}s")
-    words=len(str(data["analysis"]).split())
-    if not 35 <= words <= 55:
-        raise RuntimeError(f"Analysis narration length is invalid ({words} words).")
+    if start < 0 or end > total or not 4 <= end-start <= 6:
+        raise RuntimeError(f"Gemini selected invalid highlight: {start:.1f}-{end:.1f}s")
+    data["facts"]=[x for x in data.get("facts",[]) if isinstance(x,dict) and x.get("label") and x.get("value")][:3]
+    data["narration"]=str(data.get("narration","")).strip()
+    if len(data["narration"].split()) < 35:
+        raise RuntimeError("Artist introduction narration is too short or could not be verified.")
     return data
+
+class ImageMetaParser(HTMLParser):
+    def __init__(self):
+        super().__init__(); self.images=[]
+    def handle_starttag(self, tag, attrs):
+        a=dict(attrs)
+        if tag=="meta" and a.get("property") in ("og:image","og:image:secure_url") or tag=="meta" and a.get("name")=="twitter:image":
+            if a.get("content"): self.images.append(a["content"])
+        if tag=="img" and a.get("src"):
+            alt=(a.get("alt") or "").lower()
+            if any(k in alt for k in ("profile","artist","ningning","aespa","portrait")):
+                self.images.append(a["src"])
+
+def official_portrait(profile_url):
+    if not profile_url: return None
+    host=urlparse(profile_url).hostname or ""
+    allowed=("smtown.com","aespa.com","jype.com","ygfamily.com","yg-entertainment.com","hybecorp.com","weverse.io","starship-ent.com","cubeent.co.kr","kqent.com","pledis.co.kr","beliftlab.com")
+    if not any(host==d or host.endswith("."+d) for d in allowed):
+        print(f"Official profile URL rejected (untrusted domain): {host}")
+        return None
+    try:
+        page=requests.get(profile_url,timeout=25,headers={"User-Agent":"Mozilla/5.0"})
+        page.raise_for_status()
+        parser=ImageMetaParser(); parser.feed(page.text)
+        for candidate in parser.images:
+            image_url=urljoin(profile_url,candidate)
+            if urlparse(image_url).scheme not in ("http","https"): continue
+            img=requests.get(image_url,timeout=25,headers={"User-Agent":"Mozilla/5.0"})
+            img.raise_for_status()
+            if not img.headers.get("Content-Type","").startswith("image/"): continue
+            target=WORK/"official_artist_photo.jpg"
+            target.write_bytes(img.content)
+            with Image.open(target) as im:
+                im.verify()
+            print(f"OFFICIAL_PHOTO_SOURCE={profile_url}")
+            return target
+    except Exception as exc:
+        print(f"Official portrait unavailable; continuing without it: {exc}")
+    return None
 
 def make_overlay(data, out):
     w,h=1080,1920
-    image=Image.new("RGBA",(w,h),(0,0,0,0))
+    image=Image.new("RGBA",(w,h),(8,10,18,255))
     draw=ImageDraw.Draw(image)
-    title_font=ImageFont.truetype(FONT,52)
-    label_font=ImageFont.truetype(FONT,30)
-    body_font=ImageFont.truetype(FONT,38)
-    draw.rounded_rectangle((54,170,1026,310),radius=28,fill=(0,0,0,175))
-    title=str(data["hook"]).upper()[:42]
-    draw.text((86,210),title,font=title_font,fill="white",stroke_width=2,stroke_fill="black")
-    draw.rounded_rectangle((54,1430,1026,1755),radius=30,fill=(0,0,0,190))
-    draw.text((90,1470),"CURIOLOOP  /  PERFORMANCE BREAKDOWN",font=label_font,fill=(255,220,120))
-    summary=str(data["summary"])
-    words=summary.split()
-    lines=[]
-    line=""
-    for word in words:
-        candidate=(line+" "+word).strip()
-        if draw.textbbox((0,0),candidate,font=body_font)[2] > 850:
-            lines.append(line); line=word
-        else:
-            line=candidate
-    if line: lines.append(line)
-    y=1540
-    for line in lines[:3]:
-        draw.text((90,y),line,font=body_font,fill="white",stroke_width=1,stroke_fill="black")
-        y+=62
+    title_font=ImageFont.truetype(FONT,66)
+    label_font=ImageFont.truetype(FONT,34)
+    body_font=ImageFont.truetype(FONT,48)
+    small=ImageFont.truetype(FONT,30)
+    draw.rounded_rectangle((55,150,1025,340),radius=30,fill=(0,0,0,190))
+    draw.text((90,205),str(data.get("hook","MEET THE ARTIST")).upper()[:32],font=title_font,fill="white")
+    draw.text((85,1160),str(data.get("artist","ARTIST")),font=title_font,fill="white")
+    draw.text((88,1250),str(data.get("group","")).upper(),font=label_font,fill=(255,220,120))
+    y=1350
+    for fact in data.get("facts",[])[:3]:
+        draw.text((90,y),f"{str(fact['label']).upper()}: {fact['value']}"[:38],font=body_font,fill="white")
+        y+=105
+    draw.text((88,1780),"CURIOLOOP  /  ARTIST SPOTLIGHT",font=small,fill=(255,220,120))
     image.save(out)
+
+def render(source, data, portrait, output):
+    overlay=WORK/"artist_overlay.png"
+    voice=WORK/"artist_voice.mp3"
+    make_overlay(data,overlay)
+    asyncio.run(make_voice(data["narration"],voice))
+    voice_duration=duration(voice)
+    if voice_duration > 28:
+        raise RuntimeError(f"Artist narration too long ({voice_duration:.1f}s); keep it under 28 seconds.")
+    highlight=WORK/"highlight.mp4"
+    photo_video=WORK/"profile_segment.mp4"
+    photo=WORK/"portrait_background.jpg"
+    if portrait:
+        with Image.open(portrait) as im:
+            im=im.convert("RGB")
+            iw,ih=im.size
+            scale=max(1080/iw,1920/ih)
+            im=im.resize((int(iw*scale),int(ih*scale)))
+            left=(im.width-1080)//2; top=(im.height-1920)//2
+            im=im.crop((left,top,left+1080,top+1920))
+            im.save(photo,quality=92)
+    else:
+        # Branded fallback: gradient-like dark background, no unlicensed substitute image.
+        Image.new("RGB",(1080,1920),(15,20,35)).save(photo)
+    start=float(data["start"]); end=float(data["end"])
+    run(["ffmpeg","-y","-ss",f"{start:.3f}","-i",str(source),"-t",f"{end-start:.2f}",
+         "-vf","scale=1080:1920:force_original_aspect_ratio=increase,crop=1080:1920,setsar=1",
+         "-an","-c:v","libx264","-preset","veryfast","-crf","18","-pix_fmt","yuv420p",str(highlight)])
+    run(["ffmpeg","-y","-loop","1","-i",str(photo),"-loop","1","-i",str(overlay),
+         "-t","24","-filter_complex","[0:v]scale=1080:1920,setsar=1[bg];[1:v]format=rgba[ov];[bg][ov]overlay=0:0[v]",
+         "-map","[v]","-an","-c:v","libx264","-preset","veryfast","-crf","18","-pix_fmt","yuv420p",str(photo_video)])
+    concat=WORK/"segments.txt"
+    concat.write_text(f"file '{highlight.resolve()}'\nfile '{photo_video.resolve()}'\n",encoding="utf-8")
+    silent=WORK/"silent.mp4"
+    run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat),"-c","copy",str(silent)])
+    run(["ffmpeg","-y","-i",str(silent),"-i",str(voice),"-filter_complex",
+         "[1:a]adelay=1200|1200,apad=pad_dur=30,volume=1.0[a]",
+         "-map","0:v","-map","[a]","-t","30","-c:v","copy","-c:a","aac","-b:a","192k",
+         "-movflags","+faststart",str(output)])
+    probe=json.loads(run(["ffprobe","-v","error","-show_entries","stream=width,height","-of","json",str(output)]).stdout)
+    stream=probe["streams"][0]
+    if (stream["width"],stream["height"])!=(1080,1920): raise RuntimeError("Output is not 1080x1920.")
+    print(f"PREVIEW_READY={output}")
+    print(f"TITLE={data.get('title','Artist Spotlight')}")
+    print(f"ARTIST={data.get('artist','Unknown')}")
+    print(f"OFFICIAL_PHOTO={'yes' if portrait else 'no - branded fallback used'}")
+    print(f"NARRATION={data['narration']}")
 
 async def make_voice(text, path):
     communicate=edge_tts.Communicate(text,"en-US-AriaNeural",rate="+4%",volume="+0%")
@@ -263,24 +337,25 @@ def main():
     drive=services()
     folder=required("FANCAMVERSE_DRIVE_FOLDER_ID")
     videos=list_videos(drive,folder)
-    if not videos:
-        raise RuntimeError("No eligible Drive source videos found (Chaewon is excluded).")
+    if not videos: raise RuntimeError("No eligible Drive source videos found (Chaewon is excluded).")
     item=random.choice(videos)
     print(f"Selected source: {item['name']}")
     source=download(drive,item)
     total=duration(source)
-    if total < 30:
-        raise RuntimeError("Selected source is too short for the hybrid analysis preview.")
+    if total<30: raise RuntimeError("Selected source is too short.")
     sheet=contact_sheet(source,total)
     data=analyze(source,item["name"],total,sheet)
-    output=WORK/"curioloop_hybrid_analysis_preview.mp4"
-    render(source,data,output)
+    portrait=official_portrait(data.get("profile_url",""))
+    output=WORK/"curioloop_artist_spotlight_preview.mp4"
+    render(source,data,portrait,output)
+    description=(f"Meet {data.get('artist','this artist')} from {data.get('group','the group')}. "
+                 "Artist information is presented as an editorial spotlight. Follow CurioLoop for more.")
     (WORK/"metadata.txt").write_text(
-        f"Title: {data['title']}\n\nDescription: Original performance commentary and analysis.\n"
-        f"Subscribe for more K-pop performance breakdowns.\n\n"
-        f"Pinned comment: Which performance detail stood out to you?\n",
-        encoding="utf-8")
+        f"Title: {data.get('title','Artist Spotlight')}\n\nDescription: {description}\n\n"
+        "Pinned comment: Which artist should we feature next?\n"
+        f"Official profile source: {data.get('profile_url','Not verified')}\n",encoding="utf-8")
     print(f"SOURCE={item['name']}")
+
 
 if __name__=="__main__":
     main()
