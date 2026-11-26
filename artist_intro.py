@@ -435,7 +435,7 @@ def main():
  else:
   candidates=[x for x in candidates if identifiable(x)]
   print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
-  if not candidates:raise RuntimeError("No unprocessed Drive video has both a recognized artist and group name; skipped all ambiguous sources.")
+  if not candidates:raise RuntimeError("No unprocessed Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
   import random
   random.shuffle(candidates)
  # Do not skip a recognized artist because some profile fields are unavailable.
@@ -445,7 +445,7 @@ def main():
  print("Selected Drive source:",item["name"])
  src=download(drive,item)
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
- research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
+ research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Verified research saved:",research_path.name)
  out=render(src,p,h)
  vid,privacy=publish(yt,out,p,item["name"])
