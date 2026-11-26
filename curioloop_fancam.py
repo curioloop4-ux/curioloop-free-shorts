@@ -374,6 +374,14 @@ def parse_gemini_json(response, task_name):
     raise RuntimeError(f"Gemini {task_name} returned malformed JSON: {preview}")
 
 
+def is_standard_sakura_source(filename):
+    """Target only the regular Sakura source, not a separately labeled B version."""
+    name = Path(filename).stem.casefold()
+    is_sakura = "사쿠라" in name or "sakura" in name
+    is_b_version = bool(re.search(r"(?:^|[\\s_\\-\\[(])(?:ver(?:sion)?[\\s_\\-]*)?b(?:$|[\\s_\\-\\])])", name))
+    return is_sakura and not is_b_version
+
+
 def analyze_highlights(source, duration, filename):
     target_count = target_clips_for_duration(duration)
     # Full-source mode is opt-in; artist filtering alone still runs highlight analysis.
@@ -391,10 +399,10 @@ def analyze_highlights(source, duration, filename):
 Source filename: {filename}
 Full duration: {duration:.1f} seconds. The opening/intro before {first_allowed:.1f}s must be excluded.
 The attached contact sheets show sampled frames with their exact source timestamps.
+If and only if this filename is the regular Sakura (SAKURA/사쿠라) source and is not a B-version, prioritize the source segment from 67 to 72 seconds (1:07-1:12): at least one selected 25-26 second clip must contain that entire five-second segment, provided the source is long enough and the segment is valid. Do not apply this timing preference to any other artist or to Sakura B-version.
 Choose exactly {target_count} DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
 sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
 Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
-When the source is at least 80 seconds long, make one of the selected windows include the 67-72 second section (1:07-1:12), if that section contains a visually compelling performance moment. This is a priority region, not a 5-second clip by itself.
 Each window must be {MIN_SHORT_SECONDS} to {MAX_SHORT_SECONDS} seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
 Use the timestamps on the images to estimate boundaries. Return JSON only:
 {{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
@@ -424,6 +432,19 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
         if start >= first_allowed and end <= duration and MIN_SHORT_SECONDS <= length <= MAX_SHORT_SECONDS:
             valid.append({"start": start, "end": end,
                 "hook": re.sub(r"[^A-Za-z0-9 '!?-]", "", str(clip.get("hook", "A Must-Watch Stage Moment")))[:55]})
+    if is_standard_sakura_source(filename) and duration >= 72:
+        target_window_clips = [
+            clip for clip in valid
+            if clip["start"] <= 67.0 and clip["end"] >= 72.0
+        ]
+        if not target_window_clips:
+            print("Regular Sakura source: AI did not return a clip containing 1:07-1:12; using a 25-second window anchored on that segment.")
+            start = min(60.0, max(0.0, duration - MIN_SHORT_SECONDS))
+            valid.append({
+                "start": start,
+                "end": start + MIN_SHORT_SECONDS,
+                "hook": "Sakura Performance Highlight"
+            })
     valid.sort(key=lambda x: x["start"])
     distinct = []
     for clip in valid:
@@ -737,6 +758,14 @@ def main():
 
         used_indices = set(int(x) for x in state.get("used_clip_indices", []))
         available_indices = [i for i in range(1, len(clips) + 1) if i not in used_indices]
+        if is_standard_sakura_source(item["name"]):
+            sakura_priority = [
+                i for i in available_indices
+                if clips[i - 1]["start"] <= 67.0 and clips[i - 1]["end"] >= 72.0
+            ]
+            if sakura_priority:
+                available_indices = sakura_priority
+                print("Regular Sakura source: prioritizing the highlight containing 1:07-1:12.")
         if not available_indices:
             print(f"All highlight windows already used for {item['name']}; skipping this source.")
             source_state[item["id"]] = {**state, "name": item["name"], "complete": True}
