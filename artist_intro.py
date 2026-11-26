@@ -233,7 +233,9 @@ def profile(filename, target_hint=""):
   f'"{target}" "{group}" 프로필 키 몸무게 생년월일'.replace('"Group affiliation not confirmed"',"").strip(),
   f'"{target}" "{group}" 신체사이즈 취미 특기'.replace('"Group affiliation not confirmed"',"").strip(),
   f'"{artist}" {group} height weight birthday profile'.replace("Group affiliation not confirmed","").strip(),
-  f'site:namu.wiki "{target}" 키 몸무게 생년월일'
+  f'site:namu.wiki "{target}" 키 몸무게 생년월일',
+  f'"{target}" {group} 신발사이즈 발사이즈 허리둘레 가슴둘레 엉덩이둘레',
+  f'"{artist}" {group} shoe size foot size bust chest waist hips body measurements'
  ]
  class ProfilePageText(HTMLParser):
   def __init__(self):
@@ -318,8 +320,10 @@ def profile(filename, target_hint=""):
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
- waist=labelled_number(["허리둘레","허리 사이즈","허리"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
- shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈"],r"\d{2}(?:\.5)?\s*(?:mm|cm)")
+ bust=labelled_number(["가슴둘레","가슴 둘레","가슴 사이즈","가슴사이즈","흉부둘레","bust","chest circumference"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+ waist=labelled_number(["허리둘레","허리 사이즈","허리사이즈","waist circumference"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+ hips=labelled_number(["엉덩이둘레","엉덩이 둘레","힙둘레","힙 사이즈","hip circumference"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+ shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈","신발사이즈","shoe size","foot size"],r"\d{2,3}(?:\.5)?\s*(?:mm|cm)")
  def labeled_value(labels):
   # Read explicitly labelled values from NamuWiki and discovered profile pages.
   for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
@@ -340,6 +344,7 @@ def profile(filename, target_hint=""):
   year_match=re.search(r"(19|20)\d{2}",birth)
   if year_match:birth_year=year_match.group(0)
  body_size=labeled_value(["신체사이즈","신체 사이즈","쓰리사이즈","3사이즈","쓰리 사이즈"])
+ cup_size=labeled_value(["컵사이즈","컵 사이즈","브라사이즈","브라 사이즈","cup size","bra size"])
  position=labeled_value(["포지션","담당 포지션","보컬 포지션"])
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
@@ -347,7 +352,7 @@ def profile(filename, target_hint=""):
  print("PROFILE RESEARCH RESULT")
  print("Artist:",artist,"| Group:",group)
  print("Birth:",birth or "not verified","| Height:",height or "not verified","| Weight:",weight or "not verified")
- print("Body measurements:",body_size or "not verified","| Waist:",waist or "not verified","| Shoe size:",shoe_size or "not verified")
+ print("Body measurements:",body_size or "not verified","| Bust:",bust or "not verified","| Waist:",waist or "not verified","| Hips:",hips or "not verified","| Cup size:",cup_size or "not verified","| Shoe size:",shoe_size or "not verified")
  print("Position:",position or "not verified","| Nickname:",nickname or "not verified","| Hobby:",hobby or "not verified")
  print("Profile sources:")
  for source in profile_documents[:8]:print("-",source.get("title","Profile source"),source.get("url",""))
@@ -364,7 +369,10 @@ def profile(filename, target_hint=""):
  if birth_year:facts.append(f"Born in {birth_year}.")
  if height:facts.append(f"She is {height} tall.")
  if weight:facts.append(f"Her listed weight is {weight}.")
+ if bust:facts.append(f"Her publicly listed bust measurement is {bust}.")
  if waist:facts.append(f"Her listed waist measurement is {waist}.")
+ if hips:facts.append(f"Her listed hip measurement is {hips}.")
+ if cup_size:facts.append(f"Her listed bra or cup size is {cup_size}.")
  if shoe_size:facts.append(f"Her listed shoe size is {shoe_size}.")
  if body_size:facts.append(f"The listed body measurements are {body_size}.")
  if position:facts.append(f"Her position in the group is {position}.")
@@ -373,7 +381,13 @@ def profile(filename, target_hint=""):
  if personality:facts.append(f"Her profile describes her as {personality}.")
  def relevant(title,description):
   blob=(title+" "+description).casefold()
-  return any(x and x.casefold() in blob for x in (target,artist))
+  # Reject obvious same-name collisions before accepting a news result.
+  if re.search(r"lisa leslie|lisa leslie award|leslie award",blob):return False
+  name_match=any(x and re.search(r"(?<![a-z0-9])"+re.escape(x.casefold())+r"(?![a-z0-9])",blob) for x in (target,artist))
+  if not name_match:return False
+  if group!="Group affiliation not confirmed" and group.casefold() in blob:return True
+  context_terms=("k-pop","kpop","blackpink","girl group","idol","singer","music","debut","comeback","tour","entertainment","가수","아이돌","걸그룹","그룹","소속사","컴백","무대","음악","공연")
+  return any(term in blob for term in context_terms)
  def publisher_key(item):
   value=(item.get("publisher") or "").strip().casefold()
   return re.sub(r"[^a-z0-9가-힣]","",value) if value else urlparse(item.get("url","")).netloc.casefold().removeprefix("www.")
