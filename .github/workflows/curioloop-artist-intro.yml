@@ -55,16 +55,16 @@ jobs:
 
       - name: Generate and publish artist intro
         env:
-          FANCAMVERSE_CLIENT_ID: \${{ secrets.FANCAMVERSE_CLIENT_ID }}
-          FANCAMVERSE_CLIENT_SECRET: \${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
-          FANCAMVERSE_REFRESH_TOKEN: \${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
-          FANCAMVERSE_DRIVE_FOLDER_ID: \${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
-          YOUTUBE_CLIENT_ID: \${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: \${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: \${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          YOUTUBE_CHANNEL_ID: \${{ secrets.YOUTUBE_CHANNEL_ID }}
-          INTRO_ARTIST: \${{ inputs.artist || 'KARINA' }}
-          INTRO_OUTPUT_ONLY: \${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          INTRO_ARTIST: ${{ github.event_name == 'schedule' && 'ROTATE' || inputs.artist || 'KARINA' }}
+          INTRO_OUTPUT_ONLY: ${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
         run: python artist_intro.py
 
       - name: Save intro preview
