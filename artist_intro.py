@@ -115,39 +115,33 @@ def profile(filename, target_hint=""):
   target=next((x for x in chunks if x not in stop_words and x not in group_tokens), "")
  if not target:
   raise RuntimeError("Could not identify an artist name from the selected Drive filename: "+filename)
- # Search by the artist name and prefer an exact matching article title.
- search_url="https://namu.wiki/Search"
- try:
-  sr=session.get(search_url,params={"q":target,"target":"title"},timeout=35)
-  sr.raise_for_status()
- except requests.RequestException as e:
-  raise RuntimeError(f"NamuWiki search failed for {target}: {type(e).__name__}: {e}")
- parser=SearchLinks();parser.feed(sr.text)
- def norm(s):return re.sub(r"[\s_\-()（）]","",unquote(s)).casefold()
- chosen=None
- for href,label in parser.links:
-  page=unquote(href.split("/w/",1)[-1].split("?",1)[0])
-  if norm(page)==norm(target) or norm(label)==norm(target):
-   chosen=page;break
- if not chosen and parser.links:
-  # Search results are ordered by relevance; accept a close title only when
-  # it contains the complete requested name.
-  for href,label in parser.links:
-   page=unquote(href.split("/w/",1)[-1].split("?",1)[0])
-   if norm(target) in norm(page):
-    chosen=page;break
- if not chosen:
-  chosen=target
- time.sleep(1.2)
- raw_url="https://namu.wiki/raw"
- try:
-  rr=session.get(raw_url,params={"doc":chosen},timeout=40)
-  rr.raise_for_status()
- except requests.RequestException as e:
-  raise RuntimeError(f"NamuWiki article retrieval failed for {chosen}: {type(e).__name__}: {e}")
- raw=rr.text.strip()
- if len(raw)<300 or "<html" in raw[:500].lower() or "문서를 찾을 수 없습니다" in raw:
-  raise RuntimeError(f"NamuWiki article content was unavailable or too short: {chosen}")
+ # Resolve the exact NamuWiki mirror article directly. The primary namu.wiki
+ # host returns HTTP 403 from GitHub-hosted runners, so use the public mirror.
+ from urllib.parse import quote, unquote
+ chosen=target
+ raw=None
+ source_base=None
+ errors=[]
+ for base in ("https://namu.moe","https://d.namu.moe"):
+  headers={"Referer":base+"/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","Accept":"text/html, text/plain, */*"}
+  # The seed engine's raw endpoint is /raw/<document>, not /raw?doc=...
+  raw_url=base+"/raw/"+quote(chosen,safe="")
+  try:
+   rr=session.get(raw_url,headers=headers,timeout=40)
+   if rr.status_code==404:
+    # Some mirrors expose rendered pages but not the raw route.
+    page_url=base+"/w/"+quote(chosen,safe="")
+    rr=session.get(page_url,headers=headers,timeout=40)
+   rr.raise_for_status()
+   candidate=rr.text.strip()
+   if len(candidate)>=300 and "문서를 찾을 수 없습니다" not in candidate:
+    raw=candidate;source_base=base;break
+   errors.append(f"{base}: article response was empty or too short")
+  except requests.RequestException as e:
+   errors.append(f"{base}: {type(e).__name__}: {e}")
+  time.sleep(1.2)
+ if raw is None:
+  raise RuntimeError("NamuWiki mirror article retrieval failed. "+"; ".join(errors))
  def plain(s):
   s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
   s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
@@ -215,7 +209,7 @@ def profile(filename, target_hint=""):
   narration += " The video focuses on verified profile information and avoids treating unconfirmed claims as fact."
  if len(narration.split())>70:
   narration=" ".join(narration.split()[:70])
- source_url="https://namu.wiki/w/"+quote(chosen,safe="")
+ source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  print(f"NamuWiki research complete: {chosen}; artist={artist}; group={group}; birth={birth or 'not listed'}; narration_words={len(narration.split())}.")
  return {
   "artist":artist,"group":group,"narration":narration,
