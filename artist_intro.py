@@ -159,7 +159,7 @@ def render(src,p,hist):
    parts.append(part)
    durations.append(dur(part))
   concat_list=W/"voice_concat.txt"
-   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
+  concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
@@ -179,7 +179,7 @@ def render(src,p,hist):
     end_time=cursor+segment_duration
     cues.extend([str(cue_no),f"{stamp(cursor)} --> {stamp(end_time)}",group,""])
     cursor=end_time; cue_no+=1
-   subtitle=chr(10).join(cues)
+  subtitle=chr(10).join(cues)
   vtt.write_text(subtitle,encoding="utf-8-sig")
   if not vtt.exists() or vtt.stat().st_size<20:
    raise RuntimeError("Subtitle file was not written correctly")
