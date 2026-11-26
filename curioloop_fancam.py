@@ -632,9 +632,9 @@ def identify_artist(filename):
             "Nancy", "MOMOLAND Nancy", "Nancy fancam", "MOMOLAND fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
         ]
-    if any(token in value for token in ("이지", "lee ji", "leeji")):
-        return "이지", "ICHILLIN", [
-            "ICHILLIN", "Leeji", "ICHILLIN Leeji", "Leeji fancam",
+    if any(token in value for token in ("이지", "e.ji", "eji")):
+        return "EJI", "ICHILLIN", [
+            "E.JI", "ICHILLIN E.JI", "E.JI fancam", "ICHILLIN fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
         ]
     if any(token in value for token in ("쯔위", "tzuyu")):
