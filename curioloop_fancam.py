@@ -554,6 +554,18 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
 
 def identify_artist(filename):
     value = filename.casefold()
+    if any(token in value for token in ("사쿠라", "sakura", "miyawaki")):
+        return "SAKURA", "LE SSERAFIM", [
+            "Sakura", "LE SSERAFIM Sakura", "Sakura fancam", "LE SSERAFIM fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", CHANNEL_BRAND, "Shorts"
+        ]
+    if any(token in value for token in ("키야", "kya", "kiiiiikiii")):
+        return "KYA", "KiiiKiii", [
+            "KYA", "KiiiKiii KYA", "KiiiKiii fancam", "K-pop",
+            "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", CHANNEL_BRAND, "Shorts"
+        ]
     if any(token in value for token in ("장원영", "wonyoung", "won young")):
         return "WONYOUNG", "IVE", [
             "Wonyoung", "IVE Wonyoung", "Wonyoung fancam", "IVE fancam",
@@ -799,6 +811,11 @@ def main():
         selected_index = random.choice(available_indices)
         clip = clips[selected_index - 1]
         artist_name, _, _ = identify_artist(item["name"])
+        if not artist_name or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", artist_name):
+            raise RuntimeError(
+                f"Artist name could not be resolved to an English display name; "
+                f"refusing to render/upload without a name: {item['name']}"
+            )
         # Use the artist name for unique artifact filenames. Korean Drive filenames
         # are sanitized to the same fallback stem ("mp4"), which would overwrite
         # the first artist's rendered file when both are processed in one run.
