@@ -143,31 +143,40 @@ def render(src,p,hist):
  if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
  audio=W/"voice.mp3";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
-  communicate=edge_tts.Communicate(p["narration"],"en-US-AriaNeural",rate="-3%")
-  with audio.open("wb") as af:
-   async for chunk in communicate.stream():
-    if chunk["type"]=="audio":
-     af.write(chunk["data"])
-  # Use short, deterministic subtitle cues; do not depend on optional
-  # Edge TTS word-boundary metadata.
-  words=p["narration"].strip().split()
-  chunks=[" ".join(words[i:i+5]) for i in range(0,len(words),5)]
-  if not chunks:
+  # Generate each spoken sentence separately so subtitle timing is based on
+  # the measured duration of that exact sentence, not estimated word counts.
+  sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",p["narration"].strip()) if x.strip()]
+  if not sentences:
    raise RuntimeError("Cannot create subtitles: narration is empty")
-  audio_duration=max(1.0,min(dur(audio),footage))
-  weights=[max(1,len(x.split())) for x in chunks]
-  total=sum(weights)
+  parts=[]
+  durations=[]
+  for i,sentence in enumerate(sentences):
+   part=W/f"voice_part_{i:03d}.mp3"
+   communicate=edge_tts.Communicate(sentence,"en-US-AriaNeural",rate="-3%")
+   await communicate.save(str(part))
+   if not part.exists() or part.stat().st_size==0:
+    raise RuntimeError(f"Edge TTS returned an empty audio segment: {i}")
+   parts.append(part)
+   durations.append(dur(part))
+  concat_list=W/"voice_concat.txt"
+  concat_list.write_text("".join(f"file '{x.as_posix()}'\\n" for x in parts),encoding="utf-8")
+  run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
    return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
   cues=[]; cursor=0.0
-  for i,(line,weight) in enumerate(zip(chunks,weights),1):
-   end=audio_duration if i==len(chunks) else cursor+audio_duration*weight/total
-   cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end)}",line,""])
-   cursor=end
-  subtitle="\n".join(cues)
-  vtt.write_text(subtitle,encoding="utf-8")
+  for i,(sentence,seconds) in enumerate(zip(sentences,durations),1):
+   # Small inter-sentence allowance accounts for MP3 encoder padding.
+   end_time=cursor+seconds
+   cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end_time)}",sentence,""])
+   cursor=end_time
+  subtitle="\\n".join(cues)
+  vtt.write_text(subtitle,encoding="utf-8-sig")
+  if not vtt.exists() or vtt.stat().st_size<20:
+   raise RuntimeError("Subtitle file was not written correctly")
+  print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
+  print("Subtitle preview:",subtitle[:400].replace("\\n"," | "))
  asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
