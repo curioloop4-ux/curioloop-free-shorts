@@ -354,9 +354,9 @@ Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event de
 def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    # Preserve the complete source frame in a 9:16 canvas; never crop the top or bottom.
+    # Fill a true 9:16 frame by center-cropping landscape footage horizontally.
     output_w, output_h = 1080, 1920
-    print(f"Render aspect ratio for {source_stem}: 9:16 (full-frame fit; no crop)")
+    print(f"Render aspect ratio for {source_stem}: 9:16 (center crop; 1080x1920)")
 
     import textwrap
     for position, clip in enumerate(clips, 1):
@@ -401,7 +401,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
             name_bbox = name_draw.textbbox((0, 0), display_name, font=name_font, stroke_width=2)
             name_w, name_h = name_bbox[2] - name_bbox[0], name_bbox[3] - name_bbox[1]
             px, py = 24, 14
-            bx, by = (output_w - name_w - px * 2) // 2, 92
+            bx, by = (output_w - name_w - px * 2) // 2, 190
             name_draw.rounded_rectangle((bx, by, bx + name_w + px * 2, by + name_h + py * 2),
                                         radius=14, fill=(0, 0, 0, 125))
             name_draw.text((bx + px - name_bbox[0], by + py - name_bbox[1]), display_name,
@@ -440,6 +440,12 @@ def identify_artist(filename):
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
             "female idol", "Wonyoung performance", CHANNEL_BRAND, "Shorts"
         ]
+    if any(token in value for token in ("채령", "chaeryeong", "chae ryeong")):
+        return "CHAERYEONG", "ITZY", [
+            "Chaeryeong", "ITZY Chaeryeong", "Chaeryeong fancam", "ITZY fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Chaeryeong performance", "Shorts"
+        ]
     if any(token in value for token in ("나띠", "natty")):
         return "NATTY", "KISS OF LIFE", [
             "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
@@ -466,6 +472,11 @@ def generate_metadata(filename, hook, index):
         title = "WONYOUNG (IVE) ✨ | Charismatic K-Pop Fancam #Shorts"
         description = ("WONYOUNG of IVE ✨ Enjoy this fan-captured performance and her "
                        f"stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "CHAERYEONG":
+        title = "CHAERYEONG (ITZY) 🌙 | K-Pop Fancam #Shorts"
+        description = ("CHAERYEONG of ITZY 🌙 Enjoy this fan-captured performance and "
+                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "NATTY":
         title = "NATTY (KISS OF LIFE) 🔥 | K-Pop Fancam #Shorts"
