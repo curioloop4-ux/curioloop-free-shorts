@@ -706,7 +706,29 @@ def render(src,p,hist):
  still=W/"opening.jpg"
  run(["ffmpeg","-y","-ss",f"{t:.2f}","-i",str(src),"-frames:v","1","-q:v","2",str(still)])
  hist["pending_opening_frame"]={"artist":p["artist"].casefold(),"timestamp":t}
- start=max(0,(source_len-footage)/2);name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
+ # Choose the most visually active continuous segment instead of always taking
+ # the middle of the source, which can be a static close-up.
+ start=max(0,(source_len-footage)/2)
+ try:
+  motion=subprocess.run(["ffmpeg","-v","error","-i",str(src),"-vf","fps=2,scale=48:80:flags=area,format=gray","-f","rawvideo","-pix_fmt","gray","pipe:1"],capture_output=True,check=True).stdout
+  frame_size=48*80
+  frame_count=len(motion)//frame_size
+  window=max(2,min(frame_count,int(footage*2)))
+  diffs=[0]
+  for idx in range(1,frame_count):
+   a=motion[(idx-1)*frame_size:idx*frame_size]
+   b=motion[idx*frame_size:(idx+1)*frame_size]
+   diffs.append(sum(abs(x-y) for x,y in zip(a,b))/frame_size)
+  if frame_count>=window and len(diffs)>window:
+   scores=[(sum(diffs[i+1:i+window]),i) for i in range(frame_count-window+1)]
+   motion_score,best_index=max(scores)
+   start=min(best_index/2,max(0,source_len-footage))
+   print(f"Selected high-motion fancam segment: {start:.1f}s–{start+footage:.1f}s; motion score={motion_score:.2f}")
+  else:
+   print("Motion scan had too few frames; using centered source segment.")
+ except Exception as e:
+  print("Motion scan unavailable; using centered source segment:",type(e).__name__)
+ name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
  cue_data=json.loads((W/"subtitle_cues.json").read_text(encoding="utf-8"))
