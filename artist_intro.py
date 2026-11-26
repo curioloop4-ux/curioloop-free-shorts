@@ -206,7 +206,7 @@ def profile(filename, target_hint=""):
  # Extract physical profile data and personal characteristics only when explicitly labelled.
  def labelled_number(labels, unit_pattern):
   for label in labels:
-   m=re.search(r"(?:^|\s)"+label+r"\s*(?:\||:|：)?\s*("+unit_pattern+r")",raw,re.I)
+   m=re.search(r"(?:^|\s)"+label+r"\s*(?:\|\|?|:|：)?\s*("+unit_pattern+r")",raw,re.I)
    if m:return re.sub(r"\s+","",m.group(1))
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
