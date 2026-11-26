@@ -54,7 +54,6 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           TARGET_ARTIST: ${{ inputs.artist }}
         run: python artist_intro.py
 
