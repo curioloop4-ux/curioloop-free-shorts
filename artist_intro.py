@@ -242,6 +242,21 @@ def profile(filename, target_hint=""):
  from urllib.parse import quote_plus
  news_title=None;news_url=None;news_date=None;news_source=None
  web_facts=[]
+ # Build the core narration before adding verified web-coverage highlights.
+ facts=[f"Meet {artist}, a K-pop artist."]
+ if group!="Group affiliation not confirmed":
+  facts.append(f"{artist} is a member of {group}.")
+  if group_year:facts.append(f"The group made its debut in {group_year}.")
+ if birth_year:facts.append(f"{artist} was born in {birth_year}.")
+ if height:facts.append(f"{artist} is {height} tall.")
+ if weight:facts.append(f"{artist} weighs {weight}.")
+ if waist:facts.append(f"{artist}'s listed waist measurement is {waist}.")
+ if shoe_size:facts.append(f"{artist}'s listed shoe size is {shoe_size}.")
+ if body_size:facts.append(f"The listed body measurements are {body_size}.")
+ if position:facts.append(f"Within the group, {artist}'s position is {position}.")
+ if nickname:facts.append(f"Fans also know {artist} as {nickname}.")
+ if hobby:facts.append(f"Outside of performing, {artist} enjoys {hobby}.")
+ if personality:facts.append(f"Her profile describes her as {personality}.")
  queries=[
   f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',""),
   f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',""),
