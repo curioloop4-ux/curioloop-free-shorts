@@ -550,11 +550,13 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                           font=font, fill=fill, stroke_width=3,
                           stroke_fill=(5, 5, 12, 255))
 
-        draw_cta_line("WHO SHOULD WE FEATURE NEXT?", 220, cta_font,
-                      (255, 88, 202, 255))
-        draw_cta_line("COMMENT BELOW!", 292, cta_bold,
-                      (255, 226, 75, 255))
-        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1535, cta_bold,
+        # Keep all three CTA lines together in the visual center for the final 3 seconds.
+        # The first two lines are white; the subscription line is cyan.
+        draw_cta_line("WHO SHOULD WE FEATURE NEXT?", 760, cta_font,
+                      (255, 255, 255, 255))
+        draw_cta_line("COMMENT BELOW!", 830, cta_bold,
+                      (255, 255, 255, 255))
+        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 900, cta_bold,
                       (75, 224, 255, 255))
         cta.save(cta_path)
 
