@@ -966,6 +966,21 @@ def main():
             print("No unused source videos with a recognized artist/group remain.")
             break
 
+        # Deprioritize these frequently featured artists; use them only when
+        # no other identifiable, unused artist source is available.
+        low_priority_artists = {"HAERIN", "KAZUHA", "SAKURA", "WONYOUNG"}
+        preferred = [
+            candidate for candidate in identifiable
+            if identify_artist(candidate["name"])[0] not in low_priority_artists
+        ]
+        if preferred:
+            deferred_count = len(identifiable) - len(preferred)
+            identifiable = preferred
+            print(
+                "Low-priority artist rotation active; deferred "
+                f"{deferred_count} source(s) for Haerin, Kazuha, Sakura, and Wonyoung."
+            )
+
         # Rotate across different originals before returning to the previous source.
         last_source_id = history.get("last_source_id")
         alternatives = [candidate for candidate in identifiable if candidate["id"] != last_source_id]
