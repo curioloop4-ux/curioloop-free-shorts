@@ -875,6 +875,18 @@ def main():
  done_hashes={x.get("source_md5") for x in h["processed"] if x.get("source_md5")}
  target=os.getenv("TARGET_ARTIST","").strip()
  candidates=[x for x in scan(drive,folder) if x["id"] not in done and (not x.get("md5Checksum") or x.get("md5Checksum") not in done_hashes)]
+ # Only choose sources that the companion fancam pipeline can identify too.
+ from curioloop_fancam import identify_artist as identify_fancam_artist
+ blocked=("김채원","chaewon")
+ compatible=[]
+ for candidate in candidates:
+  if any(term in candidate["name"].casefold() for term in blocked):
+   continue
+  artist_name,group_name,_=identify_fancam_artist(candidate["name"])
+  if artist_name and group_name:
+   compatible.append(candidate)
+ candidates=compatible
+ print(f"Sources compatible with both intro and fancam pipelines: {len(candidates)}")
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  # Fail closed: random selection only considers filenames with a known artist and group.
  known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
@@ -923,4 +935,8 @@ def main():
   h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
  h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"published_at":datetime.now(timezone.utc).isoformat()})
  H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
+ # Hand off the exact same Drive original to the companion fancam workflow.
+ queue_path=R/"history"/"artist_intro_fancam_queue.json"
+ queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
+ print("Fancam handoff queued for the exact same Drive source:",item["name"])
 if __name__=="__main__":main()
