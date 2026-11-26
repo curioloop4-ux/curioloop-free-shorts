@@ -233,24 +233,26 @@ def profile(filename, target_hint=""):
   birth=birth.replace(".","-")
  # Extract physical profile data and personal characteristics only when explicitly labelled.
  def labelled_number(labels, unit_pattern):
-  # NamuWiki raw documents vary: profile cells may use || delimiters,
-  # HTML tables, newlines, or plain label/value text. Search raw and cleaned
-  # text, accepting only explicitly labelled values with measurement units.
-  readable=plain(raw)
-  for source in (raw,readable):
-   for label in labels:
-    escaped=re.escape(label)
-    patterns=[
-     r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*("+unit_pattern+r")",
-     r"(?:^|\\n)\\s*"+escaped+r"\\s*(?::|：|\\|\\|?)\\s*("+unit_pattern+r")",
-     r"(?:^|\\s)"+escaped+r"\\s*(?:\\|\\|?|:|：)?\\s*("+unit_pattern+r")",
-     r"(?:^|\\s)"+escaped+r"[^0-9]{0,100}("+unit_pattern+r")"
-    ]
-    for pattern in patterns:
-     m=re.search(pattern,source,re.I)
-     if m:return re.sub(r"\\s+","",m.group(1))
-  return None
- height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+    # Search raw and cleaned NamuWiki text for explicitly labelled measurements.
+    readable=plain(raw)
+    for source in (raw,readable):
+     for label in labels:
+      escaped=re.escape(label)
+      patterns=[
+       r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*("+unit_pattern+r")",
+       r"(?:^|\\n)\\s*"+escaped+r"\\s*(?::|：|\\|\\|?)\\s*("+unit_pattern+r")",
+       r"(?:^|\\s)"+escaped+r"\\s*(?:\\|\\|?|:|：)?\\s*("+unit_pattern+r")",
+       r"(?:^|\\s)"+escaped+r"[^0-9]{0,100}("+unit_pattern+r")"
+      ]
+      for pattern in patterns:
+       m=re.search(pattern,source,re.I)
+       if not m:
+        continue
+       value=m.group(1) if m.lastindex else None
+       if value:
+        return re.sub(r"\\s+","",value)
+    return None
+  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
  waist=labelled_number(["허리둘레","허리 사이즈","허리"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈"],r"\d{2}(?:\.5)?\s*(?:mm|cm)")
