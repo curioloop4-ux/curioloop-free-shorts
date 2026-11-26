@@ -797,8 +797,10 @@ def render(src,p,hist):
    motion_score,best_index=max(scores)
    start=min(best_index/2,max(0,source_len-footage))
    print(f"Selected high-motion fancam segment: {start:.1f}s–{start+footage:.1f}s; motion score={motion_score:.2f}")
+   hist["last_render_source_start"]=round(start,3);hist["last_render_source_duration"]=round(footage,3)
   else:
    print("Motion scan had too few frames; using centered source segment.")
+   hist["last_render_source_start"]=round(start,3);hist["last_render_source_duration"]=round(footage,3)
  except Exception as e:
   print("Motion scan unavailable; using centered source segment:",type(e).__name__)
  name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
@@ -929,14 +931,17 @@ def main():
  research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Verified research saved:",research_path.name)
  out=render(src,p,h)
+ rendered_source_start=float(h.get("last_render_source_start",0.0))
+ rendered_source_duration=float(h.get("last_render_source_duration",0.0))
+ if rendered_source_duration<=0: raise RuntimeError("Could not determine the exact source segment used in the artist intro")
  vid,privacy=publish(yt,out,p,item["name"])
  pending=h.pop("pending_opening_frame",None)
  if pending:
   h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
- h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"published_at":datetime.now(timezone.utc).isoformat()})
+ h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"published_at":datetime.now(timezone.utc).isoformat()})
  H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
  # Hand off the exact same Drive original to the companion fancam workflow.
  queue_path=R/"history"/"artist_intro_fancam_queue.json"
- queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
+ queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Fancam handoff queued for the exact same Drive source:",item["name"])
 if __name__=="__main__":main()
