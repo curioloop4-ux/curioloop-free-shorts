@@ -295,14 +295,27 @@ def make_contact_sheets(source, duration):
         sheets.append(out)
     return sheets, start
 
+def target_clips_for_duration(duration):
+    """Choose how many 25-second Shorts to extract from each source."""
+    if duration < 60:
+        return 1
+    if duration < 90:
+        return 2
+    if duration < 150:
+        return 3
+    if duration < 240:
+        return 4
+    return 5
+
+
 def analyze_highlights(source, duration, filename):
+    target_count = target_clips_for_duration(duration)
     # Full-source mode is opt-in; artist filtering alone still runs highlight analysis.
     if os.getenv("FANCAMVERSE_USE_FULL_SOURCE", "").strip().lower() in {"1", "true", "yes"}:
         print(f"Full-source mode enabled ({duration:.1f}s).")
         return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
 
-    # For a short user-supplied clip under 15 seconds, preserve the full moment
-    # as one Short instead of rejecting it or trying to invent five segments.
+    # For a source shorter than one Short, preserve the complete source.
     if duration < MIN_SHORT_SECONDS:
         print(f"Short source detected ({duration:.1f}s); using the complete clip as one Short.")
         return [{"start": 0.0, "end": duration, "hook": "A Must-Watch K-Pop Moment"}]
@@ -312,13 +325,13 @@ def analyze_highlights(source, duration, filename):
 Source filename: {filename}
 Full duration: {duration:.1f} seconds. The opening/intro before {first_allowed:.1f}s must be excluded.
 The attached contact sheets show sampled frames with their exact source timestamps.
-Choose exactly five DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
+Choose exactly {target_count} DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
 sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
 Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
 Each window must be {MIN_SHORT_SECONDS} to {MAX_SHORT_SECONDS} seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
 Use the timestamps on the images to estimate boundaries. Return JSON only:
 {{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
-Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
+Exactly {target_count} clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
     parts = [{"text": prompt}]
     for path in sheets:
         parts.append({"inline_data": {"mime_type": "image/jpeg",
@@ -349,10 +362,10 @@ Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event de
             distinct.append(clip)
     if not distinct:
         raise RuntimeError("Highlight analysis returned no valid clips. Skipping this source; no upload was made.")
-    if len(distinct) < SHORTS_PER_SOURCE:
+    if len(distinct) < target_count:
         print(
             f"Highlight analysis found {len(distinct)} valid non-overlapping clips "
-            f"(requested {SHORTS_PER_SOURCE}); continuing with the available clips."
+            f"(requested {target_count}); continuing with the available clips."
         )
     return distinct
 
@@ -641,13 +654,15 @@ def main():
         eligible = [
             item for item in files
             if not source_state.get(item["id"], {}).get("complete", False)
-            and int(source_state.get(item["id"], {}).get("next_clip", 1)) <= SHORTS_PER_SOURCE
         ]
         if not eligible:
             print("No unused source videos remain in the current Drive inbox.")
             break
 
-        item = random.choice(eligible)
+        # Rotate across different originals before returning to the previous source.
+        last_source_id = history.get("last_source_id")
+        alternatives = [candidate for candidate in eligible if candidate["id"] != last_source_id]
+        item = random.choice(alternatives or eligible)
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
             f"Batch {batch_number}/{batch_size} | Random unused source: "
@@ -657,9 +672,9 @@ def main():
         source = download_video(drive, item)
         duration = probe_duration(source, allow_short=bool(source_filter))
         saved_clips = state.get("clips")
-        if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
+        if saved_clips:
             clips = saved_clips
-            print("Using the saved five non-overlapping highlight windows for this source.")
+            print(f"Using {len(clips)} saved non-overlapping highlight window(s) for this source.")
         else:
             clips = analyze_highlights(source, duration, item["name"])
 
@@ -692,13 +707,19 @@ def main():
         video_id = upload(youtube, path, title, description, tags, privacy, publish_at=publish_at)
         uploaded_count += 1
 
+        updated_used_indices = sorted(used_indices | {selected_index})
+        source_complete = len(updated_used_indices) >= len(clips)
         source_state[item["id"]] = {
             "name": item["name"],
-            "next_clip": SHORTS_PER_SOURCE + 1,
-            "complete": True,
+            "next_clip": SHORTS_PER_SOURCE + 1 if source_complete else 1,
+            "complete": source_complete,
             "clips": clips,
-            "used_clip_indices": sorted(used_indices | {selected_index})
+            "used_clip_indices": updated_used_indices
         }
+        print(
+            f"Source progress: {len(updated_used_indices)}/{len(clips)} Shorts used; "
+            f"{'completed' if source_complete else 'will rotate back later'}."
+        )
         history["last_source_id"] = item["id"]
         history["sources"] = source_state
         history["processed"] = [
