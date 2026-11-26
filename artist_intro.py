@@ -190,7 +190,8 @@ def profile(filename, target_hint=""):
     group=english;group_year=year;found=True;break
   if found:break
  if not group:
-  raise RuntimeError("SKIPPED_UNKNOWN_GROUP: could not verify group affiliation for "+artist+" from source: "+filename)
+  group="Group affiliation not confirmed"
+  group_year=None
  # Extract birth date only when it appears next to a biographical label.
  birth=None
  birth_patterns=[
@@ -202,49 +203,70 @@ def profile(filename, target_hint=""):
   if m:birth=re.sub(r"\s+","",m.group(1));break
  if birth and re.fullmatch(r"\d{4}\.\d{1,2}\.\d{1,2}",birth):
   birth=birth.replace(".","-")
- # Build an engaging, fact-led script. Keep only concrete details verified in the retrieved profile.
- def labeled_value(labels):
+ # Extract physical profile data and personal characteristics only when explicitly labelled.
+ def labelled_number(labels, unit_pattern):
   for label in labels:
-   pattern=r"(?:^|\s)"+label+r"\s*(?:\||:|：)?\s*([^|]{2,90}?)(?=\s{2,}|\||$)"
-   m=re.search(pattern,raw,re.I)
-   if m:
-    value=re.sub(r"\s+"," ",m.group(1)).strip(" -:：")
-    value=re.sub(r"\[[^]]*\]","",value).strip()
-    if value and not re.search(r"(문서|편집|각주|출처|미상|불명)",value):
-     return value[:65]
+   m=re.search(r"(?:^|\\s)"+label+r"\\s*(?:\\||:|：)?\\s*("+unit_pattern+r")",raw,re.I)
+   if m:return re.sub(r"\\s+","",m.group(1))
   return None
+ height=labelled_number(["신장","키","height"],r"\\d{2,3}(?:\\.\\d+)?\\s*(?:cm|센티미터)")
+ weight=labelled_number(["몸무게","체중","weight"],r"\\d{2,3}(?:\\.\\d+)?\\s*(?:kg|킬로그램)")
+ birth_year=None
+ if birth:
+  year_match=re.search(r"(19|20)\\d{2}",birth)
+  if year_match:birth_year=year_match.group(0)
  position=labeled_value(["포지션","담당 포지션","보컬 포지션"])
  nickname=labeled_value(["별명","애칭"])
- facts=[f"Think you know {artist}? Here are a few details worth knowing."]
- if group!="Solo Artist":
-  facts.append(f"{artist} debuted with {group} in {group_year}.")
- if position:
-  facts.append(f"The profile lists their position as {position}.")
- if nickname:
-  facts.append(f"One nickname listed in the profile is {nickname}.")
- if birth:
-  facts.append(f"Their birth date is {birth}.")
- if len(facts)==1:
-  facts.append(f"{artist} is a South Korean performer associated with {group}.")
-  facts.append("Check the profile for confirmed details, and tell us what we should cover next.")
+ hobby=labeled_value(["취미","특기"])
+ personality=labeled_value(["성격","특징","매력 포인트"])
+ # Fetch a current news headline from Google News RSS; profile data remains separate.
+ news_title=None;news_url=None;news_date=None;news_source=None
+ try:
+  from xml.etree import ElementTree as ET
+  from urllib.parse import quote_plus
+  query=quote_plus(target+" "+(group if group!="Group affiliation not confirmed" else "K-pop"))
+  rss=session.get("https://news.google.com/rss/search?q="+query+"&hl=ko&gl=KR&ceid=KR:ko",timeout=20)
+  rss.raise_for_status()
+  root=ET.fromstring(rss.content)
+  for node in root.findall(".//item"):
+   title_node=node.find("title");link_node=node.find("link");date_node=node.find("pubDate");source_node=node.find("source")
+   candidate_title=plain(title_node.text or "") if title_node is not None else ""
+   if candidate_title and link_node is not None and link_node.text:
+    news_title=candidate_title[:180];news_url=link_node.text.strip()
+    news_date=date_node.text.strip() if date_node is not None and date_node.text else None
+    news_source=source_node.text.strip() if source_node is not None and source_node.text else None
+    break
+ except Exception as e:
+  print("Recent news lookup unavailable:",type(e).__name__,str(e)[:200])
+ # Build a profile-first script; unavailable details are omitted rather than guessed.
+ facts=[f"Meet {artist}, a K-pop artist."]
+ if birth_year:facts.append(f"{artist} was born in {birth_year}.")
+ if group!="Group affiliation not confirmed":
+  facts.append(f"{artist} debuted with {group} in {group_year}." if group_year else f"{artist} is a member of {group}.")
  else:
-  facts.append("Which fact surprised you most?")
+  facts.append("Their group affiliation is not confirmed in the available profile.")
+ if height:facts.append(f"The listed height is {height}.")
+ if weight:facts.append(f"The listed weight is {weight}.")
+ if position:facts.append(f"Their listed role is {position}.")
+ if nickname:facts.append(f"A profile nickname is {nickname}.")
+ if hobby:facts.append(f"One profile detail is their {hobby}.")
+ if personality:facts.append(f"They are described for {personality}.")
+ if news_title:facts.append(f"Recent news: {news_title}.")
+ else:facts.append("Follow the artist's official channels for their latest announcements.")
+ facts.append("Which detail about this artist did you already know?")
  narration=" ".join(facts)
- word_count=len(narration.split())
- if word_count<70:
-  raise RuntimeError(f"SKIPPED_INSUFFICIENT_VERIFIED_FACTS: narration has only {word_count} words; at least 70 verified words are required for a full-length intro.")
- if word_count>85:
-  narration=" ".join(narration.split()[:85])
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
- print(f"NamuWiki research complete: {chosen}; artist={artist}; group={group}; birth={birth or 'not listed'}; narration_words={len(narration.split())}.")
+ sources=[{"title":f"NamuWiki: {chosen}","url":source_url}]
+ if news_url:sources.append({"title":"Recent news: "+(news_source or "Google News"),"url":news_url})
+ print(f"Profile research complete: {chosen}; artist={artist}; group={group}; birth_year={birth_year or 'not listed'}; height={height or 'not listed'}; weight={weight or 'not listed'}; recent_news={'yes' if news_title else 'no'}.")
  return {
   "artist":artist,"group":group,"narration":narration,
   "title":f"{artist} | {group} Artist Spotlight"[:85],
   "tags":[x for x in ["K-pop",group.replace(" ",""),artist.replace(" ",""),"Artist Spotlight"] if x],
-  "sources":[{"title":f"NamuWiki: {chosen}","url":source_url}],
+  "sources":sources,
+  "recent_news":{"title":news_title,"url":news_url,"date":news_date,"publisher":news_source},
   "research_queries":[target]
  }
-
 
 def create_background_music(path, seconds=36, sample_rate=22050):
  # Original, royalty-free ambient pop bed synthesized locally for this channel.
@@ -402,7 +424,7 @@ def main():
  known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
  def identifiable(item):
   name=item["name"].casefold()
-  return any(a.casefold() in name for a in known_artists) and any(g.casefold() in name for g in known_groups)
+  return any(a.casefold() in name for a in known_artists)
  # Manual target may prioritize one artist, but identity validation remains mandatory.
  if target:
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
@@ -415,21 +437,10 @@ def main():
   if not candidates:raise RuntimeError("No unprocessed Drive video has both a recognized artist and group name; skipped all ambiguous sources.")
   import random
   random.shuffle(candidates)
- # Try candidates until one has enough verified material for a substantive narration.
- item=None;p=None
- for candidate in candidates:
-  print("Checking Drive source:",candidate["name"])
-  try:
-   candidate_profile=profile(candidate["name"],target_hint=target)
-  except RuntimeError as e:
-   if "SKIPPED_INSUFFICIENT_VERIFIED_FACTS" in str(e):
-    print("Skipping source with insufficient verified profile details:",candidate["name"])
-    continue
-   raise
-  item=candidate;p=candidate_profile
-  break
- if item is None or p is None:
-  raise RuntimeError("No unprocessed source had enough verified facts for a full narration. Add more eligible source videos or improve profile research.")
+ # Do not skip a recognized artist because some profile fields are unavailable.
+ item=candidates[0]
+ print("Selected source for profile research:",item["name"])
+ p=profile(item["name"],target_hint=target)
  print("Selected Drive source:",item["name"])
  src=download(drive,item)
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
