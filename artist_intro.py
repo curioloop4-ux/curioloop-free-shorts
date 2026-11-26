@@ -156,7 +156,7 @@ def render(src,p,hist):
    # Edge TTS may omit WordBoundary events. Build readable sentence-level
    # SRT cues from the narration and distribute them across the actual audio.
    print("Edge TTS supplied no word boundaries; generating timed sentence subtitles.")
-   sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",p["narration"].strip()) if x.strip()]
+   sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",p["narration"].strip()) if x.strip()]
    chunks=[]
    for sentence in sentences:
     words=sentence.split()
@@ -177,7 +177,7 @@ def render(src,p,hist):
     end=audio_duration if i==len(chunks) else cursor+audio_duration*weight/total
     cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end)}",line,""])
     cursor=end
-   subtitle="\\n".join(cues)
+   subtitle="\n".join(cues)
   vtt.write_text(subtitle,encoding="utf-8")
  asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
