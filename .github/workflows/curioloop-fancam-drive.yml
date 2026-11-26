@@ -2,10 +2,13 @@ name: CurioLoop Fancam Drive Upload
 
 on:
   schedule:
-    # GitHub cron is UTC. Upload 60 minutes before Korea publication slots.
-    # Korea Standard Time (UTC+9): publish daily at 01:17 and 05:17.
-    - cron: "17 15 * * *"
-    - cron: "17 19 * * *"
+    # GitHub cron is UTC. Run 60 minutes before each Korea publication slot.
+    # Korea Standard Time (UTC+9): publish daily at 22:00, 00:00, 02:00, 04:00, and 06:00.
+    - cron: "0 12 * * *"
+    - cron: "0 14 * * *"
+    - cron: "0 16 * * *"
+    - cron: "0 18 * * *"
+    - cron: "0 20 * * *"
   workflow_dispatch:
     inputs:
       output_only:
@@ -84,7 +87,7 @@ jobs:
           FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
           FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ github.event_name == 'schedule' && 'private' || inputs.privacy_status || 'private' }}
-          FANCAMVERSE_PUBLISH_TIME_KST: ${{ github.event.schedule == '17 15 * * *' && '01:17' || (github.event.schedule == '17 19 * * *' && '05:17' || '') }}
+          FANCAMVERSE_PUBLISH_TIME_KST: ${{ github.event.schedule == '0 12 * * *' && '22:00' || (github.event.schedule == '0 14 * * *' && '00:00' || (github.event.schedule == '0 16 * * *' && '02:00' || (github.event.schedule == '0 18 * * *' && '04:00' || (github.event.schedule == '0 20 * * *' && '06:00' || '')))) }}
         run: python curioloop_fancam.py
 
       - name: Save CurioLoop preview videos
