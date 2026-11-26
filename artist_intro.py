@@ -261,18 +261,41 @@ def upload(youtube, path, profile, source_name):
 
 def main():
     key = ARTIST.upper()
-    if key not in PROFILES:
+    rotate = key in {"ROTATE", "AUTO", "RANDOM"}
+    if not rotate and key not in PROFILES:
         raise RuntimeError(f"Unsupported artist '{ARTIST}'. Supported: {', '.join(PROFILES)}")
-    profile = PROFILES[key]
     drive, youtube = services()
     folder_id = required("FANCAMVERSE_DRIVE_FOLDER_ID")
     history = load_history()
     processed = {x.get("drive_file_id") for x in history["processed"]}
-    candidates = [x for x in list_videos(drive, folder_id) if x["id"] not in processed]
-    print(f"Artist intro source scan: {len(candidates)} unprocessed {key} video(s).")
-    if not candidates:
-        raise RuntimeError(f"No new Drive source found for {key}; no video was uploaded.")
-    item = candidates[0]
+    selected = None
+    keys = list(PROFILES)
+    if rotate:
+        # Prefer the member least recently published, while requiring a matching new Drive source.
+        last_published = {}
+        for entry in history["processed"]:
+            last_published[entry.get("artist", "")] = max(
+                last_published.get(entry.get("artist", ""), ""),
+                entry.get("published_at", "")
+            )
+        keys.sort(key=lambda name: last_published.get(name, ""))
+    else:
+        keys = [key]
+    for candidate_key in keys:
+        found = [x for x in list_videos(drive, folder_id)
+                 if x["id"] not in processed and any(alias in x.get("name", "").casefold()
+                 for alias in ([candidate_key.casefold()] + ({
+                     "KARINA": ["카리나"], "WINTER": ["윈터"],
+                     "GISELLE": ["지젤"], "NINGNING": ["닝닝"]
+                 }.get(candidate_key, []))))]
+        print(f"Artist intro source scan: {len(found)} unprocessed {candidate_key} video(s).")
+        if found:
+            key, selected = candidate_key, found[0]
+            break
+    if selected is None:
+        raise RuntimeError("No new Drive source found for any supported aespa member; no video was uploaded.")
+    profile = PROFILES[key]
+    item = selected
     source = download(drive, item)
     output = render(source, profile)
     if os.getenv("INTRO_OUTPUT_ONLY", "true").lower() not in {"0", "false", "no"}:
@@ -281,7 +304,8 @@ def main():
     video_id = upload(youtube, output, profile, item["name"])
     history["processed"].append({
         "drive_file_id": item["id"], "source_name": item["name"],
-        "artist": key, "youtube_video_id": video_id
+        "artist": key, "youtube_video_id": video_id,
+        "published_at": __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
     })
     HISTORY.parent.mkdir(parents=True, exist_ok=True)
     HISTORY.write_text(json.dumps(history, ensure_ascii=False, indent=2), encoding="utf-8")
