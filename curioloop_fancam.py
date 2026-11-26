@@ -315,7 +315,7 @@ The attached contact sheets show sampled frames with their exact source timestam
 Choose exactly five DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
 sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
 Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
-Each window must be 15 to 20 seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
+Each window must be {MIN_SHORT_SECONDS} to {MAX_SHORT_SECONDS} seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
 Use the timestamps on the images to estimate boundaries. Return JSON only:
 {{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
 Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event details, or claims not visible in the source."""
