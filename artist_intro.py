@@ -97,7 +97,7 @@ def services():
     )
     return build("drive", "v3", credentials=drive_creds), build("youtube", "v3", credentials=yt_creds)
 
-def list_videos(drive, folder_id):
+def list_videos(drive, folder_id, artist=None):
     queue, visited, videos = [folder_id], set(), []
     while queue:
         parent = queue.pop(0)
@@ -122,14 +122,15 @@ def list_videos(drive, folder_id):
                     queue.append(item["id"])
                 elif item.get("mimeType") in SUPPORTED:
                     name = item.get("name", "").casefold()
-                    aliases = [ARTIST.casefold()]
-                    if ARTIST == "KARINA":
+                    selected_artist = (artist or ARTIST).upper()
+                    aliases = [selected_artist.casefold()]
+                    if selected_artist == "KARINA":
                         aliases.append("카리나")
-                    elif ARTIST == "NINGNING":
+                    elif selected_artist == "NINGNING":
                         aliases.append("닝닝")
-                    elif ARTIST == "WINTER":
+                    elif selected_artist == "WINTER":
                         aliases.append("윈터")
-                    elif ARTIST == "GISELLE":
+                    elif selected_artist == "GISELLE":
                         aliases.append("지젤")
                     if any(alias in name for alias in aliases):
                         videos.append(item)
@@ -282,7 +283,7 @@ def main():
     else:
         keys = [key]
     for candidate_key in keys:
-        found = [x for x in list_videos(drive, folder_id)
+        found = [x for x in list_videos(drive, folder_id, candidate_key)
                  if x["id"] not in processed and any(alias in x.get("name", "").casefold()
                  for alias in ([candidate_key.casefold()] + ({
                      "KARINA": ["카리나"], "WINTER": ["윈터"],
