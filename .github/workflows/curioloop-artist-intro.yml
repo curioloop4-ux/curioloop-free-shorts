@@ -4,9 +4,9 @@ on:
   workflow_dispatch:
     inputs:
       artist:
-        description: 'Artist name to research and prioritize from Drive (e.g. Wonyoung)'
+        description: '한글 아티스트 이름으로 Drive 검색 및 자료 조사 (예: 장원영)'
         required: false
-        default: 'Wonyoung'
+        default: '장원영'
         type: string
   schedule:
     # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
