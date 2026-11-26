@@ -202,21 +202,36 @@ def profile(filename, target_hint=""):
   if m:birth=re.sub(r"\s+","",m.group(1));break
  if birth and re.fullmatch(r"\d{4}\.\d{1,2}\.\d{1,2}",birth):
   birth=birth.replace(".","-")
- # Build a short original narration from extracted facts; no copied wiki prose.
- facts=[f"{artist} is a South Korean singer and performer."]
- if group!="Solo Artist":facts.append(f"{artist} is associated with {group}.")
- if birth:facts.append(f"The biographical entry lists {birth} as the artist's birth date.")
- facts.append("This short spotlight introduces the artist's name, group affiliation, and biographical background.")
- facts.append("The script is an original summary and does not reproduce the wording of the source article.")
- facts.append("For current schedules, releases, and announcements, viewers should check the artist's official channels directly.")
- facts.append("Any detail not clearly supported by the reference is left out rather than guessed.")
+ # Build an engaging, fact-led script. Keep only concrete details verified in the retrieved profile.
+ def labeled_value(labels):
+  for label in labels:
+   pattern=r"(?:^|\\s)"+label+r"\\s*(?:\\||:|：)?\\s*([^|]{2,90}?)(?=\\s{2,}|\\||$)"
+   m=re.search(pattern,raw,re.I)
+   if m:
+    value=re.sub(r"\\s+"," ",m.group(1)).strip(" -:：")
+    value=re.sub(r"\\[[^]]*\\]","",value).strip()
+    if value and not re.search(r"(문서|편집|각주|출처|미상|불명)",value):
+     return value[:65]
+  return None
+ position=labeled_value(["포지션","담당 포지션","보컬 포지션"])
+ nickname=labeled_value(["별명","애칭"])
+ facts=[f"Think you know {artist}? Here are a few details worth knowing."]
+ if group!="Solo Artist":
+  facts.append(f"{artist} debuted with {group} in {group_year}.")
+ if position:
+  facts.append(f"The profile lists their position as {position}.")
+ if nickname:
+  facts.append(f"One nickname listed in the profile is {nickname}.")
+ if birth:
+  facts.append(f"Their birth date is {birth}.")
+ if len(facts)==1:
+  facts.append(f"{artist} is a South Korean performer associated with {group}.")
+  facts.append("Check the profile for confirmed details, and tell us what we should cover next.")
+ else:
+  facts.append("Which fact surprised you most?")
  narration=" ".join(facts)
- # Keep narration within the established 55-70 word target without adding unverified biography.
- words=narration.split()
- if len(words)<55:
-  narration += " The video focuses on verified profile information and avoids treating unconfirmed claims as fact."
- if len(narration.split())>70:
-  narration=" ".join(narration.split()[:70])
+ if len(narration.split())>55:
+  narration=" ".join(narration.split()[:55])
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  print(f"NamuWiki research complete: {chosen}; artist={artist}; group={group}; birth={birth or 'not listed'}; narration_words={len(narration.split())}.")
  return {
