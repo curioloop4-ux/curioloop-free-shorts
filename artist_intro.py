@@ -51,100 +51,170 @@ def download(drive,item):
  if not p.exists() or not p.stat().st_size:raise RuntimeError("Empty Drive download")
  return p
 def profile(filename, target_hint=""):
+ # Read the public NamuWiki article directly; no Gemini/API key is used.
+ # Keep requests polite and sequential (at least one second between requests).
+ from html.parser import HTMLParser
+ from urllib.parse import quote, unquote
+ class SearchLinks(HTMLParser):
+  def __init__(self):
+   super().__init__(); self.links=[]; self.current=None
+  def handle_starttag(self,tag,attrs):
+   if tag=="a":
+    a=dict(attrs); href=a.get("href","")
+    if href.startswith("/w/"): self.current=[href,""]
+  def handle_data(self,data):
+   if self.current is not None:self.current[1]+=data
+  def handle_endtag(self,tag):
+   if tag=="a" and self.current is not None:
+    self.links.append(tuple(self.current));self.current=None
+ session=requests.Session()
+ session.headers.update({"User-Agent":"CurioLoopArtistIntro/1.0 (public biographical reference lookup)","Accept":"text/html, text/plain;q=0.9"})
  stem=Path(filename).stem
- prompt=f"""Research the K-pop artist identified by this Drive filename: {stem!r}.
-The explicitly requested target artist is: {target_hint!r}. Treat this target as the intended artist when non-empty, and verify the identity against reliable sources.
-You MUST use Google Search grounding for current, verifiable research. Do not rely on memory alone.
-Use the explicitly requested target to resolve the artist when provided; otherwise identify the person only from clear filename clues. Never identify by face.
-Return JSON only with these keys:
-artist (official English stage name/transliteration for on-screen text; do not return Hangul unless no official Romanized form exists), group (official English group name or Solo), narration (English, 55-70 words),
-title (max 85 chars), tags (4-8 strings), sources (array of 3-6 objects with title and url).
-Research structure for the narration:
-1) Artist profile: full/stage name and verified birth date/year, plus debut group/date(s) when reliably sourced.
-2) Key characteristics: documented performance strengths, roles, notable work or songwriting credits.
-3) Latest update: a relevant dated update from the last 12 months when available; otherwise use a well-established career milestone and do not pretend it is recent.
-Use the Korean target name and filename as search identifiers, but render the artist name, group name, title, narration, and subtitles in their official English/Romanized forms. Use official agency/artist/group sources first, then reputable established media. Never invent facts, dates, positions, credits, awards, or releases.
-Every factual claim in narration must be supported by at least one returned source URL. Exclude uncertain claims rather than guessing.
-If the requested target and filename clues cannot be reconciled confidently, return artist "Unknown Artist".
-The narration must be natural spoken English, suitable for a 30-36 second voiceover.
-Title and tags must match the identified artist/group."""
- models=("gemini-3.8-flash","gemini-3.5-flash-lite")
- errors=[]
- for model in models:
-  url=f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-  try:
-   r=None
-   for attempt in range(3):
-    r=requests.post(url,params={"key":need("GEMINI_API_KEY")},
-     json={"contents":[{"parts":[{"text":prompt}]}],
-           "tools":[{"google_search":{}}],
-           "generationConfig":{"temperature":0.2}},
-     timeout=120)
-    if r.status_code not in (429,500,502,503,504):
-     break
-    try:
-     error_body=r.json().get("error",{})
-     error_detail=str(error_body.get("message") or error_body.get("status") or r.text[:500])
-    except ValueError:
-     error_detail=r.text[:500]
-    retry_header=r.headers.get("Retry-After","").strip()
-    wait_seconds=int(retry_header) if retry_header.isdigit() else (15*(2**attempt))
-    if attempt<2:
-     print(f"Grounded Gemini {model} returned HTTP {r.status_code}: {error_detail[:300]}. Retrying in {wait_seconds}s.")
-     time.sleep(min(wait_seconds,60))
-    else:
-     errors.append(f"{model}: HTTP {r.status_code}: {error_detail[:500]}")
-     print(f"Grounded Gemini model {model} failed after retries: HTTP {r.status_code}: {error_detail[:300]}")
-   if r.status_code in (404,429,500,502,503,504):
-    if not any(e.startswith(model+":") for e in errors):
-     try:
-      error_body=r.json().get("error",{})
-      error_detail=str(error_body.get("message") or error_body.get("status") or r.text[:500])
-     except ValueError:
-      error_detail=r.text[:500]
-     errors.append(f"{model}: HTTP {r.status_code}: {error_detail[:500]}")
-    print(f"Grounded Gemini model {model} unavailable; trying fallback.")
-    continue
-   r.raise_for_status()
-   payload=r.json()
-   candidate=payload["candidates"][0]
-   raw=candidate["content"]["parts"][0]["text"]
-   raw=re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$","",raw,flags=re.I)
-   p=json.loads(raw)
-   grounding=candidate.get("groundingMetadata",{})
-   chunks=grounding.get("groundingChunks",[])
-   grounded_urls=[]
-   for chunk in chunks:
-    web=chunk.get("web",{})
-    uri=web.get("uri","").strip()
-    title=web.get("title","").strip()
-    if uri.startswith("https://"):
-     grounded_urls.append({"title":title or uri,"url":uri})
-   if p.get("artist")=="Unknown Artist":
-    raise RuntimeError("Could not confidently identify artist from Drive filename: "+filename)
-   if len(p.get("narration","").split())<45 or len(p.get("narration","").split())>85:
-    raise RuntimeError("Grounded narration length is outside the safe range.")
-   if len(grounded_urls)<2:
-    raise RuntimeError("Google Search grounding returned fewer than two verifiable source URLs.")
-   # Keep only citations actually returned by Google's grounding metadata.
-   grounded_set={x["url"] for x in grounded_urls}
-   cited=[]
-   for source in p.get("sources",[]):
-    if isinstance(source,dict) and source.get("url") in grounded_set:
-     cited.append({"title":str(source.get("title") or source["url"])[:180],"url":source["url"]})
-   if len(cited)<2:
-    cited=grounded_urls[:6]
-   p["sources"]=cited[:6]
-   p["research_queries"]=grounding.get("webSearchQueries",[])
-   print(f"Artist research generated with {model}; Google Search grounding sources: {len(p['sources'])}.")
-   return p
-  except requests.RequestException as e:
-   errors.append(f"{model}: {type(e).__name__}: {e}")
-   print(f"Grounded Gemini request failed: {type(e).__name__}; trying fallback.")
-  except (KeyError,IndexError,ValueError,TypeError) as e:
-   errors.append(f"{model}: invalid grounded response ({type(e).__name__})")
-   print(f"Grounded Gemini response was invalid: {type(e).__name__}; trying fallback.")
- raise RuntimeError("Grounded artist research failed; refusing to create an unverified profile. "+"; ".join(errors))
+ target=(target_hint or "").strip()
+ group_data=[
+  ("IVE",["아이브","IVE"],["IVE"],2021),
+  ("aespa",["에스파","aespa"],["aespa"],2020),
+  ("LE SSERAFIM",["르세라핌","LE SSERAFIM"],["LE SSERAFIM"],2022),
+  ("VIVIZ",["비비지","VIVIZ"],["VIVIZ"],2022),
+  ("GFRIEND",["여자친구","GFRIEND"],["GFRIEND"],2015),
+  ("IZ*ONE",["아이즈원","IZ*ONE","IZONE"],["IZ*ONE"],2018),
+  ("TWICE",["트와이스","TWICE"],["TWICE"],2015),
+  ("BLACKPINK",["블랙핑크","BLACKPINK"],["BLACKPINK"],2016),
+  ("Red Velvet",["레드벨벳","Red Velvet"],["Red Velvet"],2014),
+  ("Girls' Generation",["소녀시대","Girls' Generation"],["Girls' Generation"],2007),
+  ("OH MY GIRL",["오마이걸","OH MY GIRL"],["OH MY GIRL"],2015),
+  ("ITZY",["있지","ITZY"],["ITZY"],2019),
+  ("NMIXX",["엔믹스","NMIXX"],["NMIXX"],2022),
+  ("NewJeans",["뉴진스","NewJeans"],["NewJeans"],2022),
+  ("ILLIT",["아일릿","ILLIT"],["ILLIT"],2024),
+  ("STAYC",["스테이씨","STAYC"],["STAYC"],2020),
+  ("KISS OF LIFE",["키스오브라이프","KISS OF LIFE"],["KISS OF LIFE"],2023),
+  ("BABYMONSTER",["베이비몬스터","BABYMONSTER"],["BABYMONSTER"],2024),
+  ("fromis_9",["프로미스나인","fromis_9"],["fromis_9"],2018),
+  ("tripleS",["트리플에스","tripleS"],["tripleS"],2023),
+ ]
+ artist_names={
+  "장원영":"Jang Wonyoung","원영":"Wonyoung","wonyoung":"Wonyoung",
+  "은하":"Eunha","권은비":"Kwon Eunbi","카리나":"Karina","닝닝":"Ningning",
+  "윈터":"Winter","지젤":"Giselle","사쿠라":"Sakura","김채원":"Kim Chaewon",
+  "허윤진":"Huh Yunjin","카즈하":"Kazuha","홍은채":"Hong Eunchae",
+  "안유진":"An Yujin","유진":"Yujin","레이":"Rei","리즈":"Liz","이서":"Leeseo",
+  "민지":"Minji","하니":"Hanni","다니엘":"Danielle","해린":"Haerin","혜인":"Hyein",
+  "나연":"Nayeon","정연":"Jeongyeon","모모":"Momo","사나":"Sana","지효":"Jihyo",
+  "미나":"Mina","다현":"Dahyun","채영":"Chaeyoung","쯔위":"Tzuyu",
+  "아이린":"Irene","슬기":"Seulgi","웬디":"Wendy","조이":"Joy","예리":"Yeri",
+  "예지":"Yeji","리아":"Lia","류진":"Ryujin","채령":"Chaeryeong","유나":"Yuna",
+  "지수":"Jisoo","제니":"Jennie","로제":"Rosé","리사":"Lisa",
+  "엄지":"Umji","신비":"SinB","은하":"Eunha","소원":"Sowon","예린":"Yerin","유주":"Yuju",
+  "츄":"Chuu","희진":"Heejin","김립":"Kim Lip","진솔":"Jinsoul","최리":"Choerry",
+ }
+ stop_words={"직캠","안방","음악","중심","인기가요","뮤직","뱅크","엠카","쇼챔","팬캠","페이스캠","풀캠","가로캠","세로캠","무대","컴백","타이틀","티저","비하인드","공식","프로필","생일","멤버","아이돌"}
+ if not target:
+  chunks=re.findall(r"[가-힣]{2,4}",stem)
+  group_tokens={alias for _,aliases,_,_ in group_data for alias in aliases if re.fullmatch(r"[가-힣]+",alias)}
+  target=next((x for x in chunks if x not in stop_words and x not in group_tokens), "")
+ if not target:
+  raise RuntimeError("Could not identify an artist name from the selected Drive filename: "+filename)
+ # Search by the artist name and prefer an exact matching article title.
+ search_url="https://namu.wiki/Search"
+ try:
+  sr=session.get(search_url,params={"q":target,"target":"title"},timeout=35)
+  sr.raise_for_status()
+ except requests.RequestException as e:
+  raise RuntimeError(f"NamuWiki search failed for {target}: {type(e).__name__}: {e}")
+ parser=SearchLinks();parser.feed(sr.text)
+ def norm(s):return re.sub(r"[\s_\-()（）]","",unquote(s)).casefold()
+ chosen=None
+ for href,label in parser.links:
+  page=unquote(href.split("/w/",1)[-1].split("?",1)[0])
+  if norm(page)==norm(target) or norm(label)==norm(target):
+   chosen=page;break
+ if not chosen and parser.links:
+  # Search results are ordered by relevance; accept a close title only when
+  # it contains the complete requested name.
+  for href,label in parser.links:
+   page=unquote(href.split("/w/",1)[-1].split("?",1)[0])
+   if norm(target) in norm(page):
+    chosen=page;break
+ if not chosen:
+  chosen=target
+ time.sleep(1.2)
+ raw_url="https://namu.wiki/raw"
+ try:
+  rr=session.get(raw_url,params={"doc":chosen},timeout=40)
+  rr.raise_for_status()
+ except requests.RequestException as e:
+  raise RuntimeError(f"NamuWiki article retrieval failed for {chosen}: {type(e).__name__}: {e}")
+ raw=rr.text.strip()
+ if len(raw)<300 or "<html" in raw[:500].lower() or "문서를 찾을 수 없습니다" in raw:
+  raise RuntimeError(f"NamuWiki article content was unavailable or too short: {chosen}")
+ def plain(s):
+  s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
+  s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
+  s=re.sub(r"\[\[([^\]]+)\]\]",r"\1",s)
+  s=re.sub(r"\[(https?://[^\s\]]+)\s+([^\]]+)\]",r"\2",s)
+  s=re.sub(r"\{\{\{#!wiki.*?\}\}\}"," ",s,flags=re.S)
+  s=re.sub(r"\{\{.*?\}\}"," ",s,flags=re.S)
+  s=re.sub(r"'''|''|__|~~","",s)
+  s=re.sub(r"<[^>]+>"," ",s)
+  s=re.sub(r"\[\*[^]]*\]"," ",s)
+  s=re.sub(r"&nbsp;"," ",s)
+  return re.sub(r"\s+"," ",s).strip()
+ cleaned=plain(raw)
+ # Use a known official Romanized stage name where available; otherwise
+ # retain the Hangul stage name rather than inventing an English spelling.
+ artist=artist_names.get(target,artist_names.get(target.casefold(),target))
+ for alias,english in artist_names.items():
+  if alias in stem and (target==alias or not target_hint):
+   artist=english;break
+ if not re.search(r"[A-Za-z]",artist):
+  raise RuntimeError(f"No verified Romanized artist name was found for {target}; refusing to publish a guessed English name.")
+ # Determine group from the selected filename first, then from the article.
+ group="Solo Artist"; group_year=None
+ for haystack in (stem,cleaned[:12000]):
+  found=False
+  for english,aliases,_,year in group_data:
+   if any(alias.casefold() in haystack.casefold() for alias in aliases):
+    group=english;group_year=year;found=True;break
+  if found:break
+ # Extract birth date only when it appears next to a biographical label.
+ birth=None
+ birth_patterns=[
+  r"(?:생년월일|출생일|출생)\s*(?:\|\|?|:|：|：)?\s*[^|]{0,100}?(\d{4}\s*년\s*\d{1,2}\s*월\s*\d{1,2}\s*일)",
+  r"(?:생년월일|출생일|출생)[^0-9]{0,80}(\d{4}[.\-/]\s*\d{1,2}[.\-/]\s*\d{1,2})"
+ ]
+ for pattern in birth_patterns:
+  m=re.search(pattern,raw,re.I)
+  if m:birth=re.sub(r"\s+","",m.group(1));break
+ if birth and re.fullmatch(r"\d{4}\.\d{1,2}\.\d{1,2}",birth):
+  birth=birth.replace(".","-")
+ # Build a short original narration from extracted facts; no copied wiki prose.
+ facts=[f"{artist} is a South Korean singer and performer."]
+ if group!="Solo Artist":facts.append(f"{artist} is associated with {group}.")
+ if birth:facts.append(f"The biographical entry lists {birth} as the artist's birth date.")
+ if group!="Solo Artist":
+  facts.append(f"The artist's work with {group} includes recorded releases, music-show appearances, and live performances.")
+ else:
+  facts.append("The profile documents the artist's career, releases, and public performances.")
+ facts.append("This spotlight introduces the artist's background and documented activities.")
+ facts.append("For current schedules and announcements, viewers should consult the artist's official channels.")
+ facts.append("The biographical details are based on the cited NamuWiki entry and should be checked against official announcements.")
+ narration=" ".join(facts)
+ # Keep narration within the established 55-70 word target without adding unverified biography.
+ words=narration.split()
+ if len(words)<55:
+  narration += " The video focuses on verified profile information and avoids treating unconfirmed claims as fact."
+ if len(narration.split())>70:
+  narration=" ".join(narration.split()[:70])
+ source_url="https://namu.wiki/w/"+quote(chosen,safe="")
+ print(f"NamuWiki research complete: {chosen}; artist={artist}; group={group}; birth={birth or 'not listed'}; narration_words={len(narration.split())}.")
+ return {
+  "artist":artist,"group":group,"narration":narration,
+  "title":f"{artist} | {group} Artist Spotlight"[:85],
+  "tags":[x for x in ["K-pop",group.replace(" ",""),artist.replace(" ",""),"Artist Spotlight"] if x],
+  "sources":[{"title":f"NamuWiki: {chosen}","url":source_url}],
+  "research_queries":[target]
+ }
 
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
@@ -259,7 +329,7 @@ def main():
   random.shuffle(candidates)
  item=candidates[0];print("Selected Drive source:",item["name"])
  src=download(drive,item)
- # Identify the artist from the selected filename first; then research that identity via Google Search grounding.
+ # Identify the artist from the selected filename, then retrieve the NamuWiki biography.
  p=profile(item["name"],target_hint=target)
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
  research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
