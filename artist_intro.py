@@ -286,7 +286,7 @@ def profile(filename, target_hint=""):
   if any((a["title"].casefold(),a["publisher"].casefold())==key for a in articles):return
   articles.append({"title":title[:220],"description":description[:600],"url":url,"publisher":publisher or "Unknown outlet","published":published or "","language":language})
  # Keep profile/interview research sources separate from spoken news.
- for query in [f'"{target}" "{group}" profile height weight birthday',f'"{target}" "{group}" interview hobby personality']:
+  for query in [f'"{target}" {group_query} news interview statement when:30d',f'"{artist}" {group_query} latest news controversy interview when:30d']:
   try:
    rr=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=18);rr.raise_for_status()
    for node in ET.fromstring(rr.content).findall(".//item"):
@@ -295,12 +295,13 @@ def profile(filename, target_hint=""):
     if len(web_facts)>=6:break
   except Exception as e:print("Profile web search unavailable:",type(e).__name__)
   time.sleep(0.7)
- # Four feeds: Korean reporting plus English/international reporting.
- feeds=[
-  (f'"{target}" {group} when:30d',"ko","KR","KR:ko"),
-  (f'"{target}" 인터뷰 OR 입장 OR 논란 OR 화제 when:30d',"ko","KR","KR:ko"),
-  (f'"{artist}" {group} when:30d',"en-US","US","US:en"),
-  (f'"{artist}" interview OR statement OR controversy OR news when:30d',"en-US","US","US:en")]
+  # Four feeds: Korean reporting plus English/international reporting.
+  group_query="" if group=="Group affiliation not confirmed" else group
+  feeds=[
+   (f'"{target}" {group_query} when:30d',"ko","KR","KR:ko"),
+   (f'"{target}" 인터뷰 OR 입장 OR 논란 OR 화제 when:30d',"ko","KR","KR:ko"),
+   (f'"{artist}" {group_query} when:30d',"en-US","US","US:en"),
+   (f'"{artist}" interview OR statement OR controversy OR news when:30d',"en-US","US","US:en")]
  for query,hl,gl,ceid in feeds:
   try:
    rr=session.get("https://news.google.com/rss/search",params={"q":query,"hl":hl,"gl":gl,"ceid":ceid,"sort":"date"},timeout=20);rr.raise_for_status()
@@ -383,6 +384,9 @@ def profile(filename, target_hint=""):
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
+  for item in articles:
+   if item.get("url") and item["url"].startswith("http") and item["url"] not in [x["url"] for x in sources] and len(sources)<10:
+    sources.append({"title":("News: "+item.get("title",""))[:100],"url":item["url"]})
  for item in web_facts[:3]:
   if item.get("url") and item["url"] not in [x["url"] for x in sources]:
    sources.append({"title":item.get("title","Public source")[:100],"url":item["url"]})
