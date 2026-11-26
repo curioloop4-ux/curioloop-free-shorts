@@ -720,7 +720,7 @@ def render(src,p,hist):
      right_part,right_seconds=await generate_sentence(right,index*2+1,depth+1)
      joined=W/f"voice_recovered_{index:03d}_{depth}.mp3"
      listing=W/f"voice_recovered_{index:03d}_{depth}.txt"
-     listing.write_text("file '"+str(left_part.resolve()).replace("\\\\","/")+"'+\\n"+"file '"+str(right_part.resolve()).replace("\\\\","/")+"'\\n",encoding="utf-8")
+     listing.write_text("file '"+str(left_part.resolve()).replace("\\","/")+"'\n"+"file '"+str(right_part.resolve()).replace("\\","/")+"'\n",encoding="utf-8")
      run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),"-c:a","libmp3lame","-q:a","3",str(joined)])
      return joined,dur(joined)
    for i,sentence in enumerate(sentences):
