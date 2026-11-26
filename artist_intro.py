@@ -245,89 +245,139 @@ def profile(filename, target_hint=""):
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
  personality=labeled_value(["성격","특징","매력 포인트"])
- # Search the open web, not just Google News. Combine general web results
- # (profiles, interviews, appearances, performances) with recent news.
- from xml.etree import ElementTree as ET
- from urllib.parse import quote_plus
- news_title=None;news_url=None;news_date=None;news_source=None
- web_facts=[]
- # Build the core narration before adding verified web-coverage highlights.
- facts=[f"Meet {artist}, a K-pop artist."]
- if group!="Group affiliation not confirmed":
-  facts.append(f"{artist} is a member of {group}.")
-  if group_year:facts.append(f"The group made its debut in {group_year}.")
- if birth_year:facts.append(f"{artist} was born in {birth_year}.")
- if height:facts.append(f"{artist} is {height} tall.")
- if weight:facts.append(f"{artist} weighs {weight}.")
- if waist:facts.append(f"{artist}'s listed waist measurement is {waist}.")
- if shoe_size:facts.append(f"{artist}'s listed shoe size is {shoe_size}.")
- if body_size:facts.append(f"The listed body measurements are {body_size}.")
- if position:facts.append(f"Within the group, {artist}'s position is {position}.")
- if nickname:facts.append(f"Fans also know {artist} as {nickname}.")
- if hobby:facts.append(f"Outside of performing, {artist} enjoys {hobby}.")
- if personality:facts.append(f"Her profile describes her as {personality}.")
- queries=[
-  f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',""),
-  f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',""),
-  f'"{target}" "{group}" variety appearance performance award'.replace('"Group affiliation not confirmed"',""),
-  f'"{target}" "{group}" news activity'.replace('"Group affiliation not confirmed"',"")
- ]
- def relevant_result(title,description):
-  blob=(title+" "+description).casefold()
-  aliases=[target.casefold(),artist.casefold()]
-  return any(x and x in blob for x in aliases)
- seen_urls=set()
- for q in queries:
-  try:
-   response=session.get("https://www.bing.com/search",params={"format":"rss","q":q},timeout=20)
-   response.raise_for_status()
-   root=ET.fromstring(response.content)
-   for node in root.findall(".//item"):
-    tn=node.find("title");ln=node.find("link");dn=node.find("description")
-    title=plain(tn.text or "") if tn is not None else ""
-    url=(ln.text or "").strip() if ln is not None else ""
-    description=plain(dn.text or "") if dn is not None else ""
-    if not title or not url or url in seen_urls or not relevant_result(title,description): continue
-    seen_urls.add(url)
-    web_facts.append({"title":title[:180],"description":description[:260],"url":url})
-    if len(web_facts)>=6: break
-   if len(web_facts)>=6: break
-  except Exception as e:
-   print("General web search unavailable:",type(e).__name__,str(e)[:160])
-  time.sleep(0.8)
- # General web snippets are useful for research, but are not verified news
- # headlines. Never turn search snippets or metadata into spoken news.
- # Keep Google News as a separate recent-coverage fallback and cross-check.
- try:
-  search_terms=[f'"{target}" {group} when:30d',f'"{target}" K-pop when:30d']
-  for search_term in search_terms:
-   rss=session.get("https://news.google.com/rss/search?q="+quote_plus(search_term)+"&hl=ko&gl=KR&ceid=KR:ko&sort=date",timeout=20)
-   rss.raise_for_status();root=ET.fromstring(rss.content)
-   for node in root.findall(".//item"):
-    tn=node.find("title");ln=node.find("link");dn=node.find("description");sn=node.find("source");pn=node.find("pubDate")
-    title=plain(tn.text or "") if tn is not None else ""
-    url=(ln.text or "").strip() if ln is not None else ""
-    description=plain(dn.text or "") if dn is not None else ""
-    aliases=[target,artist,group]
-    headline_matches=any(alias and alias!="Group affiliation not confirmed" and alias.casefold() in title.casefold() for alias in aliases)
-    # Only use a real, artist-specific English headline; skip snippets, generic
-    # coverage labels, and Korean headlines that an English TTS voice mangles.
-    english_headline=bool(re.search(r"[A-Za-z]{3,}",title)) and not re.search(r"[가-힣]",title)
-    if title and len(title)>=18 and headline_matches and english_headline and url and url not in seen_urls:
-     seen_urls.add(url)
-     if not news_title:
-      news_title=title[:180];news_url=url
-      news_date=pn.text.strip() if pn is not None and pn.text else None
-      news_source=sn.text.strip() if sn is not None and sn.text else "Google News"
-     break
-   if news_title: break
- except Exception as e:
-  print("Recent news search unavailable:",type(e).__name__,str(e)[:160])
- # Add only the verified article headline. If no suitable headline exists,
- # omit the news section entirely rather than filling it with search metadata.
- if news_title:
-  facts.append(f"Recent news about {artist}: {news_title}")
- narration=" ".join(facts)
+ # Search recent coverage across Korean and English editions and rank issue clusters.
+  from xml.etree import ElementTree as ET
+  from urllib.parse import urlparse
+  news_title=None;news_url=None;news_date=None;news_source=None
+  news_explanation=None;news_outlets=[];news_article_count=0
+  web_facts=[];articles=[]
+  facts=[f"Meet {artist}, a K-pop artist."]
+  if group!="Group affiliation not confirmed":
+   facts.append(f"{artist} is a member of {group}.")
+   if group_year:facts.append(f"The group made its debut in {group_year}.")
+  if birth_year:facts.append(f"{artist} was born in {birth_year}.")
+  if height:facts.append(f"{artist} is {height} tall.")
+  if weight:facts.append(f"{artist} weighs {weight}.")
+  if waist:facts.append(f"{artist}'s listed waist measurement is {waist}.")
+  if shoe_size:facts.append(f"{artist}'s listed shoe size is {shoe_size}.")
+  if body_size:facts.append(f"The listed body measurements are {body_size}.")
+  if position:facts.append(f"Within the group, {artist}'s position is {position}.")
+  if nickname:facts.append(f"Fans also know {artist} as {nickname}.")
+  if hobby:facts.append(f"Outside of performing, {artist} enjoys {hobby}.")
+  if personality:facts.append(f"Her profile describes her as {personality}.")
+  def relevant(title,description):
+   blob=(title+" "+description).casefold()
+   return any(x and x.casefold() in blob for x in (target,artist))
+  def publisher_key(item):
+   value=(item.get("publisher") or "").strip().casefold()
+   return re.sub(r"[^a-z0-9가-힣]","",value) if value else urlparse(item.get("url","")).netloc.casefold().removeprefix("www.")
+  def tokens(value):
+   stop={"the","and","for","with","from","that","this","has","have","was","are","her","his","their","about","after","before","into","over","under","news","report","reports","video","photos","photo","인터뷰","관련","근황","공개","화제","뉴스","소식","그룹"}
+   ignored={target.casefold(),artist.casefold(),group.casefold()}
+   return {w for w in re.findall(r"[a-z0-9가-힣]{2,}",re.sub(r"\s+-\s+[^-]{2,55}$","",value).casefold()) if w not in stop and w not in ignored}
+  def similarity(a,b):
+   x=tokens(a);y=tokens(b)
+   return len(x&y)/len(x|y) if x and y else 0.0
+  def add_article(title,description,url,publisher,published,language):
+   title=plain(title or "");description=plain(description or "")
+   if not title or not url or not relevant(title,description) or len(title)<16:return
+   if re.search(r"coverage report|recent coverage|search results|top stories",title,re.I):return
+   key=(title.casefold(),(publisher or "").casefold())
+   if any((a["title"].casefold(),a["publisher"].casefold())==key for a in articles):return
+   articles.append({"title":title[:220],"description":description[:600],"url":url,"publisher":publisher or "Unknown outlet","published":published or "","language":language})
+  # Keep profile/interview research sources separate from spoken news.
+  for query in [f'"{target}" "{group}" profile height weight birthday',f'"{target}" "{group}" interview hobby personality']:
+   try:
+    rr=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=18);rr.raise_for_status()
+    for node in ET.fromstring(rr.content).findall(".//item"):
+     title=plain(node.findtext("title") or "");url=(node.findtext("link") or "").strip();desc=plain(node.findtext("description") or "")
+     if title and url and relevant(title,desc) and not any(x["url"]==url for x in web_facts):web_facts.append({"title":title[:180],"url":url})
+     if len(web_facts)>=6:break
+   except Exception as e:print("Profile web search unavailable:",type(e).__name__)
+   time.sleep(0.7)
+  # Four feeds: Korean reporting plus English/international reporting.
+  feeds=[
+   (f'"{target}" {group} when:30d',"ko","KR","KR:ko"),
+   (f'"{target}" 인터뷰 OR 입장 OR 논란 OR 화제 when:30d',"ko","KR","KR:ko"),
+   (f'"{artist}" {group} when:30d',"en-US","US","US:en"),
+   (f'"{artist}" interview OR statement OR controversy OR news when:30d',"en-US","US","US:en")]
+  for query,hl,gl,ceid in feeds:
+   try:
+    rr=session.get("https://news.google.com/rss/search",params={"q":query,"hl":hl,"gl":gl,"ceid":ceid,"sort":"date"},timeout=20);rr.raise_for_status()
+    for node in ET.fromstring(rr.content).findall(".//item"):
+     src=node.find("source")
+     add_article(node.findtext("title") or "",node.findtext("description") or "",(node.findtext("link") or "").strip(),src.text.strip() if src is not None and src.text else "Google News",node.findtext("pubDate") or "",hl)
+   except Exception as e:print("Google News feed unavailable:",hl,type(e).__name__)
+   time.sleep(0.8)
+  # Bing contributes direct publisher links and, where available, explanatory snippets.
+  for query in [f'"{target}" {group} news interview statement when:30d',f'"{artist}" {group} latest news controversy interview when:30d']:
+   try:
+    rr=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=20);rr.raise_for_status()
+    for node in ET.fromstring(rr.content).findall(".//item"):
+     url=(node.findtext("link") or "").strip()
+     add_article(node.findtext("title") or "",node.findtext("description") or "",url,urlparse(url).netloc.replace("www.",""),"","en")
+   except Exception as e:print("Bing news search unavailable:",type(e).__name__)
+   time.sleep(0.8)
+  # Merge paraphrased headlines; rank by distinct outlets, then article count.
+  clusters=[]
+  for article in articles:
+   best=None;best_score=0.0
+   for cluster in clusters:
+    score=max(similarity(article["title"],x["title"]) for x in cluster)
+    if score>best_score:best=cluster;best_score=score
+   if best is not None and best_score>=0.30:best.append(article)
+   else:clusters.append([article])
+  ranked=[]
+  for cluster in clusters:
+   outlets={publisher_key(x) for x in cluster if publisher_key(x)}
+   if outlets:ranked.append((len(outlets),len(cluster),cluster))
+  ranked.sort(key=lambda x:(x[0],x[1]),reverse=True)
+  if ranked:
+   outlet_count,article_count,cluster=ranked[0]
+   english=[x for x in cluster if x["language"].startswith("en") and not re.search(r"[가-힣]",x["title"])]
+   # Google RSS descriptions are often just headlines; retrieve publisher meta descriptions.
+   class ArticleMeta(HTMLParser):
+    def __init__(self):
+     super().__init__();self.description="";self.paragraphs=[];self.in_p=False;self.current=[]
+    def handle_starttag(self,tag,attrs):
+     attrs=dict(attrs)
+     if tag=="meta" and (attrs.get("name","").casefold()=="description" or attrs.get("property","").casefold() in ("og:description","twitter:description")) and not self.description:self.description=attrs.get("content","").strip()
+     if tag=="p":self.in_p=True;self.current=[]
+    def handle_data(self,data):
+     if self.in_p:self.current.append(data)
+    def handle_endtag(self,tag):
+     if tag=="p" and self.in_p:
+      value=re.sub(r"\s+"," "," ".join(self.current)).strip()
+      if len(value)>60:self.paragraphs.append(value)
+      self.in_p=False
+   for article in english[:4]:
+    if len(article["description"])>90 or "news.google.com" in article["url"]:continue
+    try:
+     page=session.get(article["url"],timeout=12)
+     if page.ok and "html" in page.headers.get("content-type","").casefold():
+      parser=ArticleMeta();parser.feed(page.text[:450000])
+      detail=plain(parser.description or (parser.paragraphs[0] if parser.paragraphs else ""))
+      if len(detail)>60:article["description"]=detail[:600]
+    except Exception as e:print("Article detail unavailable:",type(e).__name__)
+    time.sleep(0.8)
+   details=[];used=set()
+   for article in sorted(english,key=lambda x:len(x["description"]),reverse=True):
+    outlet=publisher_key(article);detail=plain(article["description"])
+    if not outlet or outlet in used or len(detail)<55 or similarity(detail,article["title"])>0.72 or re.search(r"[가-힣]",detail):continue
+    used.add(outlet);details.append(detail)
+    if len(details)==2:break
+   # Omit unsupported stories: require two publishers and explanatory copy.
+   if outlet_count>=2 and details:
+    lead=english[0] if english else cluster[0]
+    news_title=re.sub(r"\s+-\s+[^-]{2,55}$","",lead["title"]).strip()[:150]
+    news_url=lead["url"];news_date=lead["published"] or None;news_source=lead["publisher"]
+    news_outlets=sorted({x["publisher"] for x in cluster})[:8];news_article_count=article_count
+    sentences=[f"The most widely covered recent story about {artist} concerns {news_title.rstrip('. ')}."]
+    sentences.append(f"Coverage from {outlet_count} independent outlets reports that {re.split(r'(?<=[.!?])\\s+',details[0])[0][:230]}")
+    if len(details)>1:sentences.append(f"Other reporting also noted that {re.split(r'(?<=[.!?])\\s+',details[1])[0][:190]}")
+    news_explanation=" ".join(sentences);facts.append(news_explanation)
+  print(f"News research: collected={len(articles)}; top_issue={news_title or 'omitted'}; articles={news_article_count}; independent_outlets={len(news_outlets)}.")
+  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
  for item in web_facts[:3]:
@@ -339,7 +389,7 @@ def profile(filename, target_hint=""):
   "title":f"{artist} | {group} Artist Spotlight"[:85],
   "tags":[x for x in ["K-pop",group.replace(" ",""),artist.replace(" ",""),"Artist Spotlight"] if x],
   "sources":sources,
-  "recent_news":{"title":news_title,"url":news_url,"date":news_date,"publisher":news_source},
+  "recent_news":{"title":news_title,"url":news_url,"date":news_date,"publisher":news_source,"explanation":news_explanation,"article_count":news_article_count,"outlets":news_outlets},
   "research_queries":[target]
  }
 
