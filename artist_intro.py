@@ -683,34 +683,51 @@ def render(src,p,hist):
    if current: sentences.append(current)
   async def generate_segments(rate):
    parts=[]; durations=[]
-   for i,sentence in enumerate(sentences):
-    part=W/f"voice_part_{i:03d}.mp3"
-    voices=["en-US-AriaNeural","en-US-JennyNeural","en-GB-SoniaNeural"]
-    last_error=None; generated=False
+   voices=["en-US-AriaNeural","en-US-JennyNeural","en-GB-SoniaNeural"]
+   async def generate_one(text,label):
+    part=W/f"voice_part_{label}.mp3"
+    last_error=None
     for voice in voices:
      for attempt in range(1,4):
       try:
        if part.exists(): part.unlink()
-       communicate=edge_tts.Communicate(sentence,voice,rate=rate)
+       communicate=edge_tts.Communicate(text,voice,rate=rate)
        await communicate.save(str(part))
        if not part.exists() or part.stat().st_size<1024:
         raise RuntimeError("TTS returned an empty or incomplete audio segment")
-       segment_seconds=dur(part)
-       if segment_seconds<=0:
-        raise RuntimeError("TTS audio segment has invalid duration")
-       print(f"TTS segment {i+1}/{len(sentences)} generated with {voice}, rate {rate} (attempt {attempt}).")
-       generated=True;break
+       seconds=dur(part)
+       if seconds<=0: raise RuntimeError("TTS audio segment has invalid duration")
+       print(f"TTS segment {label} generated with {voice}, rate {rate} (attempt {attempt}).")
+       return part,seconds
       except Exception as exc:
        last_error=exc
-       print(f"TTS attempt failed for segment {i+1}, voice {voice}, rate {rate}, attempt {attempt}/3: {type(exc).__name__}: {exc}")
+       print(f"TTS attempt failed for segment {label}, voice {voice}, rate {rate}, attempt {attempt}/3: {type(exc).__name__}: {exc}")
        if part.exists(): part.unlink()
        if attempt<3: await asyncio.sleep(2*attempt)
-     if generated:break
-    if not generated:
-     raise RuntimeError(f"All Edge TTS voices failed for narration segment {i+1}: {last_error}") from last_error
-    parts.append(part);durations.append(segment_seconds)
+    raise RuntimeError(f"All Edge TTS voices failed for segment {label}: {last_error}") from last_error
+   async def generate_sentence(text,index,depth=0):
+    label=f"{index:03d}_{depth}_{len(text)}"
+    try:
+     return await generate_one(text,label)
+    except Exception as exc:
+     words=text.split()
+     if depth>=2 or len(words)<4:
+      raise
+     midpoint=len(words)//2
+     left=" ".join(words[:midpoint]); right=" ".join(words[midpoint:])
+     print(f"TTS recovery: splitting failed narration segment {index+1} into two shorter requests (split depth {depth+1}). Original error: {exc}")
+     left_part,left_seconds=await generate_sentence(left,index*2,depth+1)
+     right_part,right_seconds=await generate_sentence(right,index*2+1,depth+1)
+     joined=W/f"voice_recovered_{index:03d}_{depth}.mp3"
+     listing=W/f"voice_recovered_{index:03d}_{depth}.txt"
+     listing.write_text("file '"+str(left_part.resolve()).replace("\\\\","/")+"'+\\n"+"file '"+str(right_part.resolve()).replace("\\\\","/")+"'\\n",encoding="utf-8")
+     run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(listing),"-c:a","libmp3lame","-q:a","3",str(joined)])
+     return joined,dur(joined)
+   for i,sentence in enumerate(sentences):
+    part,seconds=await generate_sentence(sentence,i)
+    parts.append(part);durations.append(seconds)
    concat_list=W/"voice_concat.txt"
-   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10),encoding="utf-8")
+   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\\\","/") + "'" for x in parts) + chr(10),encoding="utf-8")
    run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
    return durations,dur(audio)
   # Intro card and ending take 3 seconds total, so narration must fit 47 seconds.
