@@ -295,13 +295,18 @@ def profile(filename, target_hint=""):
     if len(web_facts)>=6:break
   except Exception as e:print("Profile web search unavailable:",type(e).__name__)
   time.sleep(0.7)
- # Four feeds: Korean reporting plus English/international reporting.
+ # Search several distinct news angles in Korean and English. The wider
+ # query set prevents a single narrow headline search from deciding the topic.
  group_query="" if group=="Group affiliation not confirmed" else group
  feeds=[
   (f'"{target}" {group_query} when:30d',"ko","KR","KR:ko"),
-  (f'"{target}" 인터뷰 OR 입장 OR 논란 OR 화제 when:30d',"ko","KR","KR:ko"),
+  (f'"{target}" 인터뷰 OR 발언 OR 입장 OR 논란 OR 화제 when:30d',"ko","KR","KR:ko"),
+  (f'"{target}" 방송 OR 출연 OR 수상 OR 컴백 OR 신곡 OR SNS OR 투어 when:30d',"ko","KR","KR:ko"),
+  (f'"{target}" 팬 반응 OR 공식입장 OR 소속사 OR 활동 when:30d',"ko","KR","KR:ko"),
   (f'"{artist}" {group_query} when:30d',"en-US","US","US:en"),
-  (f'"{artist}" interview OR statement OR controversy OR news when:30d',"en-US","US","US:en")]
+  (f'"{artist}" interview OR statement OR controversy OR reaction when:30d',"en-US","US","US:en"),
+  (f'"{artist}" appearance OR award OR comeback OR tour OR announcement when:30d',"en-US","US","US:en"),
+  (f'"{artist}" agency OR fans OR response OR activity when:30d',"en-US","US","US:en")]
  for query,hl,gl,ceid in feeds:
   try:
    rr=session.get("https://news.google.com/rss/search",params={"q":query,"hl":hl,"gl":gl,"ceid":ceid,"sort":"date"},timeout=20);rr.raise_for_status()
@@ -326,7 +331,7 @@ def profile(filename, target_hint=""):
   for cluster in clusters:
    score=max(similarity(article["title"],x["title"]) for x in cluster)
    if score>best_score:best=cluster;best_score=score
-  if best is not None and best_score>=0.30:best.append(article)
+  if best is not None and best_score>=0.25:best.append(article)
   else:clusters.append([article])
  ranked=[]
  for cluster in clusters:
@@ -351,7 +356,7 @@ def profile(filename, target_hint=""):
      value=re.sub(r"\s+"," "," ".join(self.current)).strip()
      if len(value)>60:self.paragraphs.append(value)
      self.in_p=False
-  for article in english[:4]:
+  for article in english[:8]:
    if len(article["description"])>90 or "news.google.com" in article["url"]:continue
    try:
     page=session.get(article["url"],timeout=12)
@@ -368,7 +373,7 @@ def profile(filename, target_hint=""):
    used.add(outlet);details.append(detail)
    if len(details)==2:break
   # Omit unsupported stories: require two publishers and explanatory copy.
-  if outlet_count>=2 and details:
+  if outlet_count>=2 and len(details)>=2:
    lead=english[0] if english else cluster[0]
    news_title=re.sub(r"\s+-\s+[^-]{2,55}$","",lead["title"]).strip()[:150]
    news_url=lead["url"];news_date=lead["published"] or None;news_source=lead["publisher"]
