@@ -30,7 +30,42 @@
       "used_clip_indices": [
         3
       ]
+    },
+    "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs": {
+      "name": "NewJeans HAERIN 해린 fancam long ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 177.9,
+          "end": 203.1,
+          "hook": "Energetic choreography in full swing"
+        },
+        {
+          "start": 245.0,
+          "end": 270.2,
+          "hook": "Dynamic performance with sharp moves"
+        },
+        {
+          "start": 362.6,
+          "end": 387.7,
+          "hook": "Captivating stage presence and vocals"
+        },
+        {
+          "start": 463.3,
+          "end": 488.5,
+          "hook": "Powerful dance breakdown moment"
+        },
+        {
+          "start": 564.0,
+          "end": 589.2,
+          "hook": "Fierce styling and rhythm"
+        }
+      ],
+      "used_clip_indices": [
+        4
+      ]
     }
   },
-  "last_source_id": "1ZQvFiV_0cBcjJjcTlnakOHBYChLYXR6d"
+  "last_source_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs"
 }
