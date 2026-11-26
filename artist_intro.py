@@ -385,12 +385,35 @@ def render(src,p,hist):
   durations=[]
   for i,sentence in enumerate(sentences):
    part=W/f"voice_part_{i:03d}.mp3"
-   communicate=edge_tts.Communicate(sentence,"en-US-AriaNeural",rate="-3%")
-   await communicate.save(str(part))
-   if not part.exists() or part.stat().st_size==0:
-    raise RuntimeError(f"Edge TTS returned an empty audio segment: {i}")
+   # Edge TTS can intermittently close the stream without returning audio.
+   # Retry the preferred voice, then fall back to other natural English voices.
+   voices=["en-US-AriaNeural","en-US-JennyNeural","en-GB-SoniaNeural"]
+   last_error=None
+   generated=False
+   for voice in voices:
+    for attempt in range(1,4):
+     try:
+      if part.exists(): part.unlink()
+      communicate=edge_tts.Communicate(sentence,voice,rate="-3%")
+      await communicate.save(str(part))
+      if not part.exists() or part.stat().st_size<1024:
+       raise RuntimeError("TTS returned an empty or incomplete audio segment")
+      segment_seconds=dur(part)
+      if segment_seconds<=0:
+       raise RuntimeError("TTS audio segment has invalid duration")
+      print(f"TTS segment {i+1}/{len(sentences)} generated with {voice} (attempt {attempt}).")
+      generated=True
+      break
+     except Exception as exc:
+      last_error=exc
+      print(f"TTS attempt failed for segment {i+1}, voice {voice}, attempt {attempt}/3: {type(exc).__name__}: {exc}")
+      if part.exists(): part.unlink()
+      if attempt<3: await asyncio.sleep(2*attempt)
+    if generated: break
+   if not generated:
+    raise RuntimeError(f"All Edge TTS voices failed for narration segment {i+1}: {last_error}") from last_error
    parts.append(part)
-   durations.append(dur(part))
+   durations.append(segment_seconds)
   concat_list=W/"voice_concat.txt"
   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
