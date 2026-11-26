@@ -125,27 +125,55 @@ def profile(filename, target_hint=""):
  raw=None
  source_base=None
  errors=[]
+ # Resolve the actual person article first. Idol pages often use titles such as
+ # "카리나(aespa)", while the bare stage name may lead to a disambiguation page.
+ group_aliases=[]
+ for group_name,aliases,_,_ in group_data:
+  if any(alias.casefold() in stem.casefold() for alias in aliases):
+   group_aliases=aliases;break
  for base in ("https://namu.moe","https://d.namu.moe"):
   headers={"Referer":base+"/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","Accept":"text/html, text/plain, */*"}
-  # The seed engine's raw endpoint is /raw/<document>, not /raw?doc=...
-  raw_url=base+"/raw/"+quote(chosen,safe="")
+  candidates=[]
   try:
-   rr=session.get(raw_url,headers=headers,timeout=40)
-   if rr.status_code==404:
-    # Some mirrors expose rendered pages but not the raw route.
-    page_url=base+"/w/"+quote(chosen,safe="")
-    rr=session.get(page_url,headers=headers,timeout=40)
-   rr.raise_for_status()
-   candidate=rr.text.strip()
-   if "<html" in candidate[:500].lower():
-    from html import unescape
-    candidate=re.sub(r"<(script|style)\b[^>]*>.*?</\1>"," ",candidate,flags=re.I|re.S)
-    candidate=unescape(re.sub(r"<[^>]+>"," ",candidate))
-   if len(candidate)>=300 and "문서를 찾을 수 없습니다" not in candidate:
-    raw=candidate;source_base=base;break
-   errors.append(f"{base}: article response was empty or too short")
+   search=session.get(base+"/Search",params={"q":target},headers=headers,timeout=25)
+   if search.ok:
+    parser=SearchLinks();parser.feed(search.text)
+    found=[]
+    for href,label in parser.links:
+     title=unquote(href[len("/w/"):]).replace("_"," ").strip()
+     label=plain(label)
+     if target.casefold() in (title+" "+label).casefold() and not any(x in title for x in ("동음이의어","분류:","틀:")):
+      found.append(title)
+    if group_aliases:
+     group_terms=[x.casefold() for x in group_aliases]
+     found.sort(key=lambda x:(0 if any(g in x.casefold() for g in group_terms) else 1,len(x)))
+    candidates.extend(found)
   except requests.RequestException as e:
-   errors.append(f"{base}: {type(e).__name__}: {e}")
+   errors.append(f"{base} search: {type(e).__name__}: {e}")
+  candidates.extend([target])
+  unique=[]
+  for name in candidates:
+   if name and name not in unique:unique.append(name)
+  for candidate_name in unique[:8]:
+   raw_url=base+"/raw/"+quote(candidate_name,safe="")
+   try:
+    rr=session.get(raw_url,headers=headers,timeout=40)
+    if rr.status_code==404:
+     page_url=base+"/w/"+quote(candidate_name,safe="")
+     rr=session.get(page_url,headers=headers,timeout=40)
+    rr.raise_for_status()
+    candidate=rr.text.strip()
+    if "<html" in candidate[:500].lower():
+     from html import unescape
+     candidate=re.sub(r"<(script|style)\\b[^>]*>.*?</\\1>"," ",candidate,flags=re.I|re.S)
+     candidate=unescape(re.sub(r"<[^>]+>"," ",candidate))
+    if len(candidate)>=300 and "문서를 찾을 수 없습니다" not in candidate and "동음이의어" not in candidate[:1000]:
+     raw=candidate;chosen=candidate_name;source_base=base;break
+    errors.append(f"{base}/{candidate_name}: article response was empty, disambiguation, or too short")
+   except requests.RequestException as e:
+    errors.append(f"{base}/{candidate_name}: {type(e).__name__}: {e}")
+   time.sleep(0.7)
+  if raw is not None:break
   time.sleep(1.2)
  if raw is None:
   raise RuntimeError("NamuWiki mirror article retrieval failed. "+"; ".join(errors))
