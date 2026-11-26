@@ -159,7 +159,7 @@ def render(src,p,hist):
    parts.append(part)
    durations.append(dur(part))
   concat_list=W/"voice_concat.txt"
-  concat_list.write_text("".join(f"file '{x.as_posix()}'\\n" for x in parts),encoding="utf-8")
+  concat_list.write_text("".join(f"file '{x.as_posix()}'\n" for x in parts),encoding="utf-8")
   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
