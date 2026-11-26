@@ -347,8 +347,13 @@ Exactly 5 clips. No markdown. Hooks must not invent names, song titles, event de
     for clip in valid:
         if all(clip["start"] >= old["end"] or clip["end"] <= old["start"] for old in distinct):
             distinct.append(clip)
-    if len(distinct) != SHORTS_PER_SOURCE:
-        raise RuntimeError(f"Highlight analysis returned {len(distinct)} valid distinct clips; exactly 5 are required. No upload was made.")
+    if not distinct:
+        raise RuntimeError("Highlight analysis returned no valid clips. Skipping this source; no upload was made.")
+    if len(distinct) < SHORTS_PER_SOURCE:
+        print(
+            f"Highlight analysis found {len(distinct)} valid non-overlapping clips "
+            f"(requested {SHORTS_PER_SOURCE}); continuing with the available clips."
+        )
     return distinct
 
 def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
