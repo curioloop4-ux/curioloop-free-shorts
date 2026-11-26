@@ -236,53 +236,80 @@ def profile(filename, target_hint=""):
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
  personality=labeled_value(["성격","특징","매력 포인트"])
- # Search current coverage and broader public-interest items, not only news labels.
- # Leave the update out entirely when no relevant result is found.
+ # Search the open web, not just Google News. Combine general web results
+ # (profiles, interviews, appearances, performances) with recent news.
+ from xml.etree import ElementTree as ET
+ from urllib.parse import quote_plus
  news_title=None;news_url=None;news_date=None;news_source=None
- try:
-  from xml.etree import ElementTree as ET
-  from urllib.parse import quote_plus
-  search_terms=[
-   f'"{target}" {group} (comeback OR interview OR variety OR performance OR viral OR award OR issue OR activity) when:30d',
-   f'"{target}" K-pop (interview OR broadcast OR performance OR trending OR award OR activity) when:30d',
-   f'"{group}" K-pop (comeback OR award OR performance OR variety OR viral) when:30d' if group!="Group affiliation not confirmed" else ""
-  ]
-  for search_term in [x for x in search_terms if x]:
-   query=quote_plus(search_term)
-   rss=session.get("https://news.google.com/rss/search?q="+query+"&hl=ko&gl=KR&ceid=KR:ko&sort=date",timeout=20)
-   rss.raise_for_status()
-   root=ET.fromstring(rss.content)
+ web_facts=[]; web_sources=[]
+ queries=[
+  f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',""),
+  f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',""),
+  f'"{target}" "{group}" variety appearance performance award'.replace('"Group affiliation not confirmed"',""),
+  f'"{target}" "{group}" news activity'.replace('"Group affiliation not confirmed"',"")
+ ]
+ def relevant_result(title,description):
+  blob=(title+" "+description).casefold()
+  aliases=[target.casefold(),artist.casefold()]
+  if group!="Group affiliation not confirmed": aliases.append(group.casefold())
+  return any(x and x in blob for x in aliases)
+ seen_urls=set()
+ for q in queries:
+  try:
+   response=session.get("https://www.bing.com/search",params={"format":"rss","q":q},timeout=20)
+   response.raise_for_status()
+   root=ET.fromstring(response.content)
    for node in root.findall(".//item"):
-    title_node=node.find("title");link_node=node.find("link");date_node=node.find("pubDate");source_node=node.find("source")
-    candidate_title=plain(title_node.text or "") if title_node is not None else ""
-    if candidate_title and link_node is not None and link_node.text:
-     news_title=candidate_title[:180];news_url=link_node.text.strip()
-     news_date=date_node.text.strip() if date_node is not None and date_node.text else None
-     news_source=source_node.text.strip() if source_node is not None and source_node.text else None
+    tn=node.find("title");ln=node.find("link");dn=node.find("description")
+    title=plain(tn.text or "") if tn is not None else ""
+    url=(ln.text or "").strip() if ln is not None else ""
+    description=plain(dn.text or "") if dn is not None else ""
+    if not title or not url or url in seen_urls or not relevant_result(title,description): continue
+    seen_urls.add(url)
+    web_facts.append({"title":title[:180],"description":description[:260],"url":url})
+    if len(web_facts)>=6: break
+   if len(web_facts)>=6: break
+  except Exception as e:
+   print("General web search unavailable:",type(e).__name__,str(e)[:160])
+  time.sleep(0.8)
+ if web_facts:
+  chosen_result=web_facts[0]
+  news_title=chosen_result["title"];news_url=chosen_result["url"]
+  news_source="Web search result"
+  description=chosen_result["description"]
+  if description and description.casefold() not in news_title.casefold():
+   web_facts[0]["spoken"]=f"Public coverage reports: {description}"
+  else:
+   web_facts[0]["spoken"]=f"A recent public report covers {news_title}"
+ # Keep Google News as a separate recent-coverage fallback and cross-check.
+ try:
+  search_terms=[f'"{target}" {group} when:30d',f'"{target}" K-pop when:30d']
+  for search_term in search_terms:
+   rss=session.get("https://news.google.com/rss/search?q="+quote_plus(search_term)+"&hl=ko&gl=KR&ceid=KR:ko&sort=date",timeout=20)
+   rss.raise_for_status();root=ET.fromstring(rss.content)
+   for node in root.findall(".//item"):
+    tn=node.find("title");ln=node.find("link");dn=node.find("description");sn=node.find("source");pn=node.find("pubDate")
+    title=plain(tn.text or "") if tn is not None else ""
+    url=(ln.text or "").strip() if ln is not None else ""
+    description=plain(dn.text or "") if dn is not None else ""
+    if title and url and url not in seen_urls and relevant_result(title,description):
+     seen_urls.add(url)
+     if not news_title:
+      news_title=title[:180];news_url=url
+      news_date=pn.text.strip() if pn is not None and pn.text else None
+      news_source=sn.text.strip() if sn is not None and sn.text else "Google News"
+      spoken=description or title
+      web_facts.insert(0,{"title":title[:180],"description":spoken[:260],"url":url,"spoken":f"Recent coverage reports: {spoken[:220]}"})
      break
-   if news_title:break
+   if news_title: break
  except Exception as e:
-  print("Artist update search unavailable:",type(e).__name__,str(e)[:200])
- facts=[f"Meet {artist}, a K-pop artist."]
- if birth_year:facts.append(f"{artist} was born in {birth_year}.")
- if group!="Group affiliation not confirmed":
-  facts.append(f"{artist} debuted with {group} in {group_year}." if group_year else f"{artist} is a member of {group}.")
- else:
-  facts.append("Their group affiliation is not confirmed in the available profile.")
- if height:facts.append(f"The listed height is {height}.")
- if weight:facts.append(f"The listed weight is {weight}.")
- if waist:facts.append(f"The listed waist measurement is {waist}.")
- if shoe_size:facts.append(f"The listed shoe size is {shoe_size}.")
- if body_size:facts.append(f"The listed body measurements are {body_size}.")
- if position:facts.append(f"Their listed role is {position}.")
- if nickname:facts.append(f"They are also known as {nickname}.")
- if hobby:facts.append(f"Their hobbies include {hobby}.")
- if personality:facts.append(f"They are known for {personality}.")
- if news_title:facts.append(f"One recent highlight is {news_title}.")
+  print("Recent news search unavailable:",type(e).__name__,str(e)[:160])
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
- if news_url:sources.append({"title":news_source or "Artist update","url":news_url})
+ for item in web_facts[:3]:
+  if item.get("url") and item["url"] not in [x["url"] for x in sources]:
+   sources.append({"title":item.get("title","Public source")[:100],"url":item["url"]})
  print(f"Profile research complete: {chosen}; artist={artist}; group={group}; birth_year={birth_year or 'not listed'}; height={height or 'not listed'}; weight={weight or 'not listed'}; recent_news={'yes' if news_title else 'no'}.")
  return {
   "artist":artist,"group":group,"narration":narration,
