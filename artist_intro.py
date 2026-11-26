@@ -179,7 +179,8 @@ def render(src,p,hist):
   for sentence,seconds in zip(sentences,durations):
    # Keep each caption to at most two short lines. Long sentences are
    # split into consecutive cues and timed by their spoken word counts.
-   clean_caption=re.sub(r"[\\U0001F000-\\U0001FAFF\\U00002600-\\U000027BF\\U0000FE0F\\U0000200D]","",sentence).strip()\n   wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
+   clean_caption=re.sub(r"[\U0001F000-\U0001FAFF\U00002600-\U000027BF\U0000FE0F\U0000200D]","",sentence).strip()
+   wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
    weights=[max(1,len(group.replace("\n"," ").split())) for group in groups]
