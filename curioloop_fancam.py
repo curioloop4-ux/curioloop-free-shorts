@@ -949,10 +949,25 @@ def main():
             print("No unused source videos remain in the current Drive inbox.")
             break
 
+        # Skip files whose artist/group cannot be safely identified, rather than
+        # aborting the entire run and blocking other valid originals.
+        identifiable = []
+        for candidate in eligible:
+            candidate_artist, candidate_group, _ = identify_artist(candidate["name"])
+            if (not candidate_artist or not candidate_group
+                    or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", candidate_artist)
+                    or not re.fullmatch(r"[A-Za-z0-9&!(). '-]+", candidate_group)):
+                print(f"Skipping source with unresolved artist/group: {candidate['name']}")
+                continue
+            identifiable.append(candidate)
+        if not identifiable:
+            print("No unused source videos with a recognized artist/group remain.")
+            break
+
         # Rotate across different originals before returning to the previous source.
         last_source_id = history.get("last_source_id")
-        alternatives = [candidate for candidate in eligible if candidate["id"] != last_source_id]
-        item = random.choice(alternatives or eligible)
+        alternatives = [candidate for candidate in identifiable if candidate["id"] != last_source_id]
+        item = random.choice(alternatives or identifiable)
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
             f"Batch {batch_number}/{batch_size} | Random unused source: "
@@ -1024,11 +1039,11 @@ def main():
         artist_name, group_name, _ = identify_artist(item["name"])
         if (not artist_name or not group_name
                 or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", artist_name)
-                or not re.fullmatch(r"[A-Za-z0-9&! .'-]+", group_name)):
-            raise RuntimeError(
-                f"Artist/group could not be resolved to an English display name; "
-                f"refusing to render/upload without a name: {item['name']}"
-            )
+                or not re.fullmatch(r"[A-Za-z0-9&!(). '-]+", group_name)):
+            print(f"Skipping source with unresolved artist/group after selection: {item['name']}")
+            source_state[item["id"]] = {**state, "name": item["name"], "complete": True,
+                                        "skip_reason": "unresolved_artist_group"}
+            continue
         # Keep the artist token for unique filenames; show GROUP / NAME on-screen.
         output_stem = artist_name
         display_label = f"{group_name} / {artist_name}"
