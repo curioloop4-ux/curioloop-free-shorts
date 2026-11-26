@@ -622,8 +622,23 @@ def generate_metadata(filename, hook, index):
                        f"stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "NATTY":
-        title = "NATTY (KISS OF LIFE) 🔥 | K-Pop Fancam #Shorts"
+        title = "KISS OF LIFE / NATTY 🔥 | K-Pop Fancam #Shorts"
         description = ("NATTY of KISS OF LIFE 🔥 Enjoy this fan-captured performance and "
+                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "KARINA":
+        title = "aespa / KARINA ✨ | K-Pop Fancam #Shorts"
+        description = ("KARINA of aespa ✨ Enjoy this fan-captured performance and "
+                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "SAKURA":
+        title = "LE SSERAFIM / SAKURA 🌸 | K-Pop Fancam #Shorts"
+        description = ("SAKURA of LE SSERAFIM 🌸 Enjoy this fan-captured performance and "
+                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "KYA":
+        title = "KiiiKiii / KYA ✨ | K-Pop Fancam #Shorts"
+        description = ("KYA of KiiiKiii ✨ Enjoy this fan-captured performance and "
                        f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     else:
@@ -810,18 +825,19 @@ def main():
             continue
         selected_index = random.choice(available_indices)
         clip = clips[selected_index - 1]
-        artist_name, _, _ = identify_artist(item["name"])
-        if not artist_name or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", artist_name):
+        artist_name, group_name, _ = identify_artist(item["name"])
+        if (not artist_name or not group_name
+                or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", artist_name)
+                or not re.fullmatch(r"[A-Za-z0-9&! .'-]+", group_name)):
             raise RuntimeError(
-                f"Artist name could not be resolved to an English display name; "
+                f"Artist/group could not be resolved to an English display name; "
                 f"refusing to render/upload without a name: {item['name']}"
             )
-        # Use the artist name for unique artifact filenames. Korean Drive filenames
-        # are sanitized to the same fallback stem ("mp4"), which would overwrite
-        # the first artist's rendered file when both are processed in one run.
-        output_stem = artist_name or source.stem
+        # Keep the artist token for unique filenames; show GROUP / NAME on-screen.
+        output_stem = artist_name
+        display_label = f"{group_name} / {artist_name}"
         rendered = render_clips(source, [clip], output_stem, index_offset=selected_index - 1,
-                                display_name=artist_name)
+                                display_name=display_label)
         path, clip = rendered[0]
         title, description, tags = generate_metadata(item["name"], clip["hook"], selected_index)
         print(
