@@ -391,12 +391,15 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                            stroke_width=2, stroke_fill=(0, 0, 0, 255))
         name_overlay.save(name_path)
 
-        base_filter = (
-            f"scale={output_w}:{output_h}:force_original_aspect_ratio=decrease,"
-            f"pad={output_w}:{output_h}:(ow-iw)/2:(oh-ih)/2"
-        )
+        # Fill the entire 9:16 canvas without cutting off the original performance:
+        # a blurred, darkened cover layer fills the background while the complete
+        # source frame is fitted on top at its original aspect ratio.
         filter_complex = (
-            f"[0:v]{base_filter}[base];"
+            f"[0:v]split=2[bgsrc][fgsrc];"
+            f"[bgsrc]scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
+            f"crop={output_w}:{output_h},boxblur=24:12,eq=brightness=-0.22[bg];"
+            f"[fgsrc]scale={output_w}:{output_h}:force_original_aspect_ratio=decrease[fg];"
+            f"[bg][fg]overlay=(W-w)/2:(H-h)/2[base];"
             f"[1:v]format=rgba[name];"
             f"[2:v]format=rgba[intro];"
             f"[base][name]overlay=0:0[namebase];"
