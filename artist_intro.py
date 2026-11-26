@@ -807,7 +807,7 @@ def render(src,p,hist):
  name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
- # Transparent typographic CTA overlay: top prompt + bottom subscription line.
+ # Show all call-to-action lines together, centered, during only the final 3 seconds.
  cta=W/"cta_artist_intro.png"
  card=Image.new("RGBA",(1080,1800),(0,0,0,0));draw=ImageDraw.Draw(card)
  regular=ImageFont.truetype(bold,42);heavy=ImageFont.truetype(bold,36)
@@ -816,11 +816,11 @@ def render(src,p,hist):
   tw=b[2]-b[0];pad_x,pad_y=28,18
   left=(1080-tw)//2-pad_x;right=(1080+tw)//2+pad_x
   top=y-pad_y;bottom=y+(b[3]-b[1])+pad_y
-  draw.rounded_rectangle((left,top,right,bottom),radius=24,fill=(5,8,20,155))
+  draw.rounded_rectangle((left,top,right,bottom),radius=24,fill=(5,8,20,175))
   draw.text(((1080-tw)/2,y-b[1]),text,font=face,fill=fill,stroke_width=3,stroke_fill=(5,5,12,255))
- draw_cta_line("WHO SHOULD WE FEATURE NEXT?",220,regular,(255,88,202,255))
- draw_cta_line("COMMENT BELOW!",292,heavy,(255,226,75,255))
- draw_cta_line("SUBSCRIBE FOR MORE K-POP!",1400,heavy,(75,224,255,255))
+ draw_cta_line("WHO SHOULD WE FEATURE NEXT?",735,regular,(255,88,202,255))
+ draw_cta_line("COMMENT BELOW!",815,heavy,(255,226,75,255))
+ draw_cta_line("SUBSCRIBE FOR MORE K-POP!",915,heavy,(75,224,255,255))
  card.save(cta)
  cta_start=max(1.5,length-3.0)
  cue_data=json.loads((W/"subtitle_cues.json").read_text(encoding="utf-8"))
