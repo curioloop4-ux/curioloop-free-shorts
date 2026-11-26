@@ -37,7 +37,7 @@ on:
           - private
           - unlisted
           - public
-        default: private
+        default: public
       source_filter:
         description: "Optional manual filename filter; leave blank for automatic round-robin selection of all new and unfinished Drive videos"
         required: false
