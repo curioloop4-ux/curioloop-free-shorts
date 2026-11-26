@@ -1,9 +1,6 @@
 name: CurioLoop Daily Shorts
 
 on:
-  push:
-    paths:
-      - ".run-shorts-now"
   workflow_dispatch:
     inputs:
       shorts_count:
