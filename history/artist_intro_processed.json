@@ -45,6 +45,18 @@
       "intro_footage_start": 61.0,
       "intro_footage_end": 108.532,
       "published_at": "2026-11-26T20:51:14.000256+00:00"
+    },
+    {
+      "drive_file_id": "1jsRnlSlyyzFA4bc4Wb1LXvAxX64fRnBe",
+      "source_md5": "cb04061bb126a043257915624c9c0d1e",
+      "source_artist_key": "wonyoung",
+      "source_name": "아이브 장원영 IVE WONYOUNG 직캠 FANCAM Ver KpopHots.mp4",
+      "artist": "Jang Wonyoung",
+      "youtube_video_id": "CNy8ajgaMtM",
+      "privacy": "public",
+      "intro_footage_start": 114.5,
+      "intro_footage_end": 162.416,
+      "published_at": "2026-11-26T21:49:57.866747+00:00"
     }
   ],
   "opening_frames": {
@@ -59,8 +71,11 @@
     ],
     "kazuha": [
       25.97
+    ],
+    "jang wonyoung": [
+      26.59
     ]
   },
-  "last_render_source_start": 61.0,
-  "last_render_source_duration": 47.532
+  "last_render_source_start": 114.5,
+  "last_render_source_duration": 47.916
 }
