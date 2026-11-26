@@ -144,40 +144,29 @@ def render(src,p,hist):
  audio=W/"voice.mp3";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
   communicate=edge_tts.Communicate(p["narration"],"en-US-AriaNeural",rate="-3%")
-  submaker=edge_tts.SubMaker()
   with audio.open("wb") as af:
    async for chunk in communicate.stream():
     if chunk["type"]=="audio":
      af.write(chunk["data"])
-    elif chunk["type"]=="WordBoundary":
-     submaker.feed(chunk)
-  subtitle=submaker.get_srt()
-  if not subtitle.strip():
-   # Edge TTS may omit WordBoundary events. Build readable sentence-level
-   # SRT cues from the narration and distribute them across the actual audio.
-   print("Edge TTS supplied no word boundaries; generating timed sentence subtitles.")
-   sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",p["narration"].strip()) if x.strip()]
-   chunks=[]
-   for sentence in sentences:
-    words=sentence.split()
-    while words:
-     chunks.append(" ".join(words[:8]))
-     words=words[8:]
-   if not chunks:
-    raise RuntimeError("Cannot create subtitles: narration is empty")
-   audio_duration=max(1.0,min(dur(audio),footage))
-   weights=[max(1,len(x.split())) for x in chunks]
-   total=sum(weights)
-   def stamp(seconds):
-    ms=max(0,int(round(seconds*1000)))
-    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
-    return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
-   cues=[]; cursor=0.0
-   for i,(line,weight) in enumerate(zip(chunks,weights),1):
-    end=audio_duration if i==len(chunks) else cursor+audio_duration*weight/total
-    cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end)}",line,""])
-    cursor=end
-   subtitle="\n".join(cues)
+  # Use short, deterministic subtitle cues; do not depend on optional
+  # Edge TTS word-boundary metadata.
+  words=p["narration"].strip().split()
+  chunks=[" ".join(words[i:i+5]) for i in range(0,len(words),5)]
+  if not chunks:
+   raise RuntimeError("Cannot create subtitles: narration is empty")
+  audio_duration=max(1.0,min(dur(audio),footage))
+  weights=[max(1,len(x.split())) for x in chunks]
+  total=sum(weights)
+  def stamp(seconds):
+   ms=max(0,int(round(seconds*1000)))
+   hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
+   return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
+  cues=[]; cursor=0.0
+  for i,(line,weight) in enumerate(zip(chunks,weights),1):
+   end=audio_duration if i==len(chunks) else cursor+audio_duration*weight/total
+   cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end)}",line,""])
+   cursor=end
+  subtitle="\n".join(cues)
   vtt.write_text(subtitle,encoding="utf-8")
  asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
@@ -196,7 +185,7 @@ def render(src,p,hist):
  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,"
- f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=14,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=3,Outline=1,Alignment=2,MarginL=90,MarginR=90,MarginV=100'[v1];"
+ f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=10,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=3,Outline=1,Alignment=2,MarginL=90,MarginR=90,MarginV=300'[v1];"
  "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v];[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
