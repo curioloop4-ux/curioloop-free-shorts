@@ -233,24 +233,31 @@ def profile(filename, target_hint=""):
   birth=birth.replace(".","-")
  # Extract physical profile data and personal characteristics only when explicitly labelled.
  def labelled_number(labels, unit_pattern):
-  # Search raw and cleaned NamuWiki text for explicitly labelled measurements.
+  # Parse NamuWiki table cells first: a profile label is commonly followed
+  # by its value in the next cell. Then use bounded text fallbacks.
   readable=plain(raw)
+  cells=[plain(cell) for cell in re.split(r"\|\|",raw)]
+  for i,cell in enumerate(cells):
+   normalized=re.sub(r"\s+","",cell).casefold()
+   for label in labels:
+    key=re.sub(r"\s+","",label).casefold()
+    if key and key in normalized:
+     for candidate in cells[i+1:i+4]:
+      match=re.search(unit_pattern,candidate,re.I)
+      if match:
+       return re.sub(r"\s+","",match.group(0))
   for source in (raw,readable):
    for label in labels:
     escaped=re.escape(label)
     patterns=[
      r"(?:^|\|\|)\s*"+escaped+r"\s*\|\|\s*("+unit_pattern+r")",
      r"(?:^|\n)\s*"+escaped+r"\s*(?::|：|\|\|?)\s*("+unit_pattern+r")",
-     r"(?:^|\s)"+escaped+r"\s*(?:\|\|?|:|：)?\s*("+unit_pattern+r")",
-     r"(?:^|\s)"+escaped+r"[^0-9]{0,100}("+unit_pattern+r")"
+     r"\b"+escaped+r"\b[^0-9]{0,40}("+unit_pattern+r")"
     ]
     for pattern in patterns:
-     m=re.search(pattern,source,re.I)
-     if not m:
-      continue
-     value=m.group(1) if m.lastindex else None
-     if value:
-      return re.sub(r"\s+","",value)
+     match=re.search(pattern,source,re.I)
+     if match and match.lastindex and match.group(1):
+      return re.sub(r"\s+","",match.group(1))
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
