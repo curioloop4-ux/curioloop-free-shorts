@@ -33,6 +33,18 @@
       "intro_footage_start": 532.0,
       "intro_footage_end": 579.7,
       "published_at": "2026-11-26T19:56:47.250951+00:00"
+    },
+    {
+      "drive_file_id": "1DMZ0CxlNGd1XGJY2mI6HeaSsnyVleQiV",
+      "source_md5": "6ce1775a9978585b5ca94f7d56f4aaf0",
+      "source_artist_key": "카즈하",
+      "source_name": "LE SSERAFIM KAZUHA  르세라핌 카즈하 FANCAM 직캠 Ver KpopHots.mp4",
+      "artist": "Kazuha",
+      "youtube_video_id": "tsoyWks84rg",
+      "privacy": "public",
+      "intro_footage_start": 61.0,
+      "intro_footage_end": 108.532,
+      "published_at": "2026-11-26T20:51:14.000256+00:00"
     }
   ],
   "opening_frames": {
@@ -44,8 +56,11 @@
     ],
     "haerin": [
       53.93
+    ],
+    "kazuha": [
+      25.97
     ]
   },
-  "last_render_source_start": 532.0,
-  "last_render_source_duration": 47.7
+  "last_render_source_start": 61.0,
+  "last_render_source_duration": 47.532
 }
