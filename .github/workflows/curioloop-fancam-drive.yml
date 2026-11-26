@@ -32,6 +32,7 @@ on:
         default: 1
 
 permissions:
+  actions: read
   contents: write
 
 concurrency:
