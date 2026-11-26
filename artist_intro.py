@@ -50,9 +50,9 @@ def download(drive,item):
   while not done:_,done=dl.next_chunk()
  if not p.exists() or not p.stat().st_size:raise RuntimeError("Empty Drive download")
  return p
-def profile(filename):
+def profile(filename, target_hint=""):
  stem=Path(filename).stem
- prompt=f"""Research the K-pop artist identified by this Drive filename: {stem!r}.
+Research the K-pop artist identified by this Drive filename: {stem!r}.\nThe explicitly requested target artist is: {target_hint!r}. Treat this target as the intended artist when non-empty, and verify the identity against reliable sources.
 You MUST use Google Search grounding for current, verifiable research. Do not rely on memory alone.
 Identify the person only from clear filename clues; never identify by face.
 Return JSON only with these keys:
@@ -85,7 +85,7 @@ Title and tags must match the identified artist/group."""
    payload=r.json()
    candidate=payload["candidates"][0]
    raw=candidate["content"]["parts"][0]["text"]
-   raw=re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$","",raw,flags=re.I)
+   raw=re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$","",raw,flags=re.I)
    p=json.loads(raw)
    grounding=candidate.get("groundingMetadata",{})
    chunks=grounding.get("groundingChunks",[])
@@ -224,11 +224,13 @@ def main():
  target=os.getenv("TARGET_ARTIST","").strip().casefold()
  candidates=[x for x in scan(drive,folder) if x["id"] not in done]
  if target:
-  candidates=[x for x in candidates if target in x["name"].casefold() or (target=="eunha" and "은하" in x["name"])]
+  aliases={"wonyoung":["wonyoung","장원영","원영"],"eunha":["eunha","은하"]}
+  needles=aliases.get(target,[target])
+  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
   if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested artist: {target}")
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  item=candidates[0];print("Selected Drive source:",item["name"])
- src=download(drive,item);p=profile(item["name"])
+ src=download(drive,item);p=profile(item["name"],target_hint=os.getenv("TARGET_ARTIST","").strip())
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
  research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Verified research saved:",research_path.name)
