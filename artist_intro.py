@@ -96,7 +96,7 @@ def profile(filename, target_hint=""):
  ]
  artist_names={
   "장원영":"Jang Wonyoung","원영":"Wonyoung","wonyoung":"Wonyoung",
-  "은하":"Eunha","권은비":"Kwon Eunbi","카리나":"Karina","닝닝":"Ningning",
+  "은하":"Eunha","eunha":"Eunha","jennie":"Jennie","권은비":"Kwon Eunbi","카리나":"Karina","닝닝":"Ningning",
   "윈터":"Winter","지젤":"Giselle","사쿠라":"Sakura","김채원":"Kim Chaewon",
   "허윤진":"Huh Yunjin","카즈하":"Kazuha","홍은채":"Hong Eunchae",
   "안유진":"An Yujin","유진":"Yujin","레이":"Rei","리즈":"Liz","이서":"Leeseo",
@@ -114,8 +114,9 @@ def profile(filename, target_hint=""):
   # Only accept an explicit, known artist alias in the source filename.
   matches=[alias for alias in artist_names if alias.casefold() in stem.casefold()]
   target=max(matches,key=len) if matches else ""
- if not target or target not in artist_names:
+ if not target or target.casefold() not in {name.casefold() for name in artist_names}:
   raise RuntimeError("SKIPPED_UNKNOWN_ARTIST: no recognized artist name in source filename: "+filename)
+ target=next(name for name in artist_names if name.casefold()==target.casefold())
  # Resolve the exact NamuWiki mirror article directly. The primary namu.wiki
  # host returns HTTP 403 from GitHub-hosted runners, so use the public mirror.
  from urllib.parse import quote, unquote
