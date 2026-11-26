@@ -144,7 +144,7 @@ def profile(filename, target_hint=""):
  for group_name,aliases,_,_ in group_data:
   if any(alias.casefold() in stem.casefold() for alias in aliases):
    group_aliases=aliases;break
- for base in ("https://namu.moe","https://d.namu.moe"):
+ for base in ("https://namu.wiki","https://namu.moe","https://d.namu.moe"):
   headers={"Referer":base+"/","User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36","Accept":"text/html, text/plain, */*"}
   candidates=[]
   try:
@@ -189,8 +189,10 @@ def profile(filename, target_hint=""):
   if raw is not None:break
   time.sleep(1.2)
  if raw is None:
-  raise RuntimeError("NamuWiki article retrieval failed for "+target+"; refusing to generate an artist intro without the requested biography source.")
- cleaned=plain(raw)
+  print("NamuWiki page unavailable; continuing with independently searched public profile and news sources.")
+ else:
+  print("NamuWiki article retrieved:",chosen,"via",source_base)
+ cleaned=plain(raw or "")
  # Use a known official Romanized stage name where available; otherwise
  # retain the Hangul stage name rather than inventing an English spelling.
  artist=artist_names.get(target,artist_names.get(target.casefold(),target))
@@ -232,7 +234,9 @@ def profile(filename, target_hint=""):
   f'"{artist}" {group} height weight birthday profile'.replace("Group affiliation not confirmed","").strip(),
   f'site:namu.wiki "{target}" 키 몸무게 생년월일',
   f'"{target}" {group} 신발사이즈 발사이즈 허리둘레 가슴둘레 엉덩이둘레',
-  f'"{artist}" {group} shoe size foot size bust chest waist hips body measurements'
+  f'"{artist}" {group} shoe size foot size bust chest waist hips body measurements',
+  f'"{target}" {group} official profile biography career debut member agency',
+  f'"{artist}" K-pop official biography activities variety show performance interview'
  ]
  class ProfilePageText(HTMLParser):
   def __init__(self):
@@ -273,6 +277,9 @@ def profile(filename, target_hint=""):
  # only when the source explicitly labels the relevant attribute.
  web_facts=[{"title":x["title"],"url":x["url"]} for x in profile_documents[1:] if x.get("title") and x.get("url")]
  print("Profile web research: queries=",len(profile_queries),"; source_pages=",len(profile_documents)-1)
+ if raw is None and not profile_documents:
+  raise RuntimeError("No usable biography source found for "+target+"; wiki mirrors and independent search providers returned no matching public profile pages.")
+ print("Biography source mode:", "NamuWiki + web cross-check" if raw else "independent public web sources (NamuWiki unavailable)")
  # Extract birth date only when it appears next to a biographical label.
  birth=None
  birth_patterns=[
@@ -364,6 +371,17 @@ def profile(filename, target_hint=""):
     article_highlights.append(candidate)
     if len(article_highlights)>=5:break
    if len(article_highlights)>=5:break
+ # When the wiki page is blocked, recover biographical detail from independently
+ # fetched public pages/snippets. Keep only substantial text tied to this artist.
+ if not article_highlights:
+  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
+   detail=plain(document.get("text",""))
+   if len(detail)<90 or target.casefold() not in (document.get("title","")+" "+detail).casefold():
+    continue
+   detail=re.sub(r"^(?:프로필|공식 홈페이지|공식 프로필|profile|biography)\\s*[:：-]?\\s*","",detail,flags=re.I)
+   if len(detail)>=90 and detail not in article_highlights:
+    article_highlights.append(detail[:260])
+   if len(article_highlights)>=4:break
  translated_highlights=[]
  for detail in article_highlights:
   try:
