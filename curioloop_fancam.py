@@ -526,11 +526,13 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
         name_overlay.save(name_path)
 
         # Convert every source orientation to a full-frame 9:15 Short.
-        # Scale to fill, then anchor the crop at the top to trim the bottom edge.
+        # Landscape sources are cropped symmetrically from the exact horizontal
+        # center; portrait sources naturally have no horizontal excess after scaling.
+        # Keep the vertical crop top-aligned to trim the bottom edge.
         # No blurred side/background canvas is added.
         filter_complex = (
             f"[0:v]scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
-            f"crop={output_w}:{output_h}:0:0,setsar=1[base];"
+            f"crop={output_w}:{output_h}:(in_w-{output_w})/2:0,setsar=1[base];"
             f"[1:v]format=rgba[name];"
             f"[2:v]format=rgba[intro];"
             f"[base][name]overlay=0:0[namebase];"
