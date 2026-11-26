@@ -295,15 +295,8 @@ def profile(filename, target_hint=""):
   except Exception as e:
    print("General web search unavailable:",type(e).__name__,str(e)[:160])
   time.sleep(0.8)
- if web_facts:
-  chosen_result=web_facts[0]
-  news_title=chosen_result["title"];news_url=chosen_result["url"]
-  news_source="Web search result"
-  description=chosen_result["description"]
-  if description and description.casefold() not in news_title.casefold():
-   web_facts[0]["spoken"]=f"Public coverage reports: {description}"
-  else:
-   web_facts[0]["spoken"]=f"A recent public report covers {news_title}"
+ # General web snippets are useful for research, but are not verified news
+ # headlines. Never turn search snippets or metadata into spoken news.
  # Keep Google News as a separate recent-coverage fallback and cross-check.
  try:
   search_terms=[f'"{target}" {group} when:30d',f'"{target}" K-pop when:30d']
@@ -315,21 +308,25 @@ def profile(filename, target_hint=""):
     title=plain(tn.text or "") if tn is not None else ""
     url=(ln.text or "").strip() if ln is not None else ""
     description=plain(dn.text or "") if dn is not None else ""
-    if title and url and url not in seen_urls and relevant_result(title,description):
+    aliases=[target,artist,group]
+    headline_matches=any(alias and alias!="Group affiliation not confirmed" and alias.casefold() in title.casefold() for alias in aliases)
+    # Only use a real, artist-specific English headline; skip snippets, generic
+    # coverage labels, and Korean headlines that an English TTS voice mangles.
+    english_headline=bool(re.search(r"[A-Za-z]{3,}",title)) and not re.search(r"[가-힣]",title)
+    if title and len(title)>=18 and headline_matches and english_headline and url and url not in seen_urls:
      seen_urls.add(url)
      if not news_title:
       news_title=title[:180];news_url=url
       news_date=pn.text.strip() if pn is not None and pn.text else None
       news_source=sn.text.strip() if sn is not None and sn.text else "Google News"
-      spoken=description or title
-      web_facts.insert(0,{"title":title[:180],"description":spoken[:260],"url":url,"spoken":f"Recent coverage reports: {spoken[:220]}"})
      break
    if news_title: break
  except Exception as e:
   print("Recent news search unavailable:",type(e).__name__,str(e)[:160])
- for item in web_facts[:2]:
-  spoken=item.get("spoken","").strip()
-  if spoken and len(spoken)>35:facts.append(spoken.rstrip(".")+" .")
+ # Add only the verified article headline. If no suitable headline exists,
+ # omit the news section entirely rather than filling it with search metadata.
+ if news_title:
+  facts.append(f"Recent news about {artist}: {news_title}")
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
