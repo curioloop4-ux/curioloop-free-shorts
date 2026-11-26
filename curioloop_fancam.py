@@ -5,6 +5,7 @@ import re
 import subprocess
 import time
 import random
+import difflib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -669,6 +670,57 @@ def identify_artist(filename):
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
             "female idol", "Ningning performance", "Shorts"
         ]
+    # Fuzzy recovery for minor misspellings in Drive filenames. Only accept a
+    # single clear winner; never guess when two artists are similarly close.
+    aliases = {
+        "SAKURA": ("LE SSERAFIM", ["sakura", "miyawaki", "사쿠라"]),
+        "KYA": ("KiiiKiii", ["kya", "kiya", "키야"]),
+        "WONYOUNG": ("IVE", ["wonyoung", "장원영"]),
+        "CHAERYEONG": ("ITZY", ["chaeryeong", "채령"]),
+        "EUNBI": ("SOLO", ["eunbi", "kwoneunbi", "권은비"]),
+        "EUNHA": ("VIVIZ", ["eunha", "은하"]),
+        "NATTY": ("KISS OF LIFE", ["natty", "나띠"]),
+        "JENNIE": ("BLACKPINK", ["jennie", "제니"]),
+        "YUQI": ("(G)I-DLE", ["yuqi", "yuki", "우기"]),
+        "ELLA": ("MEOVV", ["ella", "엘라"]),
+        "KAZUHA": ("LE SSERAFIM", ["kazuha", "카즈하"]),
+        "HAERIN": ("NewJeans", ["haerin", "해린"]),
+        "LISA": ("BLACKPINK", ["lisa", "리사"]),
+        "NANCY": ("MOMOLAND", ["nancy", "낸시"]),
+        "EJI": ("ICHILLIN", ["eji", "이지"]),
+        "TZUYU": ("TWICE", ["tzuyu", "쯔위"]),
+        "KARINA": ("aespa", ["karina", "카리나"]),
+        "NINGNING": ("aespa", ["ningning", "닝닝"]),
+    }
+    normalized = re.sub(r"[^a-z0-9가-힣]+", " ", value)
+    words = normalized.split()
+    candidates = []
+    compact_value = re.sub(r"[^a-z0-9가-힣]+", "", value)
+    for canonical, (team, variants) in aliases.items():
+        for alias in variants:
+            alias_norm = re.sub(r"[^a-z0-9가-힣]+", "", alias.casefold())
+            if len(alias_norm) < 3:
+                continue
+            if alias_norm in compact_value:
+                candidates.append((1.0, canonical, team, alias))
+                break
+            for word in words:
+                if len(word) >= 4 and len(alias_norm) >= 4:
+                    score = difflib.SequenceMatcher(None, word, alias_norm).ratio()
+                    if score >= 0.90:
+                        candidates.append((score, canonical, team, alias))
+    if candidates:
+        candidates.sort(key=lambda item: item[0], reverse=True)
+        best = candidates[0]
+        runner_up = next((item for item in candidates[1:] if item[1] != best[1]), None)
+        if runner_up is None or best[0] - runner_up[0] >= 0.06:
+            canonical, team = best[1], best[2]
+            print(f"Artist name auto-corrected from filename using alias '{best[3]}': {canonical} / {team}")
+            tags = [canonical.title(), f"{team} {canonical.title()}", f"{canonical.title()} fancam",
+                    f"{team} fancam", "K-pop", "K-pop Shorts", "Korean idol",
+                    "female idol", CHANNEL_BRAND, "Shorts"]
+            return canonical, team, tags
+        print(f"Artist name recovery ambiguous for '{filename}'; refusing to guess.")
     return "", "", []
 
 def generate_metadata(filename, hook, index):
