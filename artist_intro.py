@@ -803,6 +803,7 @@ def render(src,p,hist):
    hist["last_render_source_start"]=round(start,3);hist["last_render_source_duration"]=round(footage,3)
  except Exception as e:
   print("Motion scan unavailable; using centered source segment:",type(e).__name__)
+  hist["last_render_source_start"]=round(start,3);hist["last_render_source_duration"]=round(footage,3)
  name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
