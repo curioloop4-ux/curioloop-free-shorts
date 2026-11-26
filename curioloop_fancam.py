@@ -584,6 +584,12 @@ def identify_artist(filename):
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
             "female idol", "Eunbi performance", CHANNEL_BRAND, "Shorts"
         ]
+    if any(token in value for token in ("은하", "eunha")):
+        return "EUNHA", "VIVIZ", [
+            "Eunha", "VIVIZ Eunha", "Eunha fancam", "VIVIZ fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Eunha performance", CHANNEL_BRAND, "Shorts"
+        ]
     if any(token in value for token in ("나띠", "natty")):
         return "NATTY", "KISS OF LIFE", [
             "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
@@ -620,6 +626,11 @@ def generate_metadata(filename, hook, index):
         title = "KWON EUNBI ✨ | K-Pop Fancam #Shorts"
         description = ("KWON EUNBI ✨ Enjoy this fan-captured performance and her "
                        f"stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+        tags = fixed_tags
+    elif artist == "EUNHA":
+        title = "VIVIZ / EUNHA ✨ | K-Pop Fancam #Shorts"
+        description = ("EUNHA of VIVIZ ✨ Enjoy this fan-captured performance and "
+                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "NATTY":
         title = "KISS OF LIFE / NATTY 🔥 | K-Pop Fancam #Shorts"
