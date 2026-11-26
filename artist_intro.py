@@ -212,7 +212,9 @@ def publish(yt,out,p,source):
  approval_file=R/"INTRO_PUBLICATION_APPROVED.txt"
  approved=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
  privacy="public" if approved else "private"
- body={"snippet":{"title":p["title"][:100],"description":f"Meet {p['artist']} from {p['group']}.\nArtist introduction and performance highlight.\nSource: {source}\n#Kpop #ArtistSpotlight #Shorts","tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
+ research_links="\\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
+ description=f"Meet {p['artist']} from {p['group']}.\\nArtist profile, career highlights, and recent update.\\nOriginal footage source: {source}\\nResearch sources:\\n{research_links}\\n#Kpop #ArtistSpotlight #Shorts"
+ body={"snippet":{"title":p["title"][:100],"description":description[:4900],"tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
  print(f"{privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"],privacy
 def main():
@@ -226,7 +228,11 @@ def main():
   if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested artist: {target}")
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  item=candidates[0];print("Selected Drive source:",item["name"])
- src=download(drive,item);p=profile(item["name"]);out=render(src,p,h)
+ src=download(drive,item);p=profile(item["name"])
+ research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
+ research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
+ print("Verified research saved:",research_path.name)
+ out=render(src,p,h)
  vid,privacy=publish(yt,out,p,item["name"])
  pending=h.pop("pending_opening_frame",None)
  if pending:
