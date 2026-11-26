@@ -554,7 +554,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                       (255, 88, 202, 255))
         draw_cta_line("COMMENT BELOW!", 292, cta_bold,
                       (255, 226, 75, 255))
-        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1400, cta_bold,
+        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1535, cta_bold,
                       (75, 224, 255, 255))
         cta.save(cta_path)
 
