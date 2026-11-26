@@ -534,7 +534,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
         cta = Image.new("RGBA", (output_w, output_h), (0, 0, 0, 0))
         cta_draw = ImageDraw.Draw(cta)
         cta_font = ImageFont.truetype(fontfile, 42)
-        cta_bold = ImageFont.truetype(fontfile, 54)
+        cta_bold = ImageFont.truetype(fontfile, 36)
 
         def draw_cta_line(text, y, font, fill):
             box = cta_draw.textbbox((0, 0), text, font=font, stroke_width=3)
@@ -554,7 +554,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                       (255, 88, 202, 255))
         draw_cta_line("COMMENT BELOW!", 292, cta_bold,
                       (255, 226, 75, 255))
-        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1535, cta_bold,
+        draw_cta_line("SUBSCRIBE FOR MORE K-POP!", 1400, cta_bold,
                       (75, 224, 255, 255))
         cta.save(cta_path)
 
