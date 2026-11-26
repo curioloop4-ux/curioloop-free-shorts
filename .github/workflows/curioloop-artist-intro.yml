@@ -1,0 +1,90 @@
+name: CurioLoop Artist Intro
+
+on:
+  workflow_dispatch:
+    inputs:
+      artist:
+        description: "aespa member to introduce"
+        required: true
+        type: choice
+        options:
+          - KARINA
+          - WINTER
+          - GISELLE
+          - NINGNING
+        default: KARINA
+      output_only:
+        description: "Render a preview only; do not upload"
+        required: true
+        type: boolean
+        default: true
+  schedule:
+    - cron: "0 3 * * *" # Daily at 12:00 KST
+
+permissions:
+  contents: write
+
+concurrency:
+  group: curioloop-artist-intro
+  cancel-in-progress: false
+
+jobs:
+  create-artist-intro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate intro generator
+        run: python -m py_compile artist_intro.py
+
+      - name: Generate and publish artist intro
+        env:
+          FANCAMVERSE_CLIENT_ID: \${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: \${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: \${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: \${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          YOUTUBE_CLIENT_ID: \${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: \${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: \${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: \${{ secrets.YOUTUBE_CHANNEL_ID }}
+          INTRO_ARTIST: \${{ inputs.artist || 'KARINA' }}
+          INTRO_OUTPUT_ONLY: \${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
+        run: python artist_intro.py
+
+      - name: Save intro preview
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-artist-intro
+          path: work_artist_intro/*_artist_intro.mp4
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Persist successful publication history
+        if: always()
+        run: |
+          if [ -f history/artist_intro_processed.json ] && ! git diff --quiet -- history/artist_intro_processed.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add history/artist_intro_processed.json
+            git commit -m "Record CurioLoop artist intro publication"
+            git push
+          else
+            echo "No published artist intro history to persist."
+          fi
