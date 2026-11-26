@@ -111,11 +111,11 @@ def profile(filename, target_hint=""):
  }
  stop_words={"직캠","안방","음악","중심","인기가요","뮤직","뱅크","엠카","쇼챔","팬캠","페이스캠","풀캠","가로캠","세로캠","무대","컴백","타이틀","티저","비하인드","공식","프로필","생일","멤버","아이돌"}
  if not target:
-  chunks=re.findall(r"[가-힣]{2,4}",stem)
-  group_tokens={alias for _,aliases,_,_ in group_data for alias in aliases if re.fullmatch(r"[가-힣]+",alias)}
-  target=next((x for x in chunks if x not in stop_words and x not in group_tokens), "")
- if not target:
-  raise RuntimeError("Could not identify an artist name from the selected Drive filename: "+filename)
+  # Only accept an explicit, known artist alias in the source filename.
+  matches=[alias for alias in artist_names if alias.casefold() in stem.casefold()]
+  target=max(matches,key=len) if matches else ""
+ if not target or target not in artist_names:
+  raise RuntimeError("SKIPPED_UNKNOWN_ARTIST: no recognized artist name in source filename: "+filename)
  # Resolve the exact NamuWiki mirror article directly. The primary namu.wiki
  # host returns HTTP 403 from GitHub-hosted runners, so use the public mirror.
  from urllib.parse import quote, unquote
@@ -180,14 +180,16 @@ def profile(filename, target_hint=""):
    artist=surnames[target[0]]+" "+''.join(syllable(ch) for ch in target[1:]).capitalize()
   else:
    artist=''.join(syllable(ch) for ch in target).capitalize()
- # Determine group from the selected filename first, then from the article.
- group="Solo Artist"; group_year=None
+ # Require a verified group match in the filename or retrieved biography.
+ group=""; group_year=None
  for haystack in (stem,cleaned[:12000]):
   found=False
   for english,aliases,_,year in group_data:
    if any(alias.casefold() in haystack.casefold() for alias in aliases):
     group=english;group_year=year;found=True;break
   if found:break
+ if not group:
+  raise RuntimeError("SKIPPED_UNKNOWN_GROUP: could not verify group affiliation for "+artist+" from source: "+filename)
  # Extract birth date only when it appears next to a biographical label.
  birth=None
  birth_patterns=[
@@ -372,13 +374,22 @@ def main():
  target=os.getenv("TARGET_ARTIST","").strip()
  candidates=[x for x in scan(drive,folder) if x["id"] not in done]
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
- # Manual test may prioritize one requested artist; scheduled runs leave TARGET_ARTIST empty.
+ # Fail closed: random selection only considers filenames with a known artist and group.
+ known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
+ known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
+ def identifiable(item):
+  name=item["name"].casefold()
+  return any(a.casefold() in name for a in known_artists) and any(g.casefold() in name for g in known_groups)
+ # Manual target may prioritize one artist, but identity validation remains mandatory.
  if target:
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
   needles=aliases.get(target.casefold(),[target.casefold()])
-  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
-  if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested test artist: {target}")
+  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles) and identifiable(x)]
+  if not candidates:raise RuntimeError(f"No identifiable, unprocessed Drive video found for requested test artist: {target}")
  else:
+  candidates=[x for x in candidates if identifiable(x)]
+  print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
+  if not candidates:raise RuntimeError("No unprocessed Drive video has both a recognized artist and group name; skipped all ambiguous sources.")
   import random
   random.shuffle(candidates)
  item=candidates[0];print("Selected Drive source:",item["name"])
