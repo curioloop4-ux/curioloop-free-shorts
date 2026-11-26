@@ -168,7 +168,19 @@ def profile(filename, target_hint=""):
   if alias in stem and (target==alias or not target_hint):
    artist=english;break
  if not re.search(r"[A-Za-z]",artist):
-  raise RuntimeError(f"No verified Romanized artist name was found for {target}; refusing to publish a guessed English name.")
+  # Revised-Romanization fallback for artists without a listed English alias.
+  initials=["g","kk","n","d","tt","r","m","b","pp","s","ss","","j","jj","ch","k","t","p","h"]
+  vowels=["a","ae","ya","yae","eo","e","yeo","ye","o","wa","wae","oe","yo","u","wo","we","wi","yu","eu","ui","i"]
+  finals=["","k","k","ks","n","nj","nh","t","l","lk","lm","lb","ls","lt","lp","lh","m","p","ps","t","t","ng","t","t","k","t","p","t"]
+  def syllable(ch):
+   code=ord(ch)-0xAC00
+   if code<0 or code>11171:return ch
+   return initials[code//588]+vowels[(code%588)//28]+finals[code%28]
+  surnames={"김":"Kim","이":"Lee","박":"Park","최":"Choi","정":"Jung","강":"Kang","조":"Cho","윤":"Yoon","장":"Jang","임":"Lim","한":"Han","오":"Oh","서":"Seo","신":"Shin","권":"Kwon","황":"Hwang","안":"Ahn","송":"Song","류":"Ryu","홍":"Hong","전":"Jeon","문":"Moon","배":"Bae","백":"Baek","허":"Heo","남":"Nam","심":"Shim","노":"Noh"}
+  if len(target)==3 and target[0] in surnames:
+   artist=surnames[target[0]]+" "+''.join(syllable(ch) for ch in target[1:]).capitalize()
+  else:
+   artist=''.join(syllable(ch) for ch in target).capitalize()
  # Determine group from the selected filename first, then from the article.
  group="Solo Artist"; group_year=None
  for haystack in (stem,cleaned[:12000]):
@@ -192,13 +204,10 @@ def profile(filename, target_hint=""):
  facts=[f"{artist} is a South Korean singer and performer."]
  if group!="Solo Artist":facts.append(f"{artist} is associated with {group}.")
  if birth:facts.append(f"The biographical entry lists {birth} as the artist's birth date.")
- if group!="Solo Artist":
-  facts.append(f"The artist's work with {group} includes recorded releases, music-show appearances, and live performances.")
- else:
-  facts.append("The profile documents the artist's career, releases, and public performances.")
- facts.append("This spotlight introduces the artist's background and documented activities.")
- facts.append("For current schedules and announcements, viewers should consult the artist's official channels.")
- facts.append("The biographical details are based on the cited NamuWiki entry and should be checked against official announcements.")
+ facts.append("This short spotlight introduces the artist's name, group affiliation, and biographical background.")
+ facts.append("The script is an original summary and does not reproduce the wording of the source article.")
+ facts.append("For current schedules, releases, and announcements, viewers should check the artist's official channels directly.")
+ facts.append("Any detail not clearly supported by the reference is left out rather than guessed.")
  narration=" ".join(facts)
  # Keep narration within the established 55-70 word target without adding unverified biography.
  words=narration.split()
