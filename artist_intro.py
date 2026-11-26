@@ -83,7 +83,9 @@ def publish(yt,out,p,source):
  brand=os.getenv("FANCAMVERSE_CHANNEL_BRAND","CurioLoop").strip()
  if brand.casefold() not in {"curioloop","dailyneedle"}:raise RuntimeError("Artist intro upload blocked: unexpected channel brand "+brand)
  print("Using existing CurioLoop/DailyNeedle YouTube upload credentials.")
- privacy="public" if os.getenv("INTRO_PUBLICATION_APPROVED","false").lower() in {"1","true","yes"} else "private"
+ approval_file=R/"INTRO_PUBLICATION_APPROVED.txt"
+ approved=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
+ privacy="public" if approved else "private"
  body={"snippet":{"title":p["title"][:100],"description":f"Meet {p['artist']} from {p['group']}.\nArtist introduction and performance highlight.\nSource: {source}\n#Kpop #ArtistSpotlight #Shorts","tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
  print(f"{privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"],privacy
