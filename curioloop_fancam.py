@@ -351,7 +351,7 @@ def parse_gemini_json(response, task_name):
             if quoted:
                 if escaped:
                     escaped = False
-                elif char == "\\\\":
+                elif char == "\\":
                     escaped = True
                 elif char == '"':
                     quoted = False
@@ -370,7 +370,7 @@ def parse_gemini_json(response, task_name):
                             return value
                     except json.JSONDecodeError:
                         break
-    preview = raw[:350].replace("\\n", " ")
+    preview = raw[:350].replace("\n", " ")
     raise RuntimeError(f"Gemini {task_name} returned malformed JSON: {preview}")
 
 
