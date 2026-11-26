@@ -6,6 +6,7 @@ on:
     paths:
       - "main.py"
       - "discover_trending.py"
+      - "artist_intro.py"
       - ".github/workflows/**"
   workflow_dispatch:
 
@@ -23,4 +24,4 @@ jobs:
         with:
           python-version: "3.11"
       - name: Validate Python syntax
-        run: python -m py_compile main.py discover_trending.py
+        run: python -m py_compile main.py discover_trending.py artist_intro.py
