@@ -175,7 +175,7 @@ def render(src,p,hist):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
    return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
-  cues=[]; cursor=1.5; cue_no=1
+  cues=[]; cue_data=[]; cursor=1.5; cue_no=1
   for sentence,seconds in zip(sentences,durations):
    # Keep each caption to at most two short lines. Long sentences are
    # split into consecutive cues and timed by their spoken word counts.
@@ -188,10 +188,12 @@ def render(src,p,hist):
     segment_duration=seconds*weight/total
     end_time=cursor+segment_duration
     cues.extend([str(cue_no),f"{stamp(cursor)} --> {stamp(end_time)}",group,""])
+    cue_data.append({"start":round(cursor,3),"end":round(end_time,3),"text":group})
     cursor=end_time; cue_no+=1
   subtitle=chr(10).join(cues)
   vtt.write_text(subtitle,encoding="utf-8-sig")
-  if not vtt.exists() or vtt.stat().st_size<20:
+   (W/"subtitle_cues.json").write_text(json.dumps(cue_data,ensure_ascii=False),encoding="utf-8")
+  if not vtt.exists() or vtt.stat().st_size<20 or not cue_data:
    raise RuntimeError("Subtitle file was not written correctly")
   print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
   print("Subtitle preview:",subtitle[:400].replace("\n"," | "))
@@ -207,13 +209,23 @@ def render(src,p,hist):
  start=max(0,(source_len-footage)/2);name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
- sub=str(vtt).replace("'","\\'")
- fc=("[0:v]scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,trim=duration=1.5,setpts=PTS-STARTPTS,"
- f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
- f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
- f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
- f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p,subtitles=filename='{sub}':charenc=UTF-8:fontsdir=/usr/share/fonts/truetype/dejavu:force_style='FontName=DejaVu Sans,FontSize=32,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginL=90,MarginR=90,MarginV=320'[v];"
- "[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
+  cue_data=json.loads((W/"subtitle_cues.json").read_text(encoding="utf-8"))
+  subtitle_filters=[]
+  for i,cue in enumerate(cue_data):
+   cue_file=W/f"subtitle_{i:03d}.txt"
+   cue_file.write_text(cue["text"],encoding="utf-8")
+   cue_start=max(1.5,float(cue["start"]));cue_end=min(36.0,float(cue["end"]))
+   if cue_end<=cue_start: continue
+   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
+   subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=40:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:x=(w-text_w)/2:y=h-text_h-220:line_spacing=8:enable='{enable}'")
+  if not subtitle_filters: raise RuntimeError("No timed subtitle overlays were generated")
+  print("Burn-in subtitle overlays:",len(subtitle_filters))
+  fc=("[0:v]scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,trim=duration=1.5,setpts=PTS-STARTPTS,"
+  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
+  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
+  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
+  f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[v];"
+  "[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not 30<=dur(out)<=40:raise RuntimeError("Output validation failed")
