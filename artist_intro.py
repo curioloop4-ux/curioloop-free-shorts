@@ -176,7 +176,11 @@ def profile(filename, target_hint=""):
   if raw is not None:break
   time.sleep(1.2)
  if raw is None:
-  raise RuntimeError("NamuWiki mirror article retrieval failed. "+"; ".join(errors))
+  # NamuWiki mirrors are optional; continue with independent web research.
+  raw=""
+  chosen=target
+  source_base=None
+  print("NamuWiki mirror unavailable; continuing with multi-source web research.")
  def plain(s):
   s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
   s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
@@ -224,7 +228,7 @@ def profile(filename, target_hint=""):
  from urllib.parse import urlparse
  # Search the open web for profile evidence instead of relying on the NamuWiki
  # mirror's markup alone. Search snippets and fetched source pages are both parsed.
- profile_documents=[{"title":"NamuWiki: "+chosen,"url":(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe=""),"text":raw,"priority":0}]
+ profile_documents=([{"title":"NamuWiki: "+chosen,"url":source_base+"/w/"+quote(chosen,safe=""),"text":raw,"priority":0}] if source_base and raw else [])
  profile_queries=[
   f'"{target}" "{group}" 프로필 키 몸무게 생년월일'.replace('"Group affiliation not confirmed"',"").strip(),
   f'"{target}" "{group}" 신체사이즈 취미 특기'.replace('"Group affiliation not confirmed"',"").strip(),
@@ -526,8 +530,10 @@ def profile(filename, target_hint=""):
   add_if_fits(sentence)
  narration=" ".join(narration_parts)
  print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
- source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
- sources=[{"title":f"Profile: {chosen}","url":source_url}]
+ sources=[]
+ if source_base and raw:
+  source_url=source_base+"/w/"+quote(chosen,safe="")
+  sources.append({"title":f"Profile: {chosen}","url":source_url})
  for item in articles:
   if item.get("url") and item["url"].startswith("http") and item["url"] not in [x["url"] for x in sources] and len(sources)<10:
    sources.append({"title":("News: "+item.get("title",""))[:100],"url":item["url"]})
