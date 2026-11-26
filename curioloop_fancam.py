@@ -123,7 +123,7 @@ def probe_duration(source, allow_short=False):
     return duration
 
 def verify_vertical_output(path):
-    """Fail closed unless the rendered MP4 is exactly 1080x1920."""
+    """Fail closed unless the rendered MP4 is exactly 1080x1800 (9:15)."""
     result = run([
         "ffprobe", "-v", "error", "-select_streams", "v:0",
         "-show_entries", "stream=width,height", "-of", "json", str(path)
@@ -133,11 +133,11 @@ def verify_vertical_output(path):
         raise RuntimeError(f"Rendered video has no video stream: {path.name}")
     width = int(streams[0].get("width", 0))
     height = int(streams[0].get("height", 0))
-    if (width, height) != (1080, 1920):
+    if (width, height) != (1080, 1800):
         raise RuntimeError(
-            f"Refusing upload: {path.name} is {width}x{height}, expected 1080x1920 (9:16)."
+            f"Refusing upload: {path.name} is {width}x{height}, expected 1080x1800 (9:15)."
         )
-    print(f"Verified vertical output: {path.name} | {width}x{height} | 9:16")
+    print(f"Verified vertical output: {path.name} | {width}x{height} | 9:15")
 
 
 def make_services():
@@ -394,6 +394,7 @@ The attached contact sheets show sampled frames with their exact source timestam
 Choose exactly {target_count} DISTINCT, non-overlapping highlight windows. Prioritize visually engaging performance moments:
 sharp choreography, expressive facial moments, memorable gestures, energetic stage presence, or strong audience-facing moments.
 Avoid empty stage, waiting, walking to position, camera setup, long transitions, and repeated near-identical moments.
+When the source is at least 80 seconds long, make one of the selected windows include the 67-72 second section (1:07-1:12), if that section contains a visually compelling performance moment. This is a priority region, not a 5-second clip by itself.
 Each window must be {MIN_SHORT_SECONDS} to {MAX_SHORT_SECONDS} seconds long and fully inside the source video. Start at or after {first_allowed:.1f}s.
 Use the timestamps on the images to estimate boundaries. Return JSON only:
 {{"clips":[{{"start":12.0,"end":29.0,"hook":"A short natural English intro caption, 3-7 words"}}]}}
@@ -440,9 +441,9 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
 def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     outputs = []
     fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
-    # Fill a true 9:16 frame by center-cropping landscape footage horizontally.
-    output_w, output_h = 1080, 1920
-    print(f"Render aspect ratio for {source_stem}: 9:16 (center crop; 1080x1920)")
+    # Render at 9:15. Anchor the crop at the top so excess footage is removed from the bottom.
+    output_w, output_h = 1080, 1800
+    print(f"Render aspect ratio for {source_stem}: 9:15 (top-aligned crop; 1080x1800)")
 
     import textwrap
     for position, clip in enumerate(clips, 1):
@@ -495,12 +496,12 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
                            stroke_width=2, stroke_fill=(0, 0, 0, 255))
         name_overlay.save(name_path)
 
-        # Convert every source orientation to a true full-frame 9:16 Short.
-        # Landscape footage is center-cropped horizontally; portrait footage is
-        # scaled to fill. No blurred side/background canvas is added.
+        # Convert every source orientation to a full-frame 9:15 Short.
+        # Scale to fill, then anchor the crop at the top to trim the bottom edge.
+        # No blurred side/background canvas is added.
         filter_complex = (
             f"[0:v]scale={output_w}:{output_h}:force_original_aspect_ratio=increase,"
-            f"crop={output_w}:{output_h},setsar=1[base];"
+            f"crop={output_w}:{output_h}:0:0,setsar=1[base];"
             f"[1:v]format=rgba[name];"
             f"[2:v]format=rgba[intro];"
             f"[base][name]overlay=0:0[namebase];"
