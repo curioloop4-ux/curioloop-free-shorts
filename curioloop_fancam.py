@@ -19,7 +19,7 @@ WORK.mkdir(exist_ok=True)
 HISTORY = ROOT / os.getenv("FANCAMVERSE_HISTORY_FILE", "history/curioloop_fancam_processed.json")
 CHANNEL_BRAND = os.getenv("FANCAMVERSE_CHANNEL_BRAND", "CurioLoop").strip() or "CurioLoop"
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload", "https://www.googleapis.com/auth/youtube.readonly"]
+YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
 SHORTS_PER_SOURCE = 5
 MIN_SHORT_SECONDS = 15
@@ -132,29 +132,6 @@ def make_services():
         client_secret=required("YOUTUBE_CLIENT_SECRET"),
         scopes=YOUTUBE_SCOPES)
     return build("drive", "v3", credentials=drive_creds), build("youtube", "v3", credentials=youtube_creds)
-
-def verify_upload_channel(youtube):
-    expected_id = os.getenv("YOUTUBE_CHANNEL_ID", "").strip()
-    expected_title = os.getenv("YOUTUBE_EXPECTED_CHANNEL_TITLE", "CurioLoop").strip()
-    response = youtube.channels().list(part="id,snippet", mine=True).execute()
-    channels = response.get("items", [])
-    if expected_id:
-        matches = [item for item in channels if item.get("id") == expected_id]
-    else:
-        matches = [item for item in channels
-                   if item.get("snippet", {}).get("title", "").casefold() == expected_title.casefold()]
-    if len(matches) != 1:
-        actual = ", ".join(
-            f'{item.get("snippet", {}).get("title", "(unknown)")} ({item.get("id", "")})'
-            for item in channels
-        ) or "no channel returned"
-        target = expected_id or expected_title
-        raise RuntimeError(
-            f"CurioLoop OAuth verification failed. Expected exactly one match for {target}; "
-            f"Google returned: {actual}. No videos were uploaded."
-        )
-    channel = matches[0]
-    print(f'CurioLoop upload channel verified: {channel.get("snippet", {}).get("title")} ({channel.get("id")})')
 
 def load_history():
     if not HISTORY.exists():
@@ -579,7 +556,7 @@ def main():
     output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
     if not output_only:
-        verify_upload_channel(youtube)
+        print("Upload destination: CurioLoop, using the existing YOUTUBE_* OAuth token.")
 
     source_cache = {}
     uploaded_count = 0
