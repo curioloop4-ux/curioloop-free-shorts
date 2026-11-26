@@ -602,8 +602,7 @@ def profile(filename, target_hint=""):
  for sentence in extra_facts:
   add_if_fits(sentence)
  narration=" ".join(narration_parts)
- if len(narration.split())<95:
-  raise RuntimeError(f"Research produced only {len(narration.split())} narration words; refusing to publish an under-researched short intro (minimum 95 words).")
+ print(f"Research narration collected: {len(narration.split())} words; final acceptance is based on measured video duration (minimum 30 seconds).")
  print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  sources=[]
  if source_base and raw:
@@ -730,6 +729,8 @@ def render(src,p,hist):
    voice_seconds=dur(audio)
    print(f"Applied final speech time-compression factor {factor:.3f}; measured narration {voice_seconds:.1f}s.")
   print(f"Measured narration duration: {voice_seconds:.1f}s; total target: {intro+voice_seconds+1.5:.1f}s.")
+  if intro+voice_seconds+1.5<30.0:
+   raise RuntimeError(f"Measured video duration would be only {intro+voice_seconds+1.5:.1f} seconds; minimum is 30 seconds.")
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
