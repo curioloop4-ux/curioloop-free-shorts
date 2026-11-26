@@ -14,10 +14,10 @@ on:
         default: true
         type: boolean
   schedule:
-    # KST 03:00, 09:00, 15:00 — three artist-intro uploads per day.
-    - cron: "0 18 * * *"
-    - cron: "0 0 * * *"
-    - cron: "0 6 * * *"
+    # Target US evening and Indonesia evening: KST 08:00, 12:00, 22:00.
+    - cron: "0 23 * * *"
+    - cron: "0 3 * * *"
+    - cron: "0 13 * * *"
 
 permissions:
   contents: write
