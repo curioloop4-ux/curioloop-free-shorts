@@ -425,8 +425,10 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
             "-loop", "1", "-i", str(intro_path),
             "-t", f"{clip['end'] - clip['start']:.3f}",
             "-filter_complex", filter_complex, "-map", "[v]", "-map", "0:a?",
-            "-c:v", "libx264", "-preset", "veryfast", "-crf", "20",
-            "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+            "-c:v", "libx264", "-preset", "slow", "-crf", "16",
+            "-profile:v", "high", "-level:v", "4.2",
+            "-pix_fmt", "yuv420p", "-maxrate", "16M", "-bufsize", "24M",
+            "-c:a", "aac", "-b:a", "256k",
             "-movflags", "+faststart", str(output)])
         verify_vertical_output(output)
         outputs.append((output, clip))
