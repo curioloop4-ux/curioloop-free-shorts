@@ -3,23 +3,13 @@ name: CurioLoop Artist Intro
 on:
   workflow_dispatch:
     inputs:
-      artist:
-        description: "aespa member to introduce"
-        required: true
-        type: choice
-        options:
-          - KARINA
-          - WINTER
-          - GISELLE
-          - NINGNING
-        default: KARINA
       output_only:
         description: "Render a preview only; do not upload"
         required: true
         type: boolean
         default: true
   schedule:
-    - cron: "0 3 * * *" # Daily at 12:00 KST
+    - cron: "0 3,9 * * *" # Twice daily: 12:00 and 18:00 KST
 
 permissions:
   contents: write
@@ -42,10 +32,10 @@ jobs:
           python-version: "3.11"
           cache: "pip"
 
-      - name: Install FFmpeg
+      - name: Install FFmpeg and subtitle renderer
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Install dependencies
         run: pip install -r requirements.txt
@@ -53,21 +43,21 @@ jobs:
       - name: Validate intro generator
         run: python -m py_compile artist_intro.py
 
-      - name: Generate and publish artist intro
+      - name: Generate and publish one new Drive artist spotlight
         env:
-          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
-          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
-          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
-          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
-          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
-          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
-          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
-          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
-          INTRO_ARTIST: ${{ github.event_name == 'schedule' && 'ROTATE' || inputs.artist || 'KARINA' }}
-          INTRO_OUTPUT_ONLY: ${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
+          FANCAMVERSE_CLIENT_ID: \${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: \${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: \${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: \${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          YOUTUBE_CLIENT_ID: \${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: \${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: \${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: \${{ secrets.YOUTUBE_CHANNEL_ID }}
+          GEMINI_API_KEY: \${{ secrets.GEMINI_API_KEY }}
+          INTRO_OUTPUT_ONLY: \${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
         run: python artist_intro.py
 
-      - name: Save intro preview
+      - name: Save rendered preview
         if: always()
         uses: actions/upload-artifact@v4
         with:
