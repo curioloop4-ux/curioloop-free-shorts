@@ -29,7 +29,7 @@ on:
         description: "Optional manual filename filter; leave blank for automatic round-robin selection of all new and unfinished Drive videos"
         required: false
         type: string
-        default: "250706 권은비"
+        default: ""
       uploads_per_run:
         description: "Number of Shorts to process"
         required: true
