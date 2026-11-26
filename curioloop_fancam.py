@@ -817,6 +817,22 @@ def generate_metadata(filename, hook, index):
         tags = ["performance highlight", "fan edit", "music", "entertainment",
                 "Shorts", "video highlight"]
 
+    # Add evidence-led discovery tags based on successful K-pop Shorts/fancam channels.
+    # Keep the metadata specific to this clip: artist + group + performance format,
+    # rather than stuffing unrelated group names into every upload.
+    artist_tag = artist.title() if artist else ""
+    group_tag = group.strip() if group else ""
+    discovery_tags = [
+        "K-pop", "Kpop", "K-pop fancam", "Kpop fancam", "K-pop Shorts",
+        "Korean idol", "K-pop performance", "아이돌 직캠", "걸그룹 직캠",
+        "여자아이돌", "Korean girl group", "Shorts"
+    ]
+    if artist_tag:
+        discovery_tags.extend([artist_tag, f"{artist_tag} fancam"])
+    if group_tag:
+        discovery_tags.extend([group_tag, f"{group_tag} fancam"])
+    tags = discovery_tags + tags
+
     # Strip channel branding from generated tags and descriptions.
     tags = [tag for tag in tags if "curioloop" not in str(tag).casefold()]
     clean, seen = [], set()
