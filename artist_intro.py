@@ -211,6 +211,8 @@ def profile(filename, target_hint=""):
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
+ waist=labelled_number(["허리둘레","허리 사이즈","허리"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
+ shoe_size=labelled_number(["발 사이즈","신발 사이즈","발사이즈"],r"\d{2}(?:\.5)?\s*(?:mm|cm)")
  def labeled_value(labels):
   # NamuWiki profile tables commonly store a label and value in adjacent
   # ||-separated cells. Also support simple "label: value" text.
@@ -229,30 +231,38 @@ def profile(filename, target_hint=""):
  if birth:
   year_match=re.search(r"(19|20)\d{2}",birth)
   if year_match:birth_year=year_match.group(0)
+ body_size=labeled_value(["신체사이즈","신체 사이즈","쓰리사이즈","3사이즈","쓰리 사이즈"])
  position=labeled_value(["포지션","담당 포지션","보컬 포지션"])
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
  personality=labeled_value(["성격","특징","매력 포인트"])
- # Fetch a current news headline from Google News RSS; profile data remains separate.
+ # Search current coverage and broader public-interest items, not only news labels.
+ # Leave the update out entirely when no relevant result is found.
  news_title=None;news_url=None;news_date=None;news_source=None
  try:
   from xml.etree import ElementTree as ET
   from urllib.parse import quote_plus
-  query=quote_plus(target+" "+(group if group!="Group affiliation not confirmed" else "K-pop"))
-  rss=session.get("https://news.google.com/rss/search?q="+query+"&hl=ko&gl=KR&ceid=KR:ko&sort=date",timeout=20)
-  rss.raise_for_status()
-  root=ET.fromstring(rss.content)
-  for node in root.findall(".//item"):
-   title_node=node.find("title");link_node=node.find("link");date_node=node.find("pubDate");source_node=node.find("source")
-   candidate_title=plain(title_node.text or "") if title_node is not None else ""
-   if candidate_title and link_node is not None and link_node.text:
-    news_title=candidate_title[:180];news_url=link_node.text.strip()
-    news_date=date_node.text.strip() if date_node is not None and date_node.text else None
-    news_source=source_node.text.strip() if source_node is not None and source_node.text else None
-    break
+  search_terms=[
+   f'"{target}" {group} (comeback OR interview OR variety OR performance OR viral OR award OR issue OR activity) when:30d',
+   f'"{target}" K-pop (interview OR broadcast OR performance OR trending OR award OR activity) when:30d',
+   f'"{group}" K-pop (comeback OR award OR performance OR variety OR viral) when:30d' if group!="Group affiliation not confirmed" else ""
+  ]
+  for search_term in [x for x in search_terms if x]:
+   query=quote_plus(search_term)
+   rss=session.get("https://news.google.com/rss/search?q="+query+"&hl=ko&gl=KR&ceid=KR:ko&sort=date",timeout=20)
+   rss.raise_for_status()
+   root=ET.fromstring(rss.content)
+   for node in root.findall(".//item"):
+    title_node=node.find("title");link_node=node.find("link");date_node=node.find("pubDate");source_node=node.find("source")
+    candidate_title=plain(title_node.text or "") if title_node is not None else ""
+    if candidate_title and link_node is not None and link_node.text:
+     news_title=candidate_title[:180];news_url=link_node.text.strip()
+     news_date=date_node.text.strip() if date_node is not None and date_node.text else None
+     news_source=source_node.text.strip() if source_node is not None and source_node.text else None
+     break
+   if news_title:break
  except Exception as e:
-  print("Recent news lookup unavailable:",type(e).__name__,str(e)[:200])
- # Build a profile-first script; unavailable details are omitted rather than guessed.
+  print("Artist update search unavailable:",type(e).__name__,str(e)[:200])
  facts=[f"Meet {artist}, a K-pop artist."]
  if birth_year:facts.append(f"{artist} was born in {birth_year}.")
  if group!="Group affiliation not confirmed":
@@ -261,16 +271,18 @@ def profile(filename, target_hint=""):
   facts.append("Their group affiliation is not confirmed in the available profile.")
  if height:facts.append(f"The listed height is {height}.")
  if weight:facts.append(f"The listed weight is {weight}.")
+ if waist:facts.append(f"The listed waist measurement is {waist}.")
+ if shoe_size:facts.append(f"The listed shoe size is {shoe_size}.")
+ if body_size:facts.append(f"The listed body measurements are {body_size}.")
  if position:facts.append(f"Their listed role is {position}.")
- if nickname:facts.append(f"A profile nickname is {nickname}.")
- if hobby:facts.append(f"One profile detail is their {hobby}.")
- if personality:facts.append(f"They are described for {personality}.")
- if news_title:facts.append(f"Recent news: {news_title}.")
- # No generic filler is added when there is no verified recent news.
+ if nickname:facts.append(f"They are also known as {nickname}.")
+ if hobby:facts.append(f"Their hobbies include {hobby}.")
+ if personality:facts.append(f"They are known for {personality}.")
+ if news_title:facts.append(f"One recent highlight is {news_title}.")
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
- sources=[{"title":f"NamuWiki: {chosen}","url":source_url}]
- if news_url:sources.append({"title":"Recent news: "+(news_source or "Google News"),"url":news_url})
+ sources=[{"title":f"Profile: {chosen}","url":source_url}]
+ if news_url:sources.append({"title":news_source or "Artist update","url":news_url})
  print(f"Profile research complete: {chosen}; artist={artist}; group={group}; birth_year={birth_year or 'not listed'}; height={height or 'not listed'}; weight={weight or 'not listed'}; recent_news={'yes' if news_title else 'no'}.")
  return {
   "artist":artist,"group":group,"narration":narration,
@@ -352,7 +364,8 @@ def render(src,p,hist):
    clean_caption=unicodedata.normalize("NFKD",sentence)
    clean_caption=clean_caption.translate(str.maketrans({"’":"'","‘":"'","“":'"',"”":'"',"–":"-","—":"-","…":"...","•":"-"," ":" ","‐":"-","‑":"-"}))
    clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
-   clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
+   clean_caption=re.sub(r"[!！()（）\[\]{}:：;；]+","",clean_caption)
+    clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
    wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
