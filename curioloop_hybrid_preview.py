@@ -5,6 +5,7 @@ import os
 import random
 import re
 import subprocess
+import time
 from pathlib import Path
 
 import edge_tts
@@ -102,6 +103,70 @@ def contact_sheet(path, total):
     sheet.save(out,quality=88)
     return out
 
+def gemini_post_with_retry(url, api_key, payload, timeout, task_name):
+    """Retry temporary Gemini rate-limit and service errors with backoff."""
+    retryable = {408, 429, 500, 502, 503, 504}
+    max_attempts = 3
+    for attempt in range(1, max_attempts + 1):
+        try:
+            response = requests.post(
+                url, params={"key": api_key}, json=payload, timeout=timeout
+            )
+            if response.status_code not in retryable:
+                response.raise_for_status()
+                return response
+            if attempt == max_attempts:
+                detail = (response.text or "")[:1000]
+                raise RuntimeError(
+                    f"Gemini {task_name} failed after {max_attempts} attempts "
+                    f"(HTTP {response.status_code}): {detail}"
+                )
+            retry_after = response.headers.get("Retry-After", "")
+            try:
+                delay = max(float(retry_after), 8 * (2 ** (attempt - 1)))
+            except (TypeError, ValueError):
+                delay = 8 * (2 ** (attempt - 1))
+            delay = min(delay, 90) + random.uniform(0, 2)
+            print(
+                f"Gemini {task_name}: HTTP {response.status_code}; "
+                f"retry {attempt + 1}/{max_attempts} in {delay:.1f}s."
+            )
+            time.sleep(delay)
+        except requests.HTTPError:
+            raise
+        except requests.RequestException as exc:
+            if attempt == max_attempts:
+                raise RuntimeError(
+                    f"Gemini {task_name} request failed after {max_attempts} attempts: {exc}"
+                ) from exc
+            delay = 8 * (2 ** (attempt - 1)) + random.uniform(0, 2)
+            print(f"Gemini {task_name}: network error; retry in {delay:.1f}s: {exc}")
+            time.sleep(delay)
+
+def gemini_generate_with_fallback(primary_model, api_key, payload, timeout, task_name):
+    """Retry the primary Gemini model, then try the configured lighter fallback."""
+    fallback_model = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite").strip()
+    models = list(dict.fromkeys([primary_model, fallback_model]))
+    last_error = None
+    for index, model in enumerate(models):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        try:
+            print(f"Gemini {task_name}: using model {model}.")
+            return gemini_post_with_retry(url, api_key, payload, timeout, task_name)
+        except RuntimeError as exc:
+            last_error = exc
+            message = str(exc)
+            transient = any(
+                f"HTTP {status}" in message for status in (408, 429, 500, 502, 503, 504)
+            ) or "request failed after" in message
+            if not transient or index == len(models) - 1:
+                raise
+            print(
+                f"Gemini {task_name}: {model} unavailable after retries; "
+                f"switching to fallback {fallback_model}."
+            )
+    raise last_error
+
 def analyze(path, filename, total, sheet):
     prompt = f"""Create an original, fact-grounded 30-second English K-pop performance analysis Short.
 Source filename: {filename!r}. Source duration: {total:.1f} seconds.
@@ -115,10 +180,9 @@ No markdown. The analysis must be meaningful commentary, not a description of th
              "data":base64.b64encode(sheet.read_bytes()).decode("ascii")}}]}],
              "generationConfig":{"temperature":0.25,"responseMimeType":"application/json"}}
     model=os.getenv("GEMINI_MODEL","gemini-3.8-flash")
-    response=requests.post(
-        f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent",
-        params={"key":required("GEMINI_API_KEY")},json=payload,timeout=180)
-    response.raise_for_status()
+    response=gemini_generate_with_fallback(
+        model, required("GEMINI_API_KEY"), payload, 180, "hybrid performance analysis"
+    )
     data=json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
     start,end=float(data["start"]),float(data["end"])
     if start < 0 or end > total or not 22 <= end-start <= 26:
