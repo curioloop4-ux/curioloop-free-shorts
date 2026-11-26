@@ -52,6 +52,14 @@ def download(drive,item):
  return p
 def profile(filename):
  stem=Path(filename).stem.casefold()
+ if "wonyoung" in stem or "원영" in stem:
+  narration=("Meet Jang Wonyoung, born on August 31, 2004. She first debuted with IZ*ONE in October 2018, "
+   "then debuted again as a member of IVE in December 2021. Known for her poised stage presence and expressive performance style, "
+   "she has also taken part in IVE songwriting. In February 2026, IVE released their second full-length album, REVIVE+, "
+   "featuring the pre-release track BANG BANG and title track BLACKHOLE.")
+  return {"artist":"WONYOUNG","group":"IVE","narration":narration,
+   "title":"WONYOUNG | IVE Artist Spotlight #Shorts",
+   "tags":["WONYOUNG","IVE","JANG WONYOUNG","K-pop","artist spotlight","REVIVE+","Shorts"]}
  if "eunha" in stem or "은하" in stem:
   narration=("Meet Eunha, born Jung Eun-bi in 1997. She debuted in January 2015 as a member of GFRIEND, "
    "then returned to the stage in 2022 as part of VIVIZ with SinB and Umji. Known for her clear, expressive "
