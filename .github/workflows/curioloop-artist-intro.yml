@@ -2,14 +2,9 @@ name: CurioLoop Artist Intro
 
 on:
   workflow_dispatch:
-    inputs:
-      output_only:
-        description: "Render a preview only; do not upload"
-        required: true
-        type: boolean
-        default: true
   schedule:
-    - cron: "0 3,9 * * *" # Twice daily: 12:00 and 18:00 KST
+    # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
+    - cron: "0 14,17,20 * * *"
 
 permissions:
   contents: write
@@ -43,7 +38,7 @@ jobs:
       - name: Validate intro generator
         run: python -m py_compile artist_intro.py
 
-      - name: Generate and publish one new Drive artist spotlight
+      - name: Generate and upload one new Drive artist spotlight
         env:
           FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
           FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
@@ -54,10 +49,11 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          INTRO_OUTPUT_ONLY: ${{ github.event_name == 'schedule' && 'false' || (inputs.output_only && 'true' || 'false') }}
+          # Manual test runs are always private. Scheduled uploads stay private until the owner approves.
+          INTRO_PUBLICATION_APPROVED: ${{ github.event_name == 'schedule' && secrets.INTRO_PUBLICATION_APPROVED || 'false' }}
         run: python artist_intro.py
 
-      - name: Save rendered preview
+      - name: Save rendered video artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -66,7 +62,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Persist successful publication history
+      - name: Persist successful upload history
         if: always()
         run: |
           if [ -f history/artist_intro_processed.json ] && ! git diff --quiet -- history/artist_intro_processed.json; then
@@ -76,5 +72,5 @@ jobs:
             git commit -m "Record CurioLoop artist intro publication"
             git push
           else
-            echo "No published artist intro history to persist."
+            echo "No artist intro history changes to persist."
           fi
