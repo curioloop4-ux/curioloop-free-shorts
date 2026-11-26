@@ -109,7 +109,7 @@ Inspect the attached contact sheet. Do not infer an artist, group, song, event, 
 Select one visually clear, continuous clip 22 to 26 seconds long, fully within the source.
 Write original commentary that analyzes only observable performance elements (movement, timing, expression, stage presence, camera framing); avoid unsupported biography or superlatives.
 Return JSON only:
-{{"start":10.0,"end":34.0,"title":"Why This Performance Moment Works","hook":"LOOK AT THE TIMING","analysis":"55 to 65 word original voiceover script in natural English","summary":"A concise 8 to 12 word visual takeaway"}}
+{{"start":10.0,"end":34.0,"title":"Why This Performance Moment Works","hook":"LOOK AT THE TIMING","analysis":"40 to 50 word original voiceover script in natural English","summary":"A concise 8 to 12 word visual takeaway"}}
 No markdown. The analysis must be meaningful commentary, not a description of the footage alone."""
     payload={"contents":[{"parts":[{"text":prompt},{"inline_data":{"mime_type":"image/jpeg",
              "data":base64.b64encode(sheet.read_bytes()).decode("ascii")}}]}],
@@ -124,7 +124,7 @@ No markdown. The analysis must be meaningful commentary, not a description of th
     if start < 0 or end > total or not 22 <= end-start <= 26:
         raise RuntimeError(f"Gemini selected invalid clip window: {start:.1f}-{end:.1f}s")
     words=len(str(data["analysis"]).split())
-    if not 45 <= words <= 75:
+    if not 35 <= words <= 55:
         raise RuntimeError(f"Analysis narration length is invalid ({words} words).")
     return data
 
@@ -139,7 +139,7 @@ def make_overlay(data, out):
     title=str(data["hook"]).upper()[:42]
     draw.text((86,210),title,font=title_font,fill="white",stroke_width=2,stroke_fill="black")
     draw.rounded_rectangle((54,1430,1026,1755),radius=30,fill=(0,0,0,190))
-    draw.text((90,1470),"CURI0LOOP  /  PERFORMANCE BREAKDOWN",font=label_font,fill=(255,220,120))
+    draw.text((90,1470),"CURIOLOOP  /  PERFORMANCE BREAKDOWN",font=label_font,fill=(255,220,120))
     summary=str(data["summary"])
     words=summary.split()
     lines=[]
@@ -168,9 +168,12 @@ def render(source, data, output):
     asyncio.run(make_voice(data["analysis"],voice))
     voice_duration=duration(voice)
     clip_duration=float(data["end"])-float(data["start"])
-    final_duration=max(clip_duration,voice_duration+1.5)
-    if final_duration > clip_duration:
-        final_duration=clip_duration
+    if voice_duration > clip_duration - 0.5:
+        raise RuntimeError(
+            f"Voiceover ({voice_duration:.1f}s) does not fit selected clip ({clip_duration:.1f}s); "
+            "regenerate with a shorter narration."
+        )
+    final_duration=clip_duration
     filt=("[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
           "crop=1080:1920,setsar=1[base];[1:v]format=rgba[ov];"
           "[base][ov]overlay=0:0[v];"
