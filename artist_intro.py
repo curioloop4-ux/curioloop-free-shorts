@@ -48,10 +48,40 @@ Return JSON only with artist, group, narration, title, tags.
 Identify the artist only from clear filename clues, never face recognition. If unclear return artist "Unknown Artist".
 Narration 55-70 natural English words for a 30-36 second artist introduction. Only stable widely established facts; do not invent dates, awards or positions. If unsure, keep intro general and describe the artist's performance/appeal without unsupported claims.
 Title max 85 chars. tags array 4-8 strings."""
- r=requests.post("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent",params={"key":need("GEMINI_API_KEY")},json={"contents":[{"parts":[{"text":prompt}]}],"generationConfig":{"responseMimeType":"application/json","temperature":0.2}},timeout=60);r.raise_for_status()
- p=json.loads(r.json()["candidates"][0]["content"]["parts"][0]["text"])
- if p.get("artist")=="Unknown Artist" or len(p.get("narration","").split())<45:raise RuntimeError("Could not confidently identify artist from Drive filename: "+filename)
- return p
+ # Gemini 2.5 access is restricted for some projects; use current models with automatic fallback.
+ models=("gemini-3.8-flash","gemini-3.5-flash-lite")
+ errors=[]
+ for model in models:
+  url=f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+  try:
+   r=requests.post(url,params={"key":need("GEMINI_API_KEY")},
+    json={"contents":[{"parts":[{"text":prompt}]}],
+          "generationConfig":{"responseMimeType":"application/json","temperature":0.2}},
+    timeout=60)
+   if r.status_code==404:
+    errors.append(f"{model}: HTTP 404 model unavailable")
+    print(f"Gemini model {model} unavailable (404); switching to fallback.")
+    continue
+   if r.status_code in (429,500,502,503,504):
+    errors.append(f"{model}: HTTP {r.status_code}")
+    print(f"Gemini model {model} temporarily unavailable ({r.status_code}); switching to fallback.")
+    continue
+   r.raise_for_status()
+   raw=r.json()["candidates"][0]["content"]["parts"][0]["text"]
+   raw=re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$","",raw,flags=re.I)
+   p=json.loads(raw)
+   if p.get("artist")=="Unknown Artist" or len(p.get("narration","").split())<45:
+    raise RuntimeError("Could not confidently identify artist from Drive filename: "+filename)
+   print(f"Artist profile generated with {model}.")
+   return p
+  except requests.RequestException as e:
+   errors.append(f"{model}: {type(e).__name__}: {e}")
+   print(f"Gemini request failed for {model}: {type(e).__name__}; trying fallback.")
+  except (KeyError,IndexError,ValueError) as e:
+   errors.append(f"{model}: invalid response ({type(e).__name__})")
+   print(f"Gemini response from {model} was invalid; trying fallback.")
+ raise RuntimeError("All Gemini profile models failed: "+"; ".join(errors))
+
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
  if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
