@@ -153,7 +153,31 @@ def render(src,p,hist):
      submaker.feed(chunk)
   subtitle=submaker.get_srt()
   if not subtitle.strip():
-   raise RuntimeError("Edge TTS returned no word-boundary subtitle data")
+   # Edge TTS may omit WordBoundary events. Build readable sentence-level
+   # SRT cues from the narration and distribute them across the actual audio.
+   print("Edge TTS supplied no word boundaries; generating timed sentence subtitles.")
+   sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",p["narration"].strip()) if x.strip()]
+   chunks=[]
+   for sentence in sentences:
+    words=sentence.split()
+    while words:
+     chunks.append(" ".join(words[:8]))
+     words=words[8:]
+   if not chunks:
+    raise RuntimeError("Cannot create subtitles: narration is empty")
+   audio_duration=max(1.0,min(dur(audio),footage))
+   weights=[max(1,len(x.split())) for x in chunks]
+   total=sum(weights)
+   def stamp(seconds):
+    ms=max(0,int(round(seconds*1000)))
+    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
+    return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
+   cues=[]; cursor=0.0
+   for i,(line,weight) in enumerate(zip(chunks,weights),1):
+    end=audio_duration if i==len(chunks) else cursor+audio_duration*weight/total
+    cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end)}",line,""])
+    cursor=end
+   subtitle="\\n".join(cues)
   vtt.write_text(subtitle,encoding="utf-8")
  asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
