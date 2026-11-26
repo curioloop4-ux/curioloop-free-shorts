@@ -597,25 +597,25 @@ def identify_artist(filename):
         return "JENNIE", "BLACKPINK", [
             "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", "Jennie performance", CHANNEL_BRAND, "Shorts"
+            "female idol", "Jennie performance", "Shorts"
         ]
     if any(token in value for token in ("사쿠라", "sakura", "miyawaki")):
         return "SAKURA", "LE SSERAFIM", [
             "Sakura", "LE SSERAFIM Sakura", "Sakura fancam", "LE SSERAFIM fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", CHANNEL_BRAND, "Shorts"
+            "female idol", "Shorts"
         ]
     if any(token in value for token in ("키야", "kya", "kiiiiikiii")):
         return "KYA", "KiiiKiii", [
             "KYA", "KiiiKiii KYA", "KiiiKiii fancam", "K-pop",
             "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", CHANNEL_BRAND, "Shorts"
+            "female idol", "Shorts"
         ]
     if any(token in value for token in ("장원영", "wonyoung", "won young")):
         return "WONYOUNG", "IVE", [
             "Wonyoung", "IVE Wonyoung", "Wonyoung fancam", "IVE fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", "Wonyoung performance", CHANNEL_BRAND, "Shorts"
+            "female idol", "Wonyoung performance", "Shorts"
         ]
     if any(token in value for token in ("채령", "chaeryeong", "chae ryeong")):
         return "CHAERYEONG", "ITZY", [
@@ -627,70 +627,70 @@ def identify_artist(filename):
         return "EUNBI", "SOLO", [
             "Kwon Eunbi", "Eunbi", "Kwon Eunbi fancam", "Eunbi fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", "Eunbi performance", CHANNEL_BRAND, "Shorts"
+            "female idol", "Eunbi performance", "Shorts"
         ]
     if any(token in value for token in ("은하", "eunha")):
         return "EUNHA", "VIVIZ", [
             "Eunha", "VIVIZ Eunha", "Eunha fancam", "VIVIZ fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", "Eunha performance", CHANNEL_BRAND, "Shorts"
+            "female idol", "Eunha performance", "Shorts"
         ]
     if any(token in value for token in ("나띠", "natty")):
         return "NATTY", "KISS OF LIFE", [
             "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
             "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
-            "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("제니", "jennie")):
         return "JENNIE", "BLACKPINK", [
             "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
             "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
-            "female idol", "Jennie performance", CHANNEL_BRAND, "Shorts"
+            "female idol", "Jennie performance", "Shorts"
         ]
     if any(token in value for token in ("우기", "yuqi")):
         return "YUQI", "(G)I-DLE", [
             "Yuqi", "(G)I-DLE Yuqi", "Yuqi fancam", "(G)I-DLE fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("엘라", "ella")):
         return "ELLA", "MEOVV", [
             "Ella", "MEOVV Ella", "Ella fancam", "MEOVV fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("카즈하", "kazuha")):
         return "KAZUHA", "LE SSERAFIM", [
             "Kazuha", "LE SSERAFIM Kazuha", "Kazuha fancam", "LE SSERAFIM fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("해린", "haerin")):
         return "HAERIN", "NewJeans", [
             "Haerin", "NewJeans Haerin", "Haerin fancam", "NewJeans fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("리사", "lisa")):
         return "LISA", "BLACKPINK", [
             "Lisa", "BLACKPINK Lisa", "Lisa fancam", "BLACKPINK fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("낸시", "nancy")):
         return "NANCY", "MOMOLAND", [
             "Nancy", "MOMOLAND Nancy", "Nancy fancam", "MOMOLAND fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("이지", "e.ji", "eji")):
         return "EJI", "ICHILLIN", [
             "E.JI", "ICHILLIN E.JI", "E.JI fancam", "ICHILLIN fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("쯔위", "tzuyu")):
         return "TZUYU", "TWICE", [
             "Tzuyu", "TWICE Tzuyu", "Tzuyu fancam", "TWICE fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("제니", "jennie")):
         return "JENNIE", "BLACKPINK", [
             "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
-            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol", "female idol", "Shorts"
         ]
     if any(token in value for token in ("카리나", "karina")):
         return "KARINA", "aespa", [
@@ -752,7 +752,7 @@ def identify_artist(filename):
             print(f"Artist name auto-corrected from filename using alias '{best[3]}': {canonical} / {team}")
             tags = [canonical.title(), f"{team} {canonical.title()}", f"{canonical.title()} fancam",
                     f"{team} fancam", "K-pop", "K-pop Shorts", "Korean idol",
-                    "female idol", CHANNEL_BRAND, "Shorts"]
+                    "female idol", "Shorts"]
             return canonical, team, tags
         print(f"Artist name recovery ambiguous for '{filename}'; refusing to guess.")
     return "", "", []
@@ -762,70 +762,74 @@ def generate_metadata(filename, hook, index):
     if artist == "WONYOUNG":
         title = "WONYOUNG (IVE) ✨ | Charismatic K-Pop Fancam #Shorts"
         description = ("WONYOUNG of IVE ✨ Enjoy this fan-captured performance and her "
-                       f"stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "CHAERYEONG":
         title = "CHAERYEONG (ITZY) 🌙 | K-Pop Fancam #Shorts"
         description = ("CHAERYEONG of ITZY 🌙 Enjoy this fan-captured performance and "
-                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "EUNBI":
         title = "KWON EUNBI ✨ | K-Pop Fancam #Shorts"
         description = ("KWON EUNBI ✨ Enjoy this fan-captured performance and her "
-                       f"stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "EUNHA":
         title = "VIVIZ / EUNHA ✨ | K-Pop Fancam #Shorts"
         description = ("EUNHA of VIVIZ ✨ Enjoy this fan-captured performance and "
-                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\\n\\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "NATTY":
         title = "KISS OF LIFE / NATTY 🔥 | K-Pop Fancam #Shorts"
         description = ("NATTY of KISS OF LIFE 🔥 Enjoy this fan-captured performance and "
-                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "JENNIE":
         title = "BLACKPINK / JENNIE 🖤 | K-Pop Fancam #Shorts"
         description = ("JENNIE of BLACKPINK 🖤 Enjoy this fan-captured performance and "
-                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\\n\\nFan-captured footage.")
         tags = fixed_tags
     elif artist in {"YUQI", "ELLA", "KAZUHA", "HAERIN", "LISA", "NANCY", "TZUYU", "JENNIE"}:
         title = f"{group} / {artist} ✨ | K-Pop Fancam #Shorts"
         description = (f"{artist} of {group} ✨ Enjoy this fan-captured performance and "
-                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\\n\\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "KARINA":
         title = "aespa / KARINA ✨ | K-Pop Fancam #Shorts"
         description = ("KARINA of aespa ✨ Enjoy this fan-captured performance and "
-                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "SAKURA":
         title = "LE SSERAFIM / SAKURA 🌸 | K-Pop Fancam #Shorts"
         description = ("SAKURA of LE SSERAFIM 🌸 Enjoy this fan-captured performance and "
-                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     elif artist == "KYA":
         title = "KiiiKiii / KYA ✨ | K-Pop Fancam #Shorts"
         description = ("KYA of KiiiKiii ✨ Enjoy this fan-captured performance and "
-                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage.")
         tags = fixed_tags
     else:
         # Metadata must never block an otherwise valid Short when Gemini is rate-limited.
-        title = "Performance Highlight | CurioLoop #Shorts"
+        title = "Performance Highlight #Shorts"
         description = ("A short highlight from the source video. Fan-edited content; "
                        "all footage belongs to its respective rights holders.")
         tags = ["performance highlight", "fan edit", "music", "entertainment",
                 "Shorts", "video highlight"]
 
+    # Strip channel branding from generated tags and descriptions.
+    tags = [tag for tag in tags if "curioloop" not in str(tag).casefold()]
     clean, seen = [], set()
-    for tag in [CHANNEL_BRAND, "K-pop", "K-pop fancam", "Shorts"] + tags:
+    for tag in ["K-pop", "K-pop fancam", "Shorts"] + tags:
         tag = re.sub(r"\s+", " ", str(tag)).strip().lstrip("#")
         key = tag.casefold()
         if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
             clean.append(tag); seen.add(key)
     hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:6])
     description = (description + "\n\n" if description else "") + hashtags
-    return title, description[:5000], clean
+    upload_stamp = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
+    title = f"{title.replace(' #Shorts', '')} | Clip {index:02d} · {upload_stamp} #Shorts"
+    return title[:100], description[:5000], clean
 
 def next_publish_at_kst(publish_time):
     try:
