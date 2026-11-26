@@ -23,10 +23,10 @@ on:
           - public
         default: private
       source_filter:
-        description: "Manual run: select Chaeryeong first; clear this field for automatic rotation"
+        description: "Optional manual filename filter; leave blank for automatic round-robin selection of all new and unfinished Drive videos"
         required: false
         type: string
-        default: "채령"
+        default: ""
       uploads_per_run:
         description: "Number of Shorts to process"
         required: true
