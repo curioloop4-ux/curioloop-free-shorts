@@ -1,4 +1,4 @@
-import asyncio,json,os,re,subprocess,textwrap
+import asyncio,json,os,re,subprocess,textwrap,math,struct,wave
 from datetime import datetime,timezone
 from pathlib import Path
 import requests,edge_tts,time
@@ -223,10 +223,46 @@ def profile(filename, target_hint=""):
   "research_queries":[target]
  }
 
+
+def create_background_music(path, seconds=36, sample_rate=22050):
+ # Original, royalty-free ambient pop bed synthesized locally for this channel.
+ # Soft major-seventh chords and sparse plucks; intentionally unobtrusive.
+ progression=[
+  ([261.63,329.63,392.00,493.88], [523.25,659.25]),
+  ([220.00,261.63,329.63,392.00], [440.00,523.25]),
+  ([174.61,220.00,261.63,329.63], [349.23,440.00]),
+  ([196.00,246.94,293.66,392.00], [392.00,493.88])
+ ]
+ total=int(seconds*sample_rate)
+ with wave.open(str(path),"wb") as wf:
+  wf.setnchannels(2); wf.setsampwidth(2); wf.setframerate(sample_rate)
+  frames=bytearray()
+  for i in range(total):
+   t=i/sample_rate
+   bar=int(t/4)%len(progression)
+   chord,plucks=progression[bar]
+   local=t%4
+   # Gentle chord pad with a slow, unobtrusive swell.
+   swell=0.72+0.28*math.sin(math.pi*min(local/4,1))
+   pad=sum(math.sin(2*math.pi*hz*t) for hz in chord)/len(chord)
+   pad+=0.18*sum(math.sin(2*math.pi*hz*2*t) for hz in chord)/len(chord)
+   # Sparse, rounded high notes add a light contemporary pop texture.
+   beat=t%1.0
+   note=plucks[int((t%4)//1)%2]
+   decay=math.exp(-beat*5.5)
+   pluck=math.sin(2*math.pi*note*beat)*decay
+   fade=min(1.0,t/1.2,max(0.0,(seconds-t)/2.0))
+   sample=(0.72*pad*swell+0.12*pluck)*0.10*fade
+   sample=max(-0.95,min(0.95,sample))
+   value=int(sample*32767)
+   frames.extend(struct.pack("<hh",value,value))
+  wf.writeframes(frames)
+ print("Original background music generated:",path.name,"duration:",seconds,"seconds")
+
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
  if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
- audio=W/"voice.mp3";vtt=W/"voice.srt"
+ audio=W/"voice.mp3";bgm=W/"background_music.wav";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
   # Generate each spoken sentence separately so subtitle timing is based on
   # the measured duration of that exact sentence, not estimated word counts.
@@ -274,6 +310,7 @@ def render(src,p,hist):
   print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
   print("Subtitle preview:",subtitle[:400].replace("\n"," | "))
  asyncio.run(make_voice_and_subtitles())
+ create_background_music(bgm,length)
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
  choices=[max(0.5,min(source_len-0.5,source_len*x)) for x in (0.08,0.18,0.30,0.43,0.57,0.70,0.82,0.92)]
@@ -301,7 +338,9 @@ def render(src,p,hist):
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
  f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[v];"
- "[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
+ "[2:a]adelay=1500|1500,apad,atrim=duration=36[voice];"
+ "[3:a]volume=0.16,afade=t=in:st=0:d=1.2,afade=t=out:st=33:d=3,atrim=duration=36[bgm];"
+ "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not 30<=dur(out)<=40:raise RuntimeError("Output validation failed")
