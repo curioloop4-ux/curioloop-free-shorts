@@ -365,7 +365,7 @@ def render(src,p,hist):
    clean_caption=clean_caption.translate(str.maketrans({"’":"'","‘":"'","“":'"',"”":'"',"–":"-","—":"-","…":"...","•":"-"," ":" ","‐":"-","‑":"-"}))
    clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
    clean_caption=re.sub(r"[!！()（）\[\]{}:：;；]+","",clean_caption)
-    clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
+   clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
    wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
