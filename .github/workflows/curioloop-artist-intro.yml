@@ -80,12 +80,16 @@ jobs:
       - name: Persist successful upload history
         if: always()
         run: |
-          if [ -f history/artist_intro_processed.json ] && ! git diff --quiet -- history/artist_intro_processed.json; then
+          if [ -f history/artist_intro_processed.json ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add history/artist_intro_processed.json
-            git commit -m "Record CurioLoop artist intro publication"
-            git push
+            if ! git diff --cached --quiet -- history/artist_intro_processed.json; then
+              git commit -m "Record CurioLoop artist intro publication"
+              git push
+            else
+              echo "Artist intro history is already up to date."
+            fi
           else
-            echo "No artist intro history changes to persist."
+            echo "No artist intro history file was created."
           fi
