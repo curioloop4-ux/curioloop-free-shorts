@@ -378,7 +378,7 @@ def is_standard_sakura_source(filename):
     """Target only the regular Sakura source, not a separately labeled B version."""
     name = Path(filename).stem.casefold()
     is_sakura = "사쿠라" in name or "sakura" in name
-    is_b_version = bool(re.search(r"(?:^|[\\s_\\-\\[(])(?:ver(?:sion)?[\\s_\\-]*)?b(?:$|[\\s_\\-\\])])", name))
+    is_b_version = bool(re.search(r"(?:^|[\s_\-\[(])(?:ver(?:sion)?[\s_\-]*)?b(?:$|[\s_\-\])])", name))
     return is_sakura and not is_b_version
 
 
@@ -420,7 +420,15 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
         )
         data = parse_gemini_json(response, "highlight analysis")
     except Exception as exc:
-        return fallback_highlights(duration, f"AI analysis error: {exc}")
+        fallback = fallback_highlights(duration, f"AI analysis error: {exc}")
+        if is_standard_sakura_source(filename) and duration >= 72:
+            start = min(60.0, max(0.0, duration - MIN_SHORT_SECONDS))
+            fallback[0] = {
+                "start": round(start, 2),
+                "end": round(start + MIN_SHORT_SECONDS, 2),
+                "hook": "Sakura Performance Highlight"
+            }
+        return fallback
     clips = data.get("clips", [])
     valid = []
     for clip in clips:
