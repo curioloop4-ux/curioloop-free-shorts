@@ -206,7 +206,9 @@ def render(source, profile):
         "crop=1080:1800,setsar=1,"
         "drawbox=x=0:y=0:w=1080:h=190:color=black@0.35:t=fill,"
         f"drawtext=fontfile={font}:text='{profile['display']}':fontcolor=white:fontsize=58:"
-        "borderw=2:bordercolor=black@0.7:x=55:y=65[v1];"
+        "borderw=2:bordercolor=black@0.7:x=55:y=65,"
+        f"drawtext=fontfile={font}:text='FOLLOW FOR MORE':fontcolor=white:fontsize=38:"
+        "borderw=2:bordercolor=black@0.7:x=(w-text_w)/2:y=h-150:enable='gte(t,18)'[v1];"
         "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v];"
         "[1:a]apad,atrim=duration=" + f"{10 + clip_len:.3f}" + "[a]"
     )
