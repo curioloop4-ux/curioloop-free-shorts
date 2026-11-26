@@ -47,6 +47,22 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Restore the exact artist-intro handoff
+        if: github.event_name == 'workflow_run'
+        uses: actions/download-artifact@v4
+        with:
+          name: curioloop-artist-intro-handoff
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: intro_handoff
+
+      - name: Install the triggering intro handoff
+        if: github.event_name == 'workflow_run'
+        run: |
+          test -s intro_handoff/artist_intro_fancam_queue.json
+          mkdir -p history
+          cp intro_handoff/artist_intro_fancam_queue.json history/artist_intro_fancam_queue.json
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
