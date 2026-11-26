@@ -1,4 +1,4 @@
-import asyncio,json,os,re,subprocess
+import asyncio,json,os,re,subprocess,textwrap
 from datetime import datetime,timezone
 from pathlib import Path
 import requests,edge_tts
@@ -165,12 +165,20 @@ def render(src,p,hist):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
    return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
-  cues=[]; cursor=0.0
-  for i,(sentence,seconds) in enumerate(zip(sentences,durations),1):
-   # Small inter-sentence allowance accounts for MP3 encoder padding.
-   end_time=cursor+seconds
-   cues.extend([str(i),f"{stamp(cursor)} --> {stamp(end_time)}",sentence,""])
-   cursor=end_time
+  cues=[]; cursor=0.0; cue_no=1
+  for sentence,seconds in zip(sentences,durations):
+   # Keep each caption to at most two short lines. Long sentences are
+   # split into consecutive cues and timed by their spoken word counts.
+   wrapped=textwrap.wrap(sentence,width=30,break_long_words=False,break_on_hyphens=False)
+   groups=["\\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
+   if not groups: continue
+   weights=[max(1,len(group.replace("\\n"," ").split())) for group in groups]
+   total=sum(weights)
+   for group,weight in zip(groups,weights):
+    segment_duration=seconds*weight/total
+    end_time=cursor+segment_duration
+    cues.extend([str(cue_no),f"{stamp(cursor)} --> {stamp(end_time)}",group,""])
+    cursor=end_time; cue_no+=1
   subtitle="\\n".join(cues)
   vtt.write_text(subtitle,encoding="utf-8-sig")
   if not vtt.exists() or vtt.stat().st_size<20:
@@ -194,7 +202,7 @@ def render(src,p,hist):
  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,"
- f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=16,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginL=90,MarginR=90,MarginV=120'[v1];"
+ f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginL=90,MarginR=90,MarginV=55'[v1];"
  "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v];[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
