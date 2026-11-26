@@ -241,7 +241,7 @@ def profile(filename, target_hint=""):
  from xml.etree import ElementTree as ET
  from urllib.parse import quote_plus
  news_title=None;news_url=None;news_date=None;news_source=None
- web_facts=[]; web_sources=[]
+ web_facts=[]
  queries=[
   f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',""),
   f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',""),
@@ -251,7 +251,6 @@ def profile(filename, target_hint=""):
  def relevant_result(title,description):
   blob=(title+" "+description).casefold()
   aliases=[target.casefold(),artist.casefold()]
-  if group!="Group affiliation not confirmed": aliases.append(group.casefold())
   return any(x and x in blob for x in aliases)
  seen_urls=set()
  for q in queries:
