@@ -52,9 +52,10 @@ def download(drive,item):
  return p
 def profile(filename, target_hint=""):
  stem=Path(filename).stem
-Research the K-pop artist identified by this Drive filename: {stem!r}.\nThe explicitly requested target artist is: {target_hint!r}. Treat this target as the intended artist when non-empty, and verify the identity against reliable sources.
+ prompt=f"""Research the K-pop artist identified by this Drive filename: {stem!r}.
+The explicitly requested target artist is: {target_hint!r}. Treat this target as the intended artist when non-empty, and verify the identity against reliable sources.
 You MUST use Google Search grounding for current, verifiable research. Do not rely on memory alone.
-Identify the person only from clear filename clues; never identify by face.
+Use the explicitly requested target to resolve the artist when provided; otherwise identify the person only from clear filename clues. Never identify by face.
 Return JSON only with these keys:
 artist (stage name), group (current/relevant group or Solo), narration (English, 55-70 words),
 title (max 85 chars), tags (4-8 strings), sources (array of 3-6 objects with title and url).
@@ -64,7 +65,7 @@ Research structure for the narration:
 3) Latest update: a relevant dated update from the last 12 months when available; otherwise use a well-established career milestone and do not pretend it is recent.
 Use official agency/artist/group sources first, then reputable established media. Never invent facts, dates, positions, credits, awards, or releases.
 Every factual claim in narration must be supported by at least one returned source URL. Exclude uncertain claims rather than guessing.
-If filename does not identify one artist confidently, return artist "Unknown Artist".
+If the requested target and filename clues cannot be reconciled confidently, return artist "Unknown Artist".
 The narration must be natural spoken English, suitable for a 30-36 second voiceover.
 Title and tags must match the identified artist/group."""
  models=("gemini-3.8-flash","gemini-3.5-flash-lite")
