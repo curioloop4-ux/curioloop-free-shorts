@@ -446,7 +446,7 @@ def identify_artist(filename):
         return "NATTY", "KISS OF LIFE", [
             "Natty", "KISS OF LIFE", "KISS OF LIFE Natty", "Natty fancam",
             "KIOF", "K-pop", "K-pop fancam", "K-pop Shorts",
-            "Korean idol", "female idol", "FANCAMVERSE", "Shorts"
+            "Korean idol", "female idol", CHANNEL_BRAND, "Shorts"
         ]
     if any(token in value for token in ("카리나", "karina")):
         return "KARINA", "aespa", [
