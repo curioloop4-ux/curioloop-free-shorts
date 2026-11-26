@@ -21,6 +21,18 @@
       "intro_footage_start": 10.5,
       "intro_footage_end": 56.256,
       "published_at": "2026-11-26T18:58:53.560544+00:00"
+    },
+    {
+      "drive_file_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs",
+      "source_md5": "12f44bfc705e67d0b86b8feba928cd4f",
+      "source_artist_key": "해린",
+      "source_name": "NewJeans HAERIN 해린 fancam long ver KpopHots.mp4",
+      "artist": "Haerin",
+      "youtube_video_id": "tx6NV-UH-oE",
+      "privacy": "public",
+      "intro_footage_start": 532.0,
+      "intro_footage_end": 579.7,
+      "published_at": "2026-11-26T19:56:47.250951+00:00"
     }
   ],
   "opening_frames": {
@@ -29,8 +41,11 @@
     ],
     "sakura": [
       15.2
+    ],
+    "haerin": [
+      53.93
     ]
   },
-  "last_render_source_start": 10.5,
-  "last_render_source_duration": 45.756
+  "last_render_source_start": 532.0,
+  "last_render_source_duration": 47.7
 }
