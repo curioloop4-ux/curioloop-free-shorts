@@ -6,7 +6,7 @@ on:
       artist:
         description: 'Artist name to prioritize (e.g. Eunha)'
         required: false
-        default: 'Eunha'
+        default: 'Wonyoung'
         type: string
   schedule:
     # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
