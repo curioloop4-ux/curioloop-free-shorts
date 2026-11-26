@@ -732,19 +732,20 @@ def render(src,p,hist):
  name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
- # Matching polished CTA end card for artist-introduction Shorts.
+ # Transparent typographic CTA overlay: top prompt + bottom subscription line.
  cta=W/"cta_artist_intro.png"
  card=Image.new("RGBA",(1080,1800),(0,0,0,0));draw=ImageDraw.Draw(card)
- regular=ImageFont.truetype(bold,38);heavy=ImageFont.truetype(bold,46)
- draw.rounded_rectangle((58,1325,1022,1695),radius=38,fill=(12,17,34,224),outline=(255,255,255,95),width=3)
- draw.rounded_rectangle((94,1358,986,1370),radius=6,fill=(90,220,255,245))
- def center_card(text,y,face,fill):
-  b=draw.textbbox((0,0),text,font=face)
-  draw.text(((1080-(b[2]-b[0]))/2,y),text,font=face,fill=fill)
- center_card("WHO SHOULD WE FEATURE NEXT?",1400,regular,(205,220,255,255))
- center_card("COMMENT YOUR PICK",1460,heavy,(255,255,255,255))
- center_card("SUBSCRIBE FOR MORE K-POP",1538,regular,(110,225,255,255))
- center_card("NEW K-POP SHORTS EVERY DAY",1610,ImageFont.truetype(bold,23),(185,195,215,255))
+ regular=ImageFont.truetype(bold,42);heavy=ImageFont.truetype(bold,54)
+ def draw_cta_line(text,y,face,fill):
+  b=draw.textbbox((0,0),text,font=face,stroke_width=3)
+  tw=b[2]-b[0];pad_x,pad_y=28,18
+  left=(1080-tw)//2-pad_x;right=(1080+tw)//2+pad_x
+  top=y-pad_y;bottom=y+(b[3]-b[1])+pad_y
+  draw.rounded_rectangle((left,top,right,bottom),radius=24,fill=(5,8,20,155))
+  draw.text(((1080-tw)/2,y-b[1]),text,font=face,fill=fill,stroke_width=3,stroke_fill=(5,5,12,255))
+ draw_cta_line("WHO SHOULD WE FEATURE NEXT?",220,regular,(255,88,202,255))
+ draw_cta_line("COMMENT BELOW!",292,heavy,(255,226,75,255))
+ draw_cta_line("SUBSCRIBE FOR MORE K-POP!",1535,heavy,(75,224,255,255))
  card.save(cta)
  cta_start=max(1.5,length-3.0)
  cue_data=json.loads((W/"subtitle_cues.json").read_text(encoding="utf-8"))
