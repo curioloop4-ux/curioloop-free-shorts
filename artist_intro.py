@@ -1,7 +1,7 @@
 import asyncio,json,os,re,subprocess,textwrap
 from datetime import datetime,timezone
 from pathlib import Path
-import requests,edge_tts
+import requests,edge_tts,time
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload,MediaIoBaseDownload
@@ -73,14 +73,37 @@ Title and tags must match the identified artist/group."""
  for model in models:
   url=f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
   try:
-   r=requests.post(url,params={"key":need("GEMINI_API_KEY")},
-    json={"contents":[{"parts":[{"text":prompt}]}],
-          "tools":[{"google_search":{}}],
-          "generationConfig":{"temperature":0.2}},
-    timeout=120)
+   r=None
+   for attempt in range(3):
+    r=requests.post(url,params={"key":need("GEMINI_API_KEY")},
+     json={"contents":[{"parts":[{"text":prompt}]}],
+           "tools":[{"google_search":{}}],
+           "generationConfig":{"temperature":0.2}},
+     timeout=120)
+    if r.status_code not in (429,500,502,503,504):
+     break
+    try:
+     error_body=r.json().get("error",{})
+     error_detail=str(error_body.get("message") or error_body.get("status") or r.text[:500])
+    except ValueError:
+     error_detail=r.text[:500]
+    retry_header=r.headers.get("Retry-After","").strip()
+    wait_seconds=int(retry_header) if retry_header.isdigit() else (15*(2**attempt))
+    if attempt<2:
+     print(f"Grounded Gemini {model} returned HTTP {r.status_code}: {error_detail[:300]}. Retrying in {wait_seconds}s.")
+     time.sleep(min(wait_seconds,60))
+    else:
+     errors.append(f"{model}: HTTP {r.status_code}: {error_detail[:500]}")
+     print(f"Grounded Gemini model {model} failed after retries: HTTP {r.status_code}: {error_detail[:300]}")
    if r.status_code in (404,429,500,502,503,504):
-    errors.append(f"{model}: HTTP {r.status_code}")
-    print(f"Grounded Gemini model {model} unavailable ({r.status_code}); trying fallback.")
+    if not any(e.startswith(model+":") for e in errors):
+     try:
+      error_body=r.json().get("error",{})
+      error_detail=str(error_body.get("message") or error_body.get("status") or r.text[:500])
+     except ValueError:
+      error_detail=r.text[:500]
+     errors.append(f"{model}: HTTP {r.status_code}: {error_detail[:500]}")
+    print(f"Grounded Gemini model {model} unavailable; trying fallback.")
     continue
    r.raise_for_status()
    payload=r.json()
