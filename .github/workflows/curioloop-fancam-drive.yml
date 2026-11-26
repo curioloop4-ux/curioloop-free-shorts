@@ -1,0 +1,106 @@
+name: CurioLoop Fancam Drive Upload
+
+on:
+  workflow_dispatch:
+    inputs:
+      output_only:
+        description: "Render and inspect only; do not upload"
+        required: true
+        type: boolean
+        default: false
+      privacy_status:
+        description: "Visibility for the first test upload"
+        required: true
+        type: choice
+        options:
+          - private
+          - unlisted
+          - public
+        default: private
+      source_filter:
+        description: "Optional filename filter (e.g. 카리나,닝닝,장원영,나띠)"
+        required: false
+        type: string
+        default: ""
+      uploads_per_run:
+        description: "Number of Shorts to process"
+        required: true
+        type: number
+        default: 1
+
+permissions:
+  contents: write
+
+concurrency:
+  group: curioloop-fancam-drive-upload
+  cancel-in-progress: false
+
+jobs:
+  process-drive-inbox:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate restored and CurioLoop scripts
+        run: python -m py_compile fancamverse.py curioloop_fancam.py
+
+      - name: Read Drive and upload to CurioLoop
+        env:
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          GEMINI_MODEL: gemini-3.8-flash
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.YOUTUBE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
+          YOUTUBE_CHANNEL_ID: ${{ secrets.YOUTUBE_CHANNEL_ID }}
+          YOUTUBE_EXPECTED_CHANNEL_TITLE: CurioLoop
+          FANCAMVERSE_CHANNEL_BRAND: CurioLoop
+          FANCAMVERSE_EXCLUDE_ARTISTS: 김채원,chaewon
+          FANCAMVERSE_WORK_DIR: work_curioloop_fancam
+          FANCAMVERSE_HISTORY_FILE: history/curioloop_fancam_processed.json
+          FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
+          FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
+          FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
+          FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status || 'private' }}
+        run: python curioloop_fancam.py
+
+      - name: Save CurioLoop preview videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: curioloop-fancam-test-videos
+          path: work_curioloop_fancam/*_short_*.mp4
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Persist CurioLoop upload progress
+        if: always()
+        run: |
+          if [ -f history/curioloop_fancam_processed.json ] && ! git diff --quiet -- history/curioloop_fancam_processed.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add history/curioloop_fancam_processed.json
+            git commit -m "Record CurioLoop Drive fancam progress"
+            git push
+          else
+            echo "No CurioLoop upload progress to persist."
+          fi
