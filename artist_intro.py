@@ -818,8 +818,8 @@ def render(src,p,hist):
   top=y-pad_y;bottom=y+(b[3]-b[1])+pad_y
   draw.rounded_rectangle((left,top,right,bottom),radius=24,fill=(5,8,20,175))
   draw.text(((1080-tw)/2,y-b[1]),text,font=face,fill=fill,stroke_width=3,stroke_fill=(5,5,12,255))
- draw_cta_line("WHO SHOULD WE FEATURE NEXT?",735,regular,(255,88,202,255))
- draw_cta_line("COMMENT BELOW!",815,heavy,(255,226,75,255))
+ draw_cta_line("WHO SHOULD WE FEATURE NEXT?",735,regular,(255,255,255,255))
+ draw_cta_line("COMMENT BELOW!",815,heavy,(255,255,255,255))
  draw_cta_line("SUBSCRIBE FOR MORE K-POP!",915,heavy,(75,224,255,255))
  card.save(cta)
  cta_start=max(1.5,length-3.0)
