@@ -230,8 +230,11 @@ def profile(filename, target_hint=""):
  else:
   facts.append("Which fact surprised you most?")
  narration=" ".join(facts)
- if len(narration.split())>55:
-  narration=" ".join(narration.split()[:55])
+ word_count=len(narration.split())
+ if word_count<70:
+  raise RuntimeError(f"SKIPPED_INSUFFICIENT_VERIFIED_FACTS: narration has only {word_count} words; at least 70 verified words are required for a full-length intro.")
+ if word_count>85:
+  narration=" ".join(narration.split()[:85])
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  print(f"NamuWiki research complete: {chosen}; artist={artist}; group={group}; birth={birth or 'not listed'}; narration_words={len(narration.split())}.")
  return {
@@ -301,6 +304,10 @@ def render(src,p,hist):
   concat_list=W/"voice_concat.txt"
   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
+  voice_seconds=dur(audio)
+  if voice_seconds<25:
+   raise RuntimeError(f"SKIPPED_SHORT_NARRATION: generated voice is only {voice_seconds:.1f}s; minimum is 25s for a 36s intro.")
+  print(f"Validated narration audio: {voice_seconds:.1f}s for a 36s video.")
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
