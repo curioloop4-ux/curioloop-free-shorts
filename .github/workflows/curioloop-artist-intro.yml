@@ -9,7 +9,7 @@ on:
         default: ''
         type: string
       public_once:
-        description: '이번 수동 실행 영상만 공개로 업로드'
+        description: '수동 실행 영상 공개 여부 (예약 자동화는 공개 업로드)'
         required: false
         default: false
         type: boolean
@@ -60,7 +60,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
           TARGET_ARTIST: ${{ inputs.artist }}
-          INTRO_PUBLIC_ONCE: ${{ inputs.public_once }}
+          INTRO_PUBLIC_ONCE: ${{ github.event_name == 'schedule' || inputs.public_once }}
         run: python artist_intro.py
 
       - name: Save rendered video artifact
