@@ -308,6 +308,72 @@ def target_clips_for_duration(duration):
     return 5
 
 
+def fallback_highlights(duration, reason="Gemini unavailable"):
+    """Create evenly distributed, non-overlapping 25-second clips when AI analysis fails."""
+    target_count = target_clips_for_duration(duration)
+    clip_length = MIN_SHORT_SECONDS
+    first_allowed = min(INTRO_SKIP_SECONDS, max(0.0, duration - clip_length))
+    last_start = max(0.0, duration - clip_length)
+    if target_count == 1:
+        starts = [first_allowed]
+    else:
+        span = max(0.0, last_start - first_allowed)
+        starts = [first_allowed + span * i / (target_count - 1) for i in range(target_count)]
+    clips = [
+        {"start": round(start, 2), "end": round(start + clip_length, 2),
+         "hook": "A Must-Watch Performance Moment"}
+        for start in starts
+    ]
+    print(f"Using {len(clips)} evenly distributed fallback clip(s): {reason}.")
+    return clips
+
+
+def parse_gemini_json(response, task_name):
+    """Extract JSON safely from Gemini responses, including fenced or wrapped output."""
+    try:
+        raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
+    except (KeyError, IndexError, TypeError, ValueError) as exc:
+        raise RuntimeError(f"Gemini {task_name} response did not contain text.") from exc
+    cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.IGNORECASE)
+    try:
+        value = json.loads(cleaned)
+        if isinstance(value, dict):
+            return value
+    except json.JSONDecodeError:
+        pass
+    # Some model responses include a short preamble or trailing text. Extract the
+    # first balanced JSON object without altering its contents.
+    start = cleaned.find("{")
+    if start >= 0:
+        depth, quoted, escaped = 0, False, False
+        for index in range(start, len(cleaned)):
+            char = cleaned[index]
+            if quoted:
+                if escaped:
+                    escaped = False
+                elif char == "\\\\":
+                    escaped = True
+                elif char == '"':
+                    quoted = False
+                continue
+            if char == '"':
+                quoted = True
+            elif char == "{":
+                depth += 1
+            elif char == "}":
+                depth -= 1
+                if depth == 0:
+                    candidate = cleaned[start:index + 1]
+                    try:
+                        value = json.loads(candidate)
+                        if isinstance(value, dict):
+                            return value
+                    except json.JSONDecodeError:
+                        break
+    preview = raw[:350].replace("\\n", " ")
+    raise RuntimeError(f"Gemini {task_name} returned malformed JSON: {preview}")
+
+
 def analyze_highlights(source, duration, filename):
     target_count = target_clips_for_duration(duration)
     # Full-source mode is opt-in; artist filtering alone still runs highlight analysis.
@@ -336,14 +402,16 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
     for path in sheets:
         parts.append({"inline_data": {"mime_type": "image/jpeg",
             "data": base64.b64encode(path.read_bytes()).decode("ascii")}})
-    response = gemini_generate_with_fallback(
-        model, required("GEMINI_API_KEY"),
-        {"contents": [{"parts": parts}],
-         "generationConfig": {"temperature": 0.15, "responseMimeType": "application/json"}},
-        timeout=180, task_name="highlight analysis"
-    )
-    raw = response.json()["candidates"][0]["content"]["parts"][0]["text"]
-    data = json.loads(raw)
+    try:
+        response = gemini_generate_with_fallback(
+            model, required("GEMINI_API_KEY"),
+            {"contents": [{"parts": parts}],
+             "generationConfig": {"temperature": 0.1, "responseMimeType": "application/json"}},
+            timeout=180, task_name="highlight analysis"
+        )
+        data = parse_gemini_json(response, "highlight analysis")
+    except Exception as exc:
+        return fallback_highlights(duration, f"AI analysis error: {exc}")
     clips = data.get("clips", [])
     valid = []
     for clip in clips:
@@ -361,7 +429,7 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
         if all(clip["start"] >= old["end"] or clip["end"] <= old["start"] for old in distinct):
             distinct.append(clip)
     if not distinct:
-        raise RuntimeError("Highlight analysis returned no valid clips. Skipping this source; no upload was made.")
+        return fallback_highlights(duration, "AI returned no valid highlight windows")
     if len(distinct) < target_count:
         print(
             f"Highlight analysis found {len(distinct)} valid non-overlapping clips "
@@ -515,29 +583,12 @@ def generate_metadata(filename, hook, index):
                        f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     else:
-        model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
-        prompt = f"""Create YouTube Shorts metadata for {CHANNEL_BRAND}, an English-language K-pop fan-cam channel targeting US viewers.
-Source filename: {filename!r}
-On-screen English hook: {hook!r}
-Clip number: {index}
-Use ONLY details clearly present in the filename and hook. Never guess an idol, group, song, event, or venue.
-Return valid JSON only with keys title, description, tags.
-title: concise natural English, maximum 90 characters, searchable and engaging.
-description: one or two short English sentences; identify this as fan-captured footage. No official affiliation claim.
-Do NOT include dates, years, resolution terms such as 4K, camera specs, or recording metadata in the title or description.
-tags: 8 to 12 relevant English tags; no unrelated trending tags."""
-        response = gemini_generate_with_fallback(
-            model, required("GEMINI_API_KEY"),
-            {"contents": [{"parts": [{"text": prompt}]}],
-             "generationConfig": {"temperature": 0.2, "responseMimeType": "application/json"}},
-            timeout=90, task_name="metadata generation"
-        )
-        data = json.loads(response.json()["candidates"][0]["content"]["parts"][0]["text"])
-        title = str(data.get("title", "")).strip()[:100]
-        description = str(data.get("description", "")).strip()
-        tags = data.get("tags", [])
-        if not title or not isinstance(tags, list):
-            raise RuntimeError("Gemini returned invalid upload metadata.")
+        # Metadata must never block an otherwise valid Short when Gemini is rate-limited.
+        title = "Performance Highlight | CurioLoop #Shorts"
+        description = ("A short highlight from the source video. Fan-edited content; "
+                       "all footage belongs to its respective rights holders.")
+        tags = ["performance highlight", "fan edit", "music", "entertainment",
+                "Shorts", "video highlight"]
 
     clean, seen = [], set()
     for tag in [CHANNEL_BRAND, "K-pop", "K-pop fancam", "Shorts"] + tags:
@@ -558,9 +609,14 @@ def next_publish_at_kst(publish_time):
         raise ValueError("FANCAMVERSE_PUBLISH_TIME_KST must use HH:MM format.")
     now = datetime.now(ZoneInfo("Asia/Seoul"))
     publish_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    # YouTube requires scheduled publication to be in the future.
+    # If Actions starts late (or less than 15 minutes before the slot), do not
+    # silently defer the missed upload by 24 hours. Upload it immediately as public.
     if publish_at <= now + timedelta(minutes=15):
-        publish_at += timedelta(days=1)
+        print(
+            f"Scheduled slot {publish_time} is already due or too close; "
+            "publishing this Short immediately instead of deferring it to tomorrow."
+        )
+        return None
     return publish_at.isoformat(timespec="seconds")
 
 
