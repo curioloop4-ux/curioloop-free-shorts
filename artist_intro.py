@@ -189,11 +189,7 @@ def profile(filename, target_hint=""):
   if raw is not None:break
   time.sleep(1.2)
  if raw is None:
-  # NamuWiki mirrors are optional; continue with independent web research.
-  raw=""
-  chosen=target
-  source_base=None
-  print("NamuWiki mirror unavailable; continuing with multi-source web research.")
+  raise RuntimeError("NamuWiki article retrieval failed for "+target+"; refusing to generate an artist intro without the requested biography source.")
  cleaned=plain(raw)
  # Use a known official Romanized stage name where available; otherwise
  # retain the Hangul stage name rather than inventing an English spelling.
