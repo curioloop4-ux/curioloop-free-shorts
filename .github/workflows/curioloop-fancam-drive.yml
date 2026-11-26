@@ -2,11 +2,11 @@ name: CurioLoop Fancam Drive Upload
 
 on:
   schedule:
-    # Target US evening and Indonesia evening: KST 00:00, 10:00, 14:00, 16:00, 20:00.
+    # Target US evening and Indonesia evening: KST 00:00, 02:00, 04:00, 10:00, 20:00.
     - cron: "0 15 * * *"
+    - cron: "0 17 * * *"
+    - cron: "0 19 * * *"
     - cron: "0 1 * * *"
-    - cron: "0 5 * * *"
-    - cron: "0 7 * * *"
     - cron: "0 11 * * *"
   workflow_run:
     workflows: ["CurioLoop Artist Intro"]
@@ -127,7 +127,7 @@ jobs:
           FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
           FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_run') && 'public' || inputs.privacy_status || 'private' }}
-          FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '7 0 * * *' && '10:00' || (github.event.schedule == '13 2 * * *' && '12:00' || (github.event.schedule == '19 4 * * *' && '14:00' || (github.event.schedule == '23 6 * * *' && '16:00' || (github.event.schedule == '29 8 * * *' && '18:00' || (github.event.schedule == '11 10 * * *' && '20:00' || (github.event.schedule == '17 12 * * *' && '22:00' || (github.event.schedule == '23 14 * * *' && '00:00' || (github.event.schedule == '7 15 * * *' && '01:00' || (github.event.schedule == '13 16 * * *' && '02:00' || (github.event.schedule == '19 17 * * *' && '03:00' || (github.event.schedule == '23 18 * * *' && '04:00' || (github.event.schedule == '29 19 * * *' && '05:00' || (github.event.schedule == '11 20 * * *' && '06:00' || (github.event.schedule == '17 22 * * *' && '08:00' || ''))))))))))))))) }}
+          FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 15 * * *' && '00:00' || (github.event.schedule == '0 17 * * *' && '02:00' || (github.event.schedule == '0 19 * * *' && '04:00' || (github.event.schedule == '0 1 * * *' && '10:00' || (github.event.schedule == '0 11 * * *' && '20:00' || ''))))) }}
         run: python curioloop_fancam.py
 
       - name: Save CurioLoop preview videos
