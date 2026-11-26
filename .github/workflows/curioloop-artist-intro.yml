@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       artist:
-        description: 'Artist name to prioritize (e.g. Eunha)'
+        description: 'Artist name to research and prioritize from Drive (e.g. Wonyoung)'
         required: false
         default: 'Wonyoung'
         type: string
@@ -63,7 +63,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: curioloop-artist-intro
-          path: work_artist_intro/*_artist_intro.mp4
+          path: |
+            work_artist_intro/*_artist_intro.mp4
+            work_artist_intro/*_research.json
           if-no-files-found: ignore
           retention-days: 7
 
