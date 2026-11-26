@@ -340,7 +340,25 @@ def profile(filename, target_hint=""):
  ranked.sort(key=lambda x:(x[0],x[1]),reverse=True)
  if ranked:
   outlet_count,article_count,cluster=ranked[0]
-  english=[x for x in cluster if x["language"].startswith("en") and not re.search(r"[가-힣]",x["title"])]
+  # Keep the narration in English, but translate Korean reporting rather than
+  # silently excluding domestic coverage from the issue explanation.
+  english=[]
+  for item in cluster:
+   title=item["title"];description=item["description"];translated=False
+   if re.search(r"[가-힣]",title+" "+description):
+    try:
+     query_text=(title+"\n"+description[:500]).strip()
+     tr=session.get("https://translate.googleapis.com/translate_a/single",params={"client":"gtx","sl":"auto","tl":"en","dt":"t","q":query_text},timeout=12)
+     tr.raise_for_status()
+     payload=tr.json()
+     converted="".join(part[0] for part in payload[0] if part and part[0]).strip()
+     if converted:
+      pieces=converted.split("\n",1);title=pieces[0].strip() or title
+      description=pieces[1].strip() if len(pieces)>1 else ""
+      translated=True
+    except Exception as e:print("Korean news translation unavailable:",type(e).__name__)
+   if title and not re.search(r"[가-힣]",title):
+    english.append({**item,"title":title,"description":description,"translated":translated,"language":"en"})
   # Google RSS descriptions are often just headlines; retrieve publisher meta descriptions.
   class ArticleMeta(HTMLParser):
    def __init__(self):
@@ -357,7 +375,7 @@ def profile(filename, target_hint=""):
      if len(value)>60:self.paragraphs.append(value)
      self.in_p=False
   for article in english[:8]:
-   if len(article["description"])>90 or "news.google.com" in article["url"]:continue
+   if len(article["description"])>90 or article.get("translated") or "news.google.com" in article["url"]:continue
    try:
     page=session.get(article["url"],timeout=12)
     if page.ok and "html" in page.headers.get("content-type","").casefold():
