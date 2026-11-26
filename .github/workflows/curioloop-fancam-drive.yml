@@ -120,12 +120,29 @@ jobs:
       - name: Persist CurioLoop upload progress
         if: always()
         run: |
-          if [ -f history/curioloop_fancam_processed.json ] && ! git diff --quiet -- history/curioloop_fancam_processed.json; then
+          if [ -f history/curioloop_fancam_processed.json ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add history/curioloop_fancam_processed.json history/artist_intro_fancam_queue.json 2>/dev/null || true
-            git commit -m "Record CurioLoop Drive fancam progress"
-            git push
+            if ! git diff --cached --quiet; then
+              git commit -m "Record CurioLoop Drive fancam progress"
+              pushed=false
+              for attempt in 1 2 3; do
+                git fetch origin main
+                git rebase origin/main
+                if git push origin HEAD:main; then
+                  pushed=true
+                  break
+                fi
+                echo "History push attempt $attempt was rejected; rebasing on the latest main."
+              done
+              if [ "$pushed" != true ]; then
+                echo "::error::Fancam upload may have succeeded, but history could not be persisted after three safe rebase attempts."
+                exit 1
+              fi
+            else
+              echo "No CurioLoop upload progress to persist."
+            fi
           else
-            echo "No CurioLoop upload progress to persist."
+            echo "No CurioLoop upload history file exists."
           fi
