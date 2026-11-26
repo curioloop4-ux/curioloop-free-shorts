@@ -299,40 +299,6 @@ async def make_voice(text, path):
     communicate=edge_tts.Communicate(text,"en-US-AriaNeural",rate="+4%",volume="+0%")
     await communicate.save(str(path))
 
-def render(source, data, output):
-    overlay=WORK/"editorial_overlay.png"
-    voice=WORK/"analysis_voice.mp3"
-    make_overlay(data,overlay)
-    asyncio.run(make_voice(data["analysis"],voice))
-    voice_duration=duration(voice)
-    clip_duration=float(data["end"])-float(data["start"])
-    if voice_duration > clip_duration - 0.5:
-        raise RuntimeError(
-            f"Voiceover ({voice_duration:.1f}s) does not fit selected clip ({clip_duration:.1f}s); "
-            "regenerate with a shorter narration."
-        )
-    final_duration=clip_duration
-    filt=("[0:v]scale=1080:1920:force_original_aspect_ratio=increase,"
-          "crop=1080:1920,setsar=1[base];[1:v]format=rgba[ov];"
-          "[base][ov]overlay=0:0[v];"
-          "[0:a]volume=0.16[orig];[2:a]volume=1.0[voice];"
-          "[orig][voice]amix=inputs=2:duration=longest:dropout_transition=2[a]")
-    run(["ffmpeg","-y","-ss",f"{data['start']:.3f}","-i",str(source),
-         "-loop","1","-i",str(overlay),"-i",str(voice),"-t",f"{final_duration:.2f}",
-         "-filter_complex",filt,"-map","[v]","-map","[a]",
-         "-c:v","libx264","-preset","slow","-crf","17","-pix_fmt","yuv420p",
-         "-c:a","aac","-b:a","192k","-movflags","+faststart",str(output)])
-    probe=json.loads(run(["ffprobe","-v","error","-select_streams","v:0",
-                          "-show_entries","stream=width,height","-of","json",str(output)]).stdout)
-    stream=probe["streams"][0]
-    if (stream["width"],stream["height"]) != (1080,1920):
-        raise RuntimeError("Rendered preview is not 1080x1920.")
-    print(f"PREVIEW_READY={output}")
-    print(f"TITLE={data['title']}")
-    print(f"ANALYSIS={data['analysis']}")
-    print(f"CLIP={data['start']:.1f}-{data['end']:.1f}s")
-    print(f"VOICE_DURATION={voice_duration:.1f}s")
-
 def main():
     drive=services()
     folder=required("FANCAMVERSE_DRIVE_FOLDER_ID")
