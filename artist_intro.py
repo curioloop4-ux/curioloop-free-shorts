@@ -415,10 +415,23 @@ def main():
   if not candidates:raise RuntimeError("No unprocessed Drive video has both a recognized artist and group name; skipped all ambiguous sources.")
   import random
   random.shuffle(candidates)
- item=candidates[0];print("Selected Drive source:",item["name"])
+ # Try candidates until one has enough verified material for a substantive narration.
+ item=None;p=None
+ for candidate in candidates:
+  print("Checking Drive source:",candidate["name"])
+  try:
+   candidate_profile=profile(candidate["name"],target_hint=target)
+  except RuntimeError as e:
+   if "SKIPPED_INSUFFICIENT_VERIFIED_FACTS" in str(e):
+    print("Skipping source with insufficient verified profile details:",candidate["name"])
+    continue
+   raise
+  item=candidate;p=candidate_profile
+  break
+ if item is None or p is None:
+  raise RuntimeError("No unprocessed source had enough verified facts for a full narration. Add more eligible source videos or improve profile research.")
+ print("Selected Drive source:",item["name"])
  src=download(drive,item)
- # Identify the artist from the selected filename, then retrieve the NamuWiki biography.
- p=profile(item["name"],target_hint=target)
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
  research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Verified research saved:",research_path.name)
