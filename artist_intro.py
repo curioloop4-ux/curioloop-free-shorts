@@ -298,7 +298,7 @@ def profile(filename, target_hint=""):
   # Parse NamuWiki table cells first: a profile label is commonly followed
   # by its value in the next cell. Then use bounded text fallbacks.
   readable=plain(raw)
-  cells=[plain(cell) for cell in re.split(r"\|\|",raw)]
+  cells=[plain(cell) for cell in re.split(r"\|\|",raw or "")]
   for i,cell in enumerate(cells):
    normalized=re.sub(r"\s+","",cell).casefold()
    for label in labels:
