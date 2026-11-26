@@ -73,6 +73,7 @@ def profile(filename, target_hint=""):
  stem=Path(filename).stem
  target=(target_hint or "").strip()
  group_data=[
+  ("MEOVV",["미야오","MEOVV"],["MEOVV"],2025),
   ("IVE",["아이브","IVE"],["IVE"],2021),
   ("aespa",["에스파","aespa"],["aespa"],2020),
   ("LE SSERAFIM",["르세라핌","LE SSERAFIM"],["LE SSERAFIM"],2022),
@@ -183,12 +184,11 @@ def profile(filename, target_hint=""):
    artist=''.join(syllable(ch) for ch in target).capitalize()
  # Require a verified group match in the filename or retrieved biography.
  group=""; group_year=None
- for haystack in (stem,cleaned[:12000]):
-  found=False
-  for english,aliases,_,year in group_data:
-   if any(alias.casefold() in haystack.casefold() for alias in aliases):
-    group=english;group_year=year;found=True;break
-  if found:break
+ # Determine group affiliation from the source filename only. Searching the
+ # full biography can incorrectly assign a group mentioned in unrelated text.
+ for english,aliases,_,year in group_data:
+  if any(alias.casefold() in stem.casefold() for alias in aliases):
+   group=english;group_year=year;break
  if not group:
   group="Group affiliation not confirmed"
   group_year=None
