@@ -5,6 +5,8 @@ import re
 import subprocess
 import time
 import random
+from datetime import datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import requests
@@ -485,17 +487,40 @@ tags: 8 to 12 relevant English tags; no unrelated trending tags."""
     description = (description + "\n\n" if description else "") + hashtags
     return title, description[:5000], clean
 
-def upload(youtube, path, title, description, tags, privacy):
+def next_publish_at_kst(publish_time):
+    try:
+        hour, minute = [int(part) for part in publish_time.split(":", 1)]
+        if not (0 <= hour <= 23 and 0 <= minute <= 59):
+            raise ValueError
+    except (TypeError, ValueError):
+        raise ValueError("FANCAMVERSE_PUBLISH_TIME_KST must use HH:MM format.")
+    now = datetime.now(ZoneInfo("Asia/Seoul"))
+    publish_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+    # YouTube requires scheduled publication to be in the future.
+    if publish_at <= now + timedelta(minutes=15):
+        publish_at += timedelta(days=1)
+    return publish_at.isoformat(timespec="seconds")
+
+
+def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     if privacy not in {"private", "unlisted", "public"}:
         raise ValueError("Privacy must be private, unlisted, or public.")
+    if publish_at and privacy != "private":
+        raise ValueError("Scheduled YouTube publication requires private privacy status.")
+    status = {"privacyStatus": privacy, "selfDeclaredMadeForKids": False}
+    if publish_at:
+        status["publishAt"] = publish_at
     body = {"snippet": {"title": title, "description": description, "tags": tags, "categoryId": "10"},
-        "status": {"privacyStatus": privacy, "selfDeclaredMadeForKids": False}}
+        "status": status}
     result = youtube.videos().insert(part="snippet,status", body=body,
         media_body=MediaFileUpload(str(path), mimetype="video/mp4", resumable=True)).execute()
     video_id = result.get("id")
     if not video_id:
         raise RuntimeError("YouTube upload completed without returning a video ID.")
-    print(f"Uploaded: https://www.youtube.com/shorts/{video_id} (privacy={privacy})")
+    if publish_at:
+        print(f"Uploaded and scheduled: https://www.youtube.com/shorts/{video_id} (publishAt={publish_at})")
+    else:
+        print(f"Uploaded: https://www.youtube.com/shorts/{video_id} (privacy={privacy})")
     return video_id
 
 def main():
@@ -555,6 +580,11 @@ def main():
     batch_size = int(os.getenv("FANCAMVERSE_UPLOADS_PER_RUN", "3"))
     output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
+    publish_time = os.getenv("FANCAMVERSE_PUBLISH_TIME_KST", "").strip()
+    publish_at = next_publish_at_kst(publish_time) if publish_time and not output_only else None
+    if publish_at:
+        privacy = "private"
+        print(f"Scheduled YouTube publication for {publish_at} (Asia/Seoul).")
     if not output_only:
         print("Upload destination: CurioLoop, using the existing YOUTUBE_* OAuth token.")
 
@@ -620,7 +650,7 @@ def main():
             # Preview mode does not consume a clip or advance rotation history.
             continue
 
-        video_id = upload(youtube, path, title, description, tags, privacy)
+        video_id = upload(youtube, path, title, description, tags, privacy, publish_at=publish_at)
         uploaded_count += 1
 
         source_state[item["id"]] = {
