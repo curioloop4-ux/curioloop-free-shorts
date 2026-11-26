@@ -55,6 +55,18 @@ def profile(filename, target_hint=""):
  # Read the public NamuWiki article directly; no Gemini/API key is used.
  # Keep requests polite and sequential (at least one second between requests).
  from html.parser import HTMLParser
+ def plain(s):
+  s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
+  s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
+  s=re.sub(r"\[\[([^\]]+)\]\]",r"\1",s)
+  s=re.sub(r"\[(https?://[^\s\]]+)\s+([^\]]+)\]",r"\2",s)
+  s=re.sub(r"\{\{\{#!wiki.*?\}\}\}"," ",s,flags=re.S)
+  s=re.sub(r"\{\{.*?\}\}"," ",s,flags=re.S)
+  s=re.sub(r"'''|''|__|~~","",s)
+  s=re.sub(r"<[^>]+>"," ",s)
+  s=re.sub(r"\[\*[^]]*\]"," ",s)
+  s=re.sub(r"&nbsp;"," ",s)
+  return re.sub(r"\s+"," ",s).strip()
  from urllib.parse import quote, unquote
  class SearchLinks(HTMLParser):
   def __init__(self):
@@ -181,18 +193,6 @@ def profile(filename, target_hint=""):
   chosen=target
   source_base=None
   print("NamuWiki mirror unavailable; continuing with multi-source web research.")
- def plain(s):
-  s=re.sub(r"\[\[파일:[^\]]+\]\]"," ",s,flags=re.I)
-  s=re.sub(r"\[\[([^|\]]+)\|([^\]]+)\]\]",r"\2",s)
-  s=re.sub(r"\[\[([^\]]+)\]\]",r"\1",s)
-  s=re.sub(r"\[(https?://[^\s\]]+)\s+([^\]]+)\]",r"\2",s)
-  s=re.sub(r"\{\{\{#!wiki.*?\}\}\}"," ",s,flags=re.S)
-  s=re.sub(r"\{\{.*?\}\}"," ",s,flags=re.S)
-  s=re.sub(r"'''|''|__|~~","",s)
-  s=re.sub(r"<[^>]+>"," ",s)
-  s=re.sub(r"\[\*[^]]*\]"," ",s)
-  s=re.sub(r"&nbsp;"," ",s)
-  return re.sub(r"\s+"," ",s).strip()
  cleaned=plain(raw)
  # Use a known official Romanized stage name where available; otherwise
  # retain the Hangul stage name rather than inventing an English spelling.
