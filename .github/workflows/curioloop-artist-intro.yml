@@ -8,6 +8,11 @@ on:
         required: false
         default: '장원영'
         type: string
+      public_once:
+        description: '이번 수동 실행 영상만 공개로 업로드'
+        required: false
+        default: false
+        type: boolean
   schedule:
     # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
     - cron: "0 14,17,20 * * *"
@@ -55,6 +60,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
           TARGET_ARTIST: ${{ inputs.artist }}
+          INTRO_PUBLIC_ONCE: ${{ inputs.public_once }}
         run: python artist_intro.py
 
       - name: Save rendered video artifact
