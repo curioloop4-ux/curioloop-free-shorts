@@ -51,30 +51,22 @@ def download(drive,item):
  if not p.exists() or not p.stat().st_size:raise RuntimeError("Empty Drive download")
  return p
 def profile(filename):
- stem=Path(filename).stem.casefold()
- if "wonyoung" in stem or "원영" in stem:
-  narration=("Meet Jang Wonyoung, born on August 31, 2004. She first debuted with IZ*ONE in October 2018, "
-   "then debuted again as a member of IVE in December 2021. Known for her poised stage presence and expressive performance style, "
-   "she has also taken part in IVE songwriting. In February 2026, IVE released their second full-length album, REVIVE+, "
-   "featuring the pre-release track BANG BANG and title track BLACKHOLE.")
-  return {"artist":"WONYOUNG","group":"IVE","narration":narration,
-   "title":"WONYOUNG | IVE Artist Spotlight #Shorts",
-   "tags":["WONYOUNG","IVE","JANG WONYOUNG","K-pop","artist spotlight","REVIVE+","Shorts"]}
- if "eunha" in stem or "은하" in stem:
-  narration=("Meet Eunha, born Jung Eun-bi in 1997. She debuted in January 2015 as a member of GFRIEND, "
-   "then returned to the stage in 2022 as part of VIVIZ with SinB and Umji. Known for her clear, expressive "
-   "vocals, she has also contributed to drama soundtracks. In October 2026, the trio signed with UNCORE, "
-   "while their future group name remains under discussion. In November, they won a court ruling over unpaid "
-   "earnings from their former agency.")
-  return {"artist":"EUNHA","group":"GFRIEND / VIVIZ","narration":narration,
-   "title":"EUNHA | Artist Spotlight #Shorts",
-   "tags":["EUNHA","GFRIEND","VIVIZ","UNCORE","K-pop","artist spotlight","Shorts"]}
- prompt=f"""Source filename: {Path(filename).stem}
-Return JSON only with artist, group, narration, title, tags.
-Identify the artist only from clear filename clues, never face recognition. If unclear return artist "Unknown Artist".
-Narration 55-70 natural English words for a 30-36 second artist introduction. Only stable widely established facts; do not invent dates, awards or positions. If unsure, keep intro general and describe the artist's performance/appeal without unsupported claims.
-Title max 85 chars. tags array 4-8 strings."""
- # Gemini 2.5 access is restricted for some projects; use current models with automatic fallback.
+ stem=Path(filename).stem
+ prompt=f"""Research the K-pop artist identified by this Drive filename: {stem!r}.
+You MUST use Google Search grounding for current, verifiable research. Do not rely on memory alone.
+Identify the person only from clear filename clues; never identify by face.
+Return JSON only with these keys:
+artist (stage name), group (current/relevant group or Solo), narration (English, 55-70 words),
+title (max 85 chars), tags (4-8 strings), sources (array of 3-6 objects with title and url).
+Research structure for the narration:
+1) Artist profile: full/stage name and verified birth date/year, plus debut group/date(s) when reliably sourced.
+2) Key characteristics: documented performance strengths, roles, notable work or songwriting credits.
+3) Latest update: a relevant dated update from the last 12 months when available; otherwise use a well-established career milestone and do not pretend it is recent.
+Use official agency/artist/group sources first, then reputable established media. Never invent facts, dates, positions, credits, awards, or releases.
+Every factual claim in narration must be supported by at least one returned source URL. Exclude uncertain claims rather than guessing.
+If filename does not identify one artist confidently, return artist "Unknown Artist".
+The narration must be natural spoken English, suitable for a 30-36 second voiceover.
+Title and tags must match the identified artist/group."""
  models=("gemini-3.8-flash","gemini-3.5-flash-lite")
  errors=[]
  for model in models:
@@ -82,79 +74,53 @@ Title max 85 chars. tags array 4-8 strings."""
   try:
    r=requests.post(url,params={"key":need("GEMINI_API_KEY")},
     json={"contents":[{"parts":[{"text":prompt}]}],
+          "tools":[{"google_search":{}}],
           "generationConfig":{"responseMimeType":"application/json","temperature":0.2}},
-    timeout=60)
-   if r.status_code==404:
-    errors.append(f"{model}: HTTP 404 model unavailable")
-    print(f"Gemini model {model} unavailable (404); switching to fallback.")
-    continue
-   if r.status_code in (429,500,502,503,504):
+    timeout=120)
+   if r.status_code in (404,429,500,502,503,504):
     errors.append(f"{model}: HTTP {r.status_code}")
-    print(f"Gemini model {model} temporarily unavailable ({r.status_code}); switching to fallback.")
+    print(f"Grounded Gemini model {model} unavailable ({r.status_code}); trying fallback.")
     continue
    r.raise_for_status()
-   raw=r.json()["candidates"][0]["content"]["parts"][0]["text"]
-   raw=re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$","",raw,flags=re.I)
+   payload=r.json()
+   candidate=payload["candidates"][0]
+   raw=candidate["content"]["parts"][0]["text"]
+   raw=re.sub(r"^\\s*```(?:json)?\\s*|\\s*```\\s*$","",raw,flags=re.I)
    p=json.loads(raw)
-   if p.get("artist")=="Unknown Artist" or len(p.get("narration","").split())<45:
+   grounding=candidate.get("groundingMetadata",{})
+   chunks=grounding.get("groundingChunks",[])
+   grounded_urls=[]
+   for chunk in chunks:
+    web=chunk.get("web",{})
+    uri=web.get("uri","").strip()
+    title=web.get("title","").strip()
+    if uri.startswith("https://"):
+     grounded_urls.append({"title":title or uri,"url":uri})
+   if p.get("artist")=="Unknown Artist":
     raise RuntimeError("Could not confidently identify artist from Drive filename: "+filename)
-   print(f"Artist profile generated with {model}.")
+   if len(p.get("narration","").split())<45 or len(p.get("narration","").split())>85:
+    raise RuntimeError("Grounded narration length is outside the safe range.")
+   if len(grounded_urls)<2:
+    raise RuntimeError("Google Search grounding returned fewer than two verifiable source URLs.")
+   # Keep only citations actually returned by Google's grounding metadata.
+   grounded_set={x["url"] for x in grounded_urls}
+   cited=[]
+   for source in p.get("sources",[]):
+    if isinstance(source,dict) and source.get("url") in grounded_set:
+     cited.append({"title":str(source.get("title") or source["url"])[:180],"url":source["url"]})
+   if len(cited)<2:
+    cited=grounded_urls[:6]
+   p["sources"]=cited[:6]
+   p["research_queries"]=grounding.get("webSearchQueries",[])
+   print(f"Artist research generated with {model}; Google Search grounding sources: {len(p['sources'])}.")
    return p
   except requests.RequestException as e:
    errors.append(f"{model}: {type(e).__name__}: {e}")
-   print(f"Gemini request failed for {model}: {type(e).__name__}; trying fallback.")
-  except (KeyError,IndexError,ValueError) as e:
-   errors.append(f"{model}: invalid response ({type(e).__name__})")
-   print(f"Gemini response from {model} was invalid; trying fallback.")
- # Offline fallback: known filename aliases can still produce an intro when Gemini is rate-limited.
- aliases = {
-  "eunha":("EUNHA","VIVIZ"), "은하":("EUNHA","VIVIZ"),
-  "sinb":("SINB","VIVIZ"), "신비":("SINB","VIVIZ"),
-  "umji":("UMJI","VIVIZ"), "엄지":("UMJI","VIVIZ"),
-  "karina":("KARINA","aespa"), "카리나":("KARINA","aespa"),
-  "ningning":("NINGNING","aespa"), "닝닝":("NINGNING","aespa"),
-  "winter":("WINTER","aespa"), "윈터":("WINTER","aespa"),
-  "giselle":("GISELLE","aespa"), "지젤":("GISELLE","aespa"),
-  "jennie":("JENNIE","BLACKPINK"), "제니":("JENNIE","BLACKPINK"),
-  "lisa":("LISA","BLACKPINK"), "리사":("LISA","BLACKPINK"),
-  "jisoo":("JISOO","BLACKPINK"), "지수":("JISOO","BLACKPINK"),
-  "rose":("ROSÉ","BLACKPINK"), "로제":("ROSÉ","BLACKPINK"),
-  "sakura":("SAKURA","LE SSERAFIM"), "사쿠라":("SAKURA","LE SSERAFIM"),
-  "chaewon":("CHAEWON","LE SSERAFIM"), "채원":("CHAEWON","LE SSERAFIM"),
-  "yunjin":("YUNJIN","LE SSERAFIM"), "윤진":("YUNJIN","LE SSERAFIM"),
-  "kazuha":("KAZUHA","LE SSERAFIM"), "카즈하":("KAZUHA","LE SSERAFIM"),
-  "eunchae":("EUNCHAE","LE SSERAFIM"), "은채":("EUNCHAE","LE SSERAFIM"),
-  "wonyoung":("WONYOUNG","IVE"), "원영":("WONYOUNG","IVE"),
-  "yujin":("YUJIN","IVE"), "유진":("YUJIN","IVE"),
-  "rei":("REI","IVE"), "레이":("REI","IVE"),
-  "liz":("LIZ","IVE"), "리즈":("LIZ","IVE"),
-  "leeseo":("LEESEO","IVE"), "이서":("LEESEO","IVE"),
-  "gaeul":("GAEUL","IVE"), "가을":("GAEUL","IVE"),
-  "tzuyu":("TZUYU","TWICE"), "쯔위":("TZUYU","TWICE"),
-  "nayeon":("NAYEON","TWICE"), "나연":("NAYEON","TWICE"),
-  "sana":("SANA","TWICE"), "사나":("SANA","TWICE"),
-  "momo":("MOMO","TWICE"), "모모":("MOMO","TWICE"),
-  "yuqi":("YUQI","(G)I-DLE"), "우기":("YUQI","(G)I-DLE"),
-  "haerin":("HAERIN","NewJeans"), "해린":("HAERIN","NewJeans"),
-  "natty":("NATTY","KISS OF LIFE"), "나띠":("NATTY","KISS OF LIFE"),
-  "nancy":("NANCY","MOMOLAND"), "낸시":("NANCY","MOMOLAND"),
-  "kwon eunbi":("KWON EUNBI","Solo"), "권은비":("KWON EUNBI","Solo")
- }
- stem=Path(filename).stem.casefold()
- matches=[v for k,v in aliases.items() if k in stem]
- # Prefer the longest alias to avoid matching a short token inside another name.
- if matches:
-  artist,group=sorted(matches,key=lambda v:len(v[0]),reverse=True)[0]
-  narration=(f"Meet {artist}, a performer from {group}. In this spotlight, the focus is on the energy, "
-   f"stage presence, and expressive details that make this performance memorable. Watch the way "
-   f"{artist} connects movement with the rhythm and brings confidence to every moment. "
-   f"This introduction celebrates the performance itself and offers a quick look at the artist "
-   f"for fans discovering or revisiting {artist}.")
-  print(f"Gemini unavailable; generated a safe local artist profile for {artist} ({group}).")
-  return {"artist":artist,"group":group,"narration":narration,
-   "title":f"{artist} | {group} Artist Spotlight #Shorts",
-   "tags":[artist,group,"K-pop","artist spotlight","performance","fancam"]}
- raise RuntimeError("All Gemini profile models failed and no safe filename alias matched: "+"; ".join(errors))
+   print(f"Grounded Gemini request failed: {type(e).__name__}; trying fallback.")
+  except (KeyError,IndexError,ValueError,TypeError) as e:
+   errors.append(f"{model}: invalid grounded response ({type(e).__name__})")
+   print(f"Grounded Gemini response was invalid: {type(e).__name__}; trying fallback.")
+ raise RuntimeError("Grounded artist research failed; refusing to create an unverified profile. "+"; ".join(errors))
 
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
