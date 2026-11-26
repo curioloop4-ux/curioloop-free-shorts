@@ -590,7 +590,7 @@ def profile(filename, target_hint=""):
  narration=" ".join(narration_parts)
  if len(narration.split())<95:
   raise RuntimeError(f"Research produced only {len(narration.split())} narration words; refusing to publish an under-researched short intro (minimum 95 words).")
- print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 65 seconds.")
+ print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  sources=[]
  if source_base and raw:
   source_url=source_base+"/w/"+quote(chosen,safe="")
@@ -667,44 +667,55 @@ def render(src,p,hist):
     else:
      current=candidate
    if current: sentences.append(current)
-  parts=[]
-  durations=[]
-  for i,sentence in enumerate(sentences):
-   part=W/f"voice_part_{i:03d}.mp3"
-   # Edge TTS can intermittently close the stream without returning audio.
-   # Retry the preferred voice, then fall back to other natural English voices.
-   voices=["en-US-AriaNeural","en-US-JennyNeural","en-GB-SoniaNeural"]
-   last_error=None
-   generated=False
-   for voice in voices:
-    for attempt in range(1,4):
-     try:
-      if part.exists(): part.unlink()
-      communicate=edge_tts.Communicate(sentence,voice,rate="-3%")
-      await communicate.save(str(part))
-      if not part.exists() or part.stat().st_size<1024:
-       raise RuntimeError("TTS returned an empty or incomplete audio segment")
-      segment_seconds=dur(part)
-      if segment_seconds<=0:
-       raise RuntimeError("TTS audio segment has invalid duration")
-      print(f"TTS segment {i+1}/{len(sentences)} generated with {voice} (attempt {attempt}).")
-      generated=True
-      break
-     except Exception as exc:
-      last_error=exc
-      print(f"TTS attempt failed for segment {i+1}, voice {voice}, attempt {attempt}/3: {type(exc).__name__}: {exc}")
-      if part.exists(): part.unlink()
-      if attempt<3: await asyncio.sleep(2*attempt)
-    if generated: break
-   if not generated:
-    raise RuntimeError(f"All Edge TTS voices failed for narration segment {i+1}: {last_error}") from last_error
-   parts.append(part)
-   durations.append(segment_seconds)
-  concat_list=W/"voice_concat.txt"
-  concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
-  run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
-  voice_seconds=dur(audio)
-  print(f"Measured narration duration: {voice_seconds:.1f}s.")
+  async def generate_segments(rate):
+   parts=[]; durations=[]
+   for i,sentence in enumerate(sentences):
+    part=W/f"voice_part_{i:03d}.mp3"
+    voices=["en-US-AriaNeural","en-US-JennyNeural","en-GB-SoniaNeural"]
+    last_error=None; generated=False
+    for voice in voices:
+     for attempt in range(1,4):
+      try:
+       if part.exists(): part.unlink()
+       communicate=edge_tts.Communicate(sentence,voice,rate=rate)
+       await communicate.save(str(part))
+       if not part.exists() or part.stat().st_size<1024:
+        raise RuntimeError("TTS returned an empty or incomplete audio segment")
+       segment_seconds=dur(part)
+       if segment_seconds<=0:
+        raise RuntimeError("TTS audio segment has invalid duration")
+       print(f"TTS segment {i+1}/{len(sentences)} generated with {voice}, rate {rate} (attempt {attempt}).")
+       generated=True;break
+      except Exception as exc:
+       last_error=exc
+       print(f"TTS attempt failed for segment {i+1}, voice {voice}, rate {rate}, attempt {attempt}/3: {type(exc).__name__}: {exc}")
+       if part.exists(): part.unlink()
+       if attempt<3: await asyncio.sleep(2*attempt)
+     if generated:break
+    if not generated:
+     raise RuntimeError(f"All Edge TTS voices failed for narration segment {i+1}: {last_error}") from last_error
+    parts.append(part);durations.append(segment_seconds)
+   concat_list=W/"voice_concat.txt"
+   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10),encoding="utf-8")
+   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
+   return durations,dur(audio)
+  # Intro card and ending take 3 seconds total, so narration must fit 47 seconds.
+  # First use a natural pace, then regenerate the complete voice track progressively faster.
+  tts_rates=["-3%","+8%","+16%","+24%","+32%","+40%","+50%"]
+  durations,voice_seconds=await generate_segments(tts_rates[0])
+  for rate in tts_rates[1:]:
+   if voice_seconds<=47.0:break
+   print(f"Narration would exceed 50 seconds ({voice_seconds+3.0:.1f}s total); regenerating at {rate}.")
+   durations,voice_seconds=await generate_segments(rate)
+  if voice_seconds>47.0:
+   # Last-resort time compression guarantees the requested 50-second ceiling.
+   factor=voice_seconds/47.0
+   run(["ffmpeg","-y","-i",str(audio),"-filter:a",f"atempo={factor:.5f}","-vn",str(W/"voice_capped.mp3")])
+   shutil.move(str(W/"voice_capped.mp3"),str(audio))
+   durations=[seconds/factor for seconds in durations]
+   voice_seconds=dur(audio)
+   print(f"Applied final speech time-compression factor {factor:.3f}; measured narration {voice_seconds:.1f}s.")
+  print(f"Measured narration duration: {voice_seconds:.1f}s; total target: {intro+voice_seconds+1.5:.1f}s.")
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
@@ -740,11 +751,11 @@ def render(src,p,hist):
  asyncio.run(make_voice_and_subtitles())
  # Runtime follows spoken content: title + narration + brief ending.
  voice_seconds=dur(audio)
- length=min(65.0,max(10.0,intro+voice_seconds+1.5))
+ length=min(50.0,max(10.0,intro+voice_seconds+1.5))
  footage=length-intro
  if source_len<footage+1:
   raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least {footage+1:.1f}s for this {length:.1f}s intro")
- print(f"Dynamic video duration: {length:.1f}s (narration {voice_seconds:.1f}s + title and ending).")
+ print(f"Dynamic video duration: {length:.1f}s (hard maximum 50s; narration {voice_seconds:.1f}s + title and ending).")
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
  choices=[max(0.5,min(source_len-0.5,source_len*x)) for x in (0.08,0.18,0.30,0.43,0.57,0.70,0.82,0.92)]
