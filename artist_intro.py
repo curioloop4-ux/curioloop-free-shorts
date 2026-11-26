@@ -373,15 +373,29 @@ def profile(filename, target_hint=""):
    if len(article_highlights)>=5:break
  # When the wiki page is blocked, recover biographical detail from independently
  # fetched public pages/snippets. Keep only substantial text tied to this artist.
- if not article_highlights:
-  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
-   detail=plain(document.get("text",""))
-   if len(detail)<90 or not any(name.casefold() in (document.get("title","")+" "+detail).casefold() for name in (target,artist)):
-    continue
-   detail=re.sub(r"^(?:프로필|공식 홈페이지|공식 프로필|profile|biography)\\s*[:：-]?\\s*","",detail,flags=re.I)
-   if len(detail)>=90 and detail not in article_highlights:
-    article_highlights.append(detail[:260])
-   if len(article_highlights)>=4:break
+ # Supplement sparse wiki sections with independently fetched profile pages.
+ # Previously this fallback ran only when zero wiki highlights existed, so a
+ # page with 1-3 highlights ignored all other fetched profile sources.
+ def highlight_key(value):
+  return re.sub(r"[^가-힣a-z0-9]","",value.casefold())
+ existing_highlight_keys={highlight_key(x) for x in article_highlights}
+ for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
+  if len(article_highlights)>=7:break
+  if document.get("priority",2)==0:continue
+  title=plain(document.get("title",""))
+  detail=plain(document.get("text",""))
+  if len(detail)<90 or not any(name.casefold() in (title+" "+detail).casefold() for name in (target,artist)):
+   continue
+  candidates=re.split(r"(?<=[.!?。])\\s+|(?<=[다요죠함음])\\s{2,}",detail)
+  for candidate in candidates:
+   candidate=plain(candidate)
+   if len(candidate)<55 or len(candidate)>280:continue
+   if not any(name.casefold() in candidate.casefold() for name in (target,artist,group) if name and name!="Group affiliation not confirmed"):continue
+   key=highlight_key(candidate)
+   if not key or key in existing_highlight_keys:continue
+   article_highlights.append(candidate)
+   existing_highlight_keys.add(key)
+   break
  translated_highlights=[]
  for detail in article_highlights:
   try:
@@ -389,9 +403,9 @@ def profile(filename, target_hint=""):
    tr.raise_for_status()
    translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
    if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
-  except Exception as e:print("NamuWiki highlight translation unavailable:",type(e).__name__)
-  if len(translated_highlights)>=3:break
- print("NamuWiki article highlights extracted:",len(translated_highlights),"from section text")
+  except Exception as e:print("Biography highlight translation unavailable:",type(e).__name__)
+  if len(translated_highlights)>=5:break
+ print("Biography highlights extracted:",len(article_highlights),"; translated:",len(translated_highlights),"from NamuWiki and independent profile pages")
  print("PROFILE RESEARCH RESULT")
  print("Artist:",artist,"| Group:",group)
  print("Birth:",birth or "not verified","| Height:",height or "not verified","| Weight:",weight or "not verified")
