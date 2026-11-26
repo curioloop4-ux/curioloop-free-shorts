@@ -216,11 +216,11 @@ def profile(filename, target_hint=""):
   # ||-separated cells. Also support simple "label: value" text.
   for label in labels:
    escaped=re.escape(label)
-   m=re.search(r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*([^|\\n]{1,100})",raw,re.I)
+   m=re.search(r"(?:^|\|\|)\s*"+escaped+r"\s*\|\|\s*([^|\n]{1,100})",raw,re.I)
    if m:
     value=plain(m.group(1))
     if value:return value[:100]
-   m=re.search(r"(?:^|\\n)\\s*"+escaped+r"\\s*[:：]\\s*([^|\\n]{1,100})",raw,re.I)
+   m=re.search(r"(?:^|\n)\s*"+escaped+r"\s*[:：]\s*([^|\n]{1,100})",raw,re.I)
    if m:
     value=plain(m.group(1))
     if value:return value[:100]
