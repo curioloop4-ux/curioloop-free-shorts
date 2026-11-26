@@ -2,6 +2,12 @@ name: CurioLoop Artist Intro
 
 on:
   workflow_dispatch:
+    inputs:
+      artist:
+        description: 'Artist name to prioritize (e.g. Eunha)'
+        required: false
+        default: 'Eunha'
+        type: string
   schedule:
     # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
     - cron: "0 14,17,20 * * *"
@@ -49,6 +55,7 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          TARGET_ARTIST: ${{ inputs.artist }}
         run: python artist_intro.py
 
       - name: Save rendered video artifact
