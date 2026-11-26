@@ -386,7 +386,7 @@ def profile(filename, target_hint=""):
   detail=plain(document.get("text",""))
   if len(detail)<90 or not any(name.casefold() in (title+" "+detail).casefold() for name in (target,artist)):
    continue
-  candidates=re.split(r"(?<=[.!?。])\\s+|(?<=[다요죠함음])\\s{2,}",detail)
+  candidates=re.split(r"(?<=[.!?。])\s+|(?<=[다요죠함음])\s{2,}",detail)
   for candidate in candidates:
    candidate=plain(candidate)
    if len(candidate)<55 or len(candidate)>280:continue
