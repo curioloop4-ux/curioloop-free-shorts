@@ -476,7 +476,7 @@ def generate_metadata(filename, hook, index):
     elif artist == "CHAERYEONG":
         title = "CHAERYEONG (ITZY) 🌙 | K-Pop Fancam #Shorts"
         description = ("CHAERYEONG of ITZY 🌙 Enjoy this fan-captured performance and "
-                       f"her stage presence.\\n\\nFan-captured footage. {CHANNEL_BRAND}.")
+                       f"her stage presence.\n\nFan-captured footage. {CHANNEL_BRAND}.")
         tags = fixed_tags
     elif artist == "NATTY":
         title = "NATTY (KISS OF LIFE) 🔥 | K-Pop Fancam #Shorts"
