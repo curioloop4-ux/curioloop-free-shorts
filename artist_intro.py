@@ -387,9 +387,21 @@ def render(src,p,hist):
  async def make_voice_and_subtitles():
   # Generate each spoken sentence separately so subtitle timing is based on
   # the measured duration of that exact sentence, not estimated word counts.
-  sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",p["narration"].strip()) if x.strip()]
-  if not sentences:
+  raw_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",p["narration"].strip()) if x.strip()]
+  if not raw_sentences:
    raise RuntimeError("Cannot create subtitles: narration is empty")
+  # Short requests reduce Edge TTS NoAudioReceived failures on long clauses.
+  sentences=[]
+  for raw_sentence in raw_sentences:
+   current=""
+   for word in raw_sentence.split():
+    candidate=(current+" "+word).strip()
+    if len(candidate)>160 and current:
+     sentences.append(current)
+     current=word
+    else:
+     current=candidate
+   if current: sentences.append(current)
   parts=[]
   durations=[]
   for i,sentence in enumerate(sentences):
