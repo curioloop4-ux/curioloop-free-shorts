@@ -145,7 +145,7 @@ def render(src,p,hist):
  async def make_voice_and_subtitles():
   # Generate each spoken sentence separately so subtitle timing is based on
   # the measured duration of that exact sentence, not estimated word counts.
-  sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",p["narration"].strip()) if x.strip()]
+  sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",p["narration"].strip()) if x.strip()]
   if not sentences:
    raise RuntimeError("Cannot create subtitles: narration is empty")
   parts=[]
@@ -170,21 +170,21 @@ def render(src,p,hist):
    # Keep each caption to at most two short lines. Long sentences are
    # split into consecutive cues and timed by their spoken word counts.
    wrapped=textwrap.wrap(sentence,width=30,break_long_words=False,break_on_hyphens=False)
-   groups=["\\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
+   groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
-   weights=[max(1,len(group.replace("\\n"," ").split())) for group in groups]
+   weights=[max(1,len(group.replace("\n"," ").split())) for group in groups]
    total=sum(weights)
    for group,weight in zip(groups,weights):
     segment_duration=seconds*weight/total
     end_time=cursor+segment_duration
     cues.extend([str(cue_no),f"{stamp(cursor)} --> {stamp(end_time)}",group,""])
     cursor=end_time; cue_no+=1
-  subtitle="\\n".join(cues)
+  subtitle="\n".join(cues)
   vtt.write_text(subtitle,encoding="utf-8-sig")
   if not vtt.exists() or vtt.stat().st_size<20:
    raise RuntimeError("Subtitle file was not written correctly")
   print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
-  print("Subtitle preview:",subtitle[:400].replace("\\n"," | "))
+  print("Subtitle preview:",subtitle[:400].replace("\n"," | "))
  asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
