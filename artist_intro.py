@@ -359,7 +359,7 @@ def create_background_music(path, seconds=36, sample_rate=22050):
 
 def render(src,p,hist):
  intro=1.5; source_len=dur(src)
- audio=W/"voice.mp3";bgm=W/"background_music.wav";vtt=W/"voice.srt"
+ audio=W/"voice.mp3";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
   # Generate each spoken sentence separately so subtitle timing is based on
   # the measured duration of that exact sentence, not estimated word counts.
@@ -449,10 +449,16 @@ def render(src,p,hist):
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
  f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[v];"
- f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
- f"[3:a]volume=0.16,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0.0,length-1.5):.3f}:d=1.5,atrim=duration={length:.3f}[bgm];"
- "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]")
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-i",str(bgm),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+ fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
+ # Retain the source performance sound at a reduced level under the narration.
+ probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
+ has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
+ if has_source_audio:
+  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.18,apad,atrim=duration={length:.3f}[original];"
+  fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+ else:
+  fc+="[voice]anull[a]"
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
