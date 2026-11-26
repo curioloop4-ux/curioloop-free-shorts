@@ -311,8 +311,11 @@ def publish(yt,out,p,source):
  if brand.casefold() not in {"curioloop","dailyneedle"}:raise RuntimeError("Artist intro upload blocked: unexpected channel brand "+brand)
  print("Using existing CurioLoop/DailyNeedle YouTube upload credentials.")
  approval_file=R/"INTRO_PUBLICATION_APPROVED.txt"
- approved=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
+ approved_once=os.getenv("INTRO_PUBLIC_ONCE","").strip().lower() in {"1","true","yes"}
+ approved_file=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
+ approved=approved_once or approved_file
  privacy="public" if approved else "private"
+ print("One-time public approval:", "enabled" if approved_once else "disabled")
  research_links="\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
  description=f"Meet {p['artist']} from {p['group']}.\nArtist profile, career highlights, and recent update.\nOriginal footage source: {source}\nResearch sources:\n{research_links}\n#Kpop #ArtistSpotlight #Shorts"
  body={"snippet":{"title":p["title"][:100],"description":description[:4900],"tags":p.get("tags",[])+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
