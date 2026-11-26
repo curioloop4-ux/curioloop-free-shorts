@@ -572,7 +572,11 @@ def main():
     source_state = history.setdefault("sources", {})
     for old_id in history.get("processed", []):
         source_state.setdefault(old_id, {"next_clip": SHORTS_PER_SOURCE + 1, "complete": True})
-    last_source_id = history.get("last_source_id")
+    # Migration: any source that has already consumed a clip in the old
+    # sequential scheme is treated as used, so it will never be repeated.
+    for state in source_state.values():
+        if int(state.get("next_clip", 1)) > 1:
+            state["complete"] = True
 
     files = list_source_videos(drive, folder_id)
     source_filter = os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip()
@@ -611,15 +615,9 @@ def main():
         print("No eligible videos found in the configured Google Drive inbox.")
         return
 
-    # Keep all current source videos in a round-robin rotation.
-    start_at = 0
-    if last_source_id and not source_filter:
-        for i, item in enumerate(files):
-            if item["id"] == last_source_id:
-                start_at = (i + 1) % len(files)
-                break
-
-    batch_size = int(os.getenv("FANCAMVERSE_UPLOADS_PER_RUN", "3"))
+    # Randomly select from unused source videos. A source is consumed after
+    # one successful Short, preventing any original video from being repeated.
+    batch_size = int(os.getenv("FANCAMVERSE_UPLOADS_PER_RUN", "1"))
     output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
     publish_time = os.getenv("FANCAMVERSE_PUBLISH_TIME_KST", "").strip()
@@ -630,49 +628,41 @@ def main():
     if not output_only:
         print("Upload destination: CurioLoop, using the existing YOUTUBE_* OAuth token.")
 
-    source_cache = {}
     uploaded_count = 0
-    cursor = start_at
 
     for batch_number in range(1, batch_size + 1):
-        selected = None
-        selected_index = None
-        selected_file_index = None
-
-        for offset in range(len(files)):
-            idx = (cursor + offset) % len(files)
-            item = files[idx]
-            state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
-            next_clip = int(state.get("next_clip", 1))
-            if next_clip <= SHORTS_PER_SOURCE and not state.get("complete", False):
-                selected = item
-                selected_index = next_clip
-                selected_file_index = idx
-                break
-
-        if selected is None:
-            print("No more unprocessed Shorts remain in the current Drive source videos.")
+        eligible = [
+            item for item in files
+            if not source_state.get(item["id"], {}).get("complete", False)
+            and int(source_state.get(item["id"], {}).get("next_clip", 1)) <= SHORTS_PER_SOURCE
+        ]
+        if not eligible:
+            print("No unused source videos remain in the current Drive inbox.")
             break
 
-        item = selected
-        cursor = (selected_file_index + 1) % len(files)
+        item = random.choice(eligible)
+        state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
-            f"Batch {batch_number}/{batch_size} | Round-robin source: "
-            f"{item['name']} ({item['id']}) | Short {selected_index}/{SHORTS_PER_SOURCE}"
+            f"Batch {batch_number}/{batch_size} | Random unused source: "
+            f"{item['name']} ({item['id']})"
         )
 
-        if item["id"] not in source_cache:
-            source = download_video(drive, item)
-            duration = probe_duration(source, allow_short=bool(source_filter))
-            saved_clips = source_state.get(item["id"], {}).get("clips")
-            if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
-                clips = saved_clips
-                print("Using the saved five highlight windows for this source.")
-            else:
-                clips = analyze_highlights(source, duration, item["name"])
-            source_cache[item["id"]] = (source, clips)
+        source = download_video(drive, item)
+        duration = probe_duration(source, allow_short=bool(source_filter))
+        saved_clips = state.get("clips")
+        if saved_clips and len(saved_clips) == SHORTS_PER_SOURCE:
+            clips = saved_clips
+            print("Using the saved five non-overlapping highlight windows for this source.")
+        else:
+            clips = analyze_highlights(source, duration, item["name"])
 
-        source, clips = source_cache[item["id"]]
+        used_indices = set(int(x) for x in state.get("used_clip_indices", []))
+        available_indices = [i for i in range(1, len(clips) + 1) if i not in used_indices]
+        if not available_indices:
+            print(f"All highlight windows already used for {item['name']}; skipping this source.")
+            source_state[item["id"]] = {**state, "name": item["name"], "complete": True}
+            continue
+        selected_index = random.choice(available_indices)
         clip = clips[selected_index - 1]
         artist_name, _, _ = identify_artist(item["name"])
         # Use the artist name for unique artifact filenames. Korean Drive filenames
@@ -697,9 +687,10 @@ def main():
 
         source_state[item["id"]] = {
             "name": item["name"],
-            "next_clip": selected_index + 1,
-            "complete": selected_index >= len(clips),
-            "clips": clips
+            "next_clip": SHORTS_PER_SOURCE + 1,
+            "complete": True,
+            "clips": clips,
+            "used_clip_indices": sorted(used_indices | {selected_index})
         }
         history["last_source_id"] = item["id"]
         history["sources"] = source_state
