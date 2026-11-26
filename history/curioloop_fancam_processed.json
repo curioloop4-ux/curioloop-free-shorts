@@ -1,0 +1,36 @@
+{
+  "processed": [],
+  "sources": {
+    "1ZQvFiV_0cBcjJjcTlnakOHBYChLYXR6d": {
+      "name": "LE SSERAFIM 르세라핌 SAKURA 사쿠라 Fancam Ver KpopHots_B.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 10.0,
+          "end": 35.0,
+          "hook": "A Must-Watch Performance Moment"
+        },
+        {
+          "start": 61.67,
+          "end": 86.67,
+          "hook": "A Must-Watch Performance Moment"
+        },
+        {
+          "start": 113.35,
+          "end": 138.35,
+          "hook": "A Must-Watch Performance Moment"
+        },
+        {
+          "start": 165.02,
+          "end": 190.02,
+          "hook": "A Must-Watch Performance Moment"
+        }
+      ],
+      "used_clip_indices": [
+        3
+      ]
+    }
+  },
+  "last_source_id": "1ZQvFiV_0cBcjJjcTlnakOHBYChLYXR6d"
+}
