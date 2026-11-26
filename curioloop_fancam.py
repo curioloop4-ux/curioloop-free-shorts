@@ -764,6 +764,22 @@ def main():
         else:
             clips = analyze_highlights(source, duration, item["name"])
 
+        # Also cover previously saved highlight lists: the regular Sakura source
+        # must have a selectable 25-second clip containing the 1:07-1:12 segment.
+        if is_standard_sakura_source(item["name"]) and duration >= 72:
+            has_sakura_window = any(
+                clip["start"] <= 67.0 and clip["end"] >= 72.0
+                for clip in clips
+            )
+            if not has_sakura_window:
+                start = min(60.0, max(0.0, duration - MIN_SHORT_SECONDS))
+                clips.append({
+                    "start": start,
+                    "end": start + MIN_SHORT_SECONDS,
+                    "hook": "Sakura Performance Highlight"
+                })
+                print("Added dedicated regular-Sakura clip containing 1:07-1:12.")
+
         used_indices = set(int(x) for x in state.get("used_clip_indices", []))
         available_indices = [i for i in range(1, len(clips) + 1) if i not in used_indices]
         if is_standard_sakura_source(item["name"]):
