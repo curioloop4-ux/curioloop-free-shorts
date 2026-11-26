@@ -62,8 +62,14 @@ jobs:
         run: |
           test -f history/artist_intro_fancam_queue.json
           SOURCE_ID="$(jq -r '.drive_file_id // empty' history/artist_intro_fancam_queue.json)"
+          INTRO_START="$(jq -r '.intro_footage_start // empty' history/artist_intro_fancam_queue.json)"
+          INTRO_END="$(jq -r '.intro_footage_end // empty' history/artist_intro_fancam_queue.json)"
           test -n "$SOURCE_ID"
+          test -n "$INTRO_START"
+          test -n "$INTRO_END"
           echo "FANCAMVERSE_COORDINATED_SOURCE_ID=$SOURCE_ID" >> "$GITHUB_ENV"
+          echo "FANCAMVERSE_INTRO_SOURCE_START=$INTRO_START" >> "$GITHUB_ENV"
+          echo "FANCAMVERSE_INTRO_SOURCE_END=$INTRO_END" >> "$GITHUB_ENV"
 
       - name: Install FFmpeg
         run: |
