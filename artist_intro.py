@@ -286,7 +286,7 @@ def profile(filename, target_hint=""):
   if any((a["title"].casefold(),a["publisher"].casefold())==key for a in articles):return
   articles.append({"title":title[:220],"description":description[:600],"url":url,"publisher":publisher or "Unknown outlet","published":published or "","language":language})
  # Keep profile/interview research sources separate from spoken news.
-  for query in [f'"{target}" {group_query} news interview statement when:30d',f'"{artist}" {group_query} latest news controversy interview when:30d']:
+ for query in [f'"{target}" "{group}" profile height weight birthday'.replace('"Group affiliation not confirmed"',"").strip(),f'"{target}" "{group}" interview hobby personality'.replace('"Group affiliation not confirmed"',"").strip()]:
   try:
    rr=session.get("https://www.bing.com/search",params={"format":"rss","q":query},timeout=18);rr.raise_for_status()
    for node in ET.fromstring(rr.content).findall(".//item"):
