@@ -35,7 +35,7 @@ def scan(drive,folder):
   if parent in seen: continue
   seen.add(parent); token=None
   while True:
-   a={"q":f"'{parent}' in parents and trashed=false","pageSize":100,"orderBy":"createdTime","fields":"nextPageToken,files(id,name,mimeType,createdTime,size)","supportsAllDrives":True,"includeItemsFromAllDrives":True}
+   a={"q":f"'{parent}' in parents and trashed=false","pageSize":100,"orderBy":"createdTime","fields":"nextPageToken,files(id,name,mimeType,createdTime,size,md5Checksum)","supportsAllDrives":True,"includeItemsFromAllDrives":True}
    if token:a["pageToken"]=token
    r=drive.files().list(**a).execute()
    for f in r.get("files",[]):
@@ -828,15 +828,22 @@ def main():
  drive,yt=services();folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
  done={x.get("drive_file_id") for x in h["processed"]}
+ done_hashes={x.get("source_md5") for x in h["processed"] if x.get("source_md5")}
  target=os.getenv("TARGET_ARTIST","").strip()
- candidates=[x for x in scan(drive,folder) if x["id"] not in done]
+ candidates=[x for x in scan(drive,folder) if x["id"] not in done and (not x.get("md5Checksum") or x.get("md5Checksum") not in done_hashes)]
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  # Fail closed: random selection only considers filenames with a known artist and group.
  known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
  known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
- def identifiable(item):
+ alias_to_key={a.casefold():a.casefold() for a in known_artists}
+ for canonical,aliases in {"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"],"sakura":["사쿠라","sakura"],"jennie":["제니","jennie"]}.items():
+  for alias in aliases:alias_to_key[alias.casefold()]=canonical
+ def source_artist_key(item):
   name=item["name"].casefold()
-  return any(a.casefold() in name for a in known_artists)
+  matches=[alias for alias in alias_to_key if alias in name]
+  return alias_to_key[max(matches,key=len)] if matches else ""
+ def identifiable(item):
+  return bool(source_artist_key(item))
  # Manual target may prioritize one artist, but identity validation remains mandatory.
  if target:
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
@@ -848,9 +855,16 @@ def main():
   print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
   if not candidates:raise RuntimeError("No unprocessed Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
   import random
+  recent_artist_keys=[x.get("source_artist_key") or x.get("artist","").casefold() for x in h["processed"][-2:]]
+  diversified=[x for x in candidates if source_artist_key(x) not in recent_artist_keys]
+  if diversified:
+   candidates=diversified
+   print("Recent-artist repeat prevention active; excluded artists:",", ".join(recent_artist_keys))
   random.shuffle(candidates)
  # Do not skip a recognized artist because some profile fields are unavailable.
  item=candidates[0]
+ selected_artist_key=source_artist_key(item)
+ print("Selected source artist key:",selected_artist_key or "manual target")
  print("Selected source for profile research:",item["name"])
  p=profile(item["name"],target_hint=target)
  print("Selected Drive source:",item["name"])
@@ -863,6 +877,6 @@ def main():
  pending=h.pop("pending_opening_frame",None)
  if pending:
   h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
- h["processed"].append({"drive_file_id":item["id"],"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"published_at":datetime.now(timezone.utc).isoformat()})
+ h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"published_at":datetime.now(timezone.utc).isoformat()})
  H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
 if __name__=="__main__":main()
