@@ -711,7 +711,7 @@ def render(src,p,hist):
    # Last-resort time compression guarantees the requested 50-second ceiling.
    factor=voice_seconds/47.0
    run(["ffmpeg","-y","-i",str(audio),"-filter:a",f"atempo={factor:.5f}","-vn",str(W/"voice_capped.mp3")])
-   shutil.move(str(W/"voice_capped.mp3"),str(audio))
+   os.replace(str(W/"voice_capped.mp3"),str(audio))
    durations=[seconds/factor for seconds in durations]
    voice_seconds=dur(audio)
    print(f"Applied final speech time-compression factor {factor:.3f}; measured narration {voice_seconds:.1f}s.")
