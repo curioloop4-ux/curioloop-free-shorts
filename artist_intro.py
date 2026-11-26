@@ -934,7 +934,7 @@ def main():
  known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
  known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
  alias_to_key={a.casefold():a.casefold() for a in known_artists}
- for canonical,aliases in {"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"],"sakura":["사쿠라","sakura"],"jennie":["제니","jennie"],"haerin":["해린","혜린","haerin"]}.items():
+ for canonical,aliases in {"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"],"sakura":["사쿠라","sakura"],"kazuha":["카즈하","kazuha"],"jennie":["제니","jennie"],"haerin":["해린","혜린","haerin"]}.items():
   for alias in aliases:alias_to_key[alias.casefold()]=canonical
  def source_artist_key(item):
   name=item["name"].casefold()
