@@ -205,11 +205,11 @@ def profile(filename, target_hint=""):
  # Build an engaging, fact-led script. Keep only concrete details verified in the retrieved profile.
  def labeled_value(labels):
   for label in labels:
-   pattern=r"(?:^|\\s)"+label+r"\\s*(?:\\||:|：)?\\s*([^|]{2,90}?)(?=\\s{2,}|\\||$)"
+   pattern=r"(?:^|\s)"+label+r"\s*(?:\||:|：)?\s*([^|]{2,90}?)(?=\s{2,}|\||$)"
    m=re.search(pattern,raw,re.I)
    if m:
-    value=re.sub(r"\\s+"," ",m.group(1)).strip(" -:：")
-    value=re.sub(r"\\[[^]]*\\]","",value).strip()
+    value=re.sub(r"\s+"," ",m.group(1)).strip(" -:：")
+    value=re.sub(r"\[[^]]*\]","",value).strip()
     if value and not re.search(r"(문서|편집|각주|출처|미상|불명)",value):
      return value[:65]
   return None
