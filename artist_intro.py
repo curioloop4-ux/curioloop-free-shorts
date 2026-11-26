@@ -340,6 +340,13 @@ def profile(filename, target_hint=""):
  nickname=labeled_value(["별명","애칭"])
  hobby=labeled_value(["취미","특기"])
  personality=labeled_value(["성격","특징","매력 포인트"])
+ print("PROFILE RESEARCH RESULT")
+ print("Artist:",artist,"| Group:",group)
+ print("Birth:",birth or "not verified","| Height:",height or "not verified","| Weight:",weight or "not verified")
+ print("Body measurements:",body_size or "not verified","| Waist:",waist or "not verified","| Shoe size:",shoe_size or "not verified")
+ print("Position:",position or "not verified","| Nickname:",nickname or "not verified","| Hobby:",hobby or "not verified")
+ print("Profile sources:")
+ for source in profile_documents[:8]:print("-",source.get("title","Profile source"),source.get("url",""))
  # Search recent coverage across Korean and English editions and rank issue clusters.
  from xml.etree import ElementTree as ET
  from urllib.parse import urlparse
