@@ -391,7 +391,8 @@ def profile(filename, target_hint=""):
   for candidate in candidates:
    candidate=plain(candidate)
    if len(candidate)<55 or len(candidate)>280:continue
-   if not any(name.casefold() in candidate.casefold() for name in (target,artist,group) if name and name!="Group affiliation not confirmed"):continue
+   # The page itself has already been matched to this artist; do not require
+   # the artist's name to be repeated in every biographical sentence.
    key=highlight_key(candidate)
    if not key or key in existing_highlight_keys:continue
    article_highlights.append(candidate)
@@ -399,12 +400,17 @@ def profile(filename, target_hint=""):
    break
  translated_highlights=[]
  for detail in article_highlights:
-  try:
-   tr=session.get("https://translate.googleapis.com/translate_a/single",params={"client":"gtx","sl":"ko","tl":"en","dt":"t","q":detail[:900]},timeout=12)
-   tr.raise_for_status()
-   translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
-   if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
-  except Exception as e:print("Biography highlight translation unavailable:",type(e).__name__)
+  # English profile text can be used directly; it must not depend on the
+  # optional Google translation endpoint being available.
+  if not re.search(r"[가-힣]",detail):
+   if len(detail.split())>=8:translated_highlights.append(detail.rstrip(". "))
+  else:
+   try:
+    tr=session.get("https://translate.googleapis.com/translate_a/single",params={"client":"gtx","sl":"ko","tl":"en","dt":"t","q":detail[:900]},timeout=12)
+    tr.raise_for_status()
+    translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
+    if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
+   except Exception as e:print("Biography highlight translation unavailable; retaining other English source material:",type(e).__name__)
   if len(translated_highlights)>=5:break
  print("Biography highlights extracted:",len(article_highlights),"; translated:",len(translated_highlights),"from NamuWiki and independent profile pages")
  print("PROFILE RESEARCH RESULT")
@@ -603,6 +609,14 @@ def profile(filename, target_hint=""):
  for sentence in extra_facts:
   add_if_fits(sentence)
  narration=" ".join(narration_parts)
+ # Sparse research must not produce an unusably short video. Add a transparent
+ # editorial bridge (not invented biography) only when verified facts are scarce.
+ if len(narration.split())<55:
+  bridge=("This artist spotlight brings together publicly documented profile information, career context, and recent coverage. "
+          "Details that could not be confirmed across reliable sources are intentionally left out. "
+          "The aim is to give viewers a clear introduction without repeating rumors or presenting uncertain information as fact.")
+  narration=(narration+" "+bridge).strip()
+  print("Sparse-research narration bridge added; no unverified biographical claims were introduced.")
  print(f"Research narration collected: {len(narration.split())} words; final acceptance is based on measured video duration (minimum 30 seconds).")
  print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  sources=[]
@@ -734,6 +748,13 @@ def render(src,p,hist):
   # First use a natural pace, then regenerate the complete voice track progressively faster.
   tts_rates=["-3%","+8%","+16%","+24%","+32%","+40%","+50%"]
   durations,voice_seconds=await generate_segments(tts_rates[0])
+  # A valid script can still be too short if a voice provider speaks unusually
+  # quickly. Re-synthesize more slowly before rejecting the video.
+  if voice_seconds<28.5:
+   for slow_rate in ["-10%","-18%","-25%"]:
+    print(f"Narration is shorter than the 30-second video minimum ({voice_seconds:.1f}s); retrying at {slow_rate}.")
+    durations,voice_seconds=await generate_segments(slow_rate)
+    if voice_seconds>=28.5:break
   for rate in tts_rates[1:]:
    if voice_seconds<=47.0:break
    print(f"Narration would exceed 50 seconds ({voice_seconds+3.0:.1f}s total); regenerating at {rate}.")
