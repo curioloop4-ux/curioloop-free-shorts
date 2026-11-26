@@ -141,8 +141,21 @@ Title max 85 chars. tags array 4-8 strings."""
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
  if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
- audio=W/"voice.mp3";vtt=W/"voice.vtt"
- asyncio.run(edge_tts.Communicate(p["narration"],"en-US-JennyNeural",rate="+2%").save(str(audio),str(vtt)))
+ audio=W/"voice.mp3";vtt=W/"voice.srt"
+ async def make_voice_and_subtitles():
+  communicate=edge_tts.Communicate(p["narration"],"en-US-JennyNeural",rate="+2%")
+  submaker=edge_tts.SubMaker()
+  with audio.open("wb") as af:
+   async for chunk in communicate.stream():
+    if chunk["type"]=="audio":
+     af.write(chunk["data"])
+    elif chunk["type"]=="WordBoundary":
+     submaker.feed(chunk)
+  subtitle=submaker.get_srt()
+  if not subtitle.strip():
+   raise RuntimeError("Edge TTS returned no word-boundary subtitle data")
+  vtt.write_text(subtitle,encoding="utf-8")
+ asyncio.run(make_voice_and_subtitles())
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
  choices=[max(0.5,min(source_len-0.5,source_len*x)) for x in (0.08,0.18,0.30,0.43,0.57,0.70,0.82,0.92)]
