@@ -49,8 +49,6 @@ jobs:
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
-          # Manual test runs are always private. Scheduled uploads stay private until the owner approves.
-          INTRO_PUBLICATION_APPROVED: ${{ github.event_name == 'schedule' && secrets.INTRO_PUBLICATION_APPROVED || 'false' }}
         run: python artist_intro.py
 
       - name: Save rendered video artifact
