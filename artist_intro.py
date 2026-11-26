@@ -355,17 +355,17 @@ def profile(filename, target_hint=""):
  articles=[]
  facts=[f"Meet {artist}, a K-pop artist."]
  if group!="Group affiliation not confirmed":
-  facts.append(f"{artist} is a member of {group}.")
+  facts.append(f"She is a member of {group}.")
   if group_year:facts.append(f"The group made its debut in {group_year}.")
- if birth_year:facts.append(f"{artist} was born in {birth_year}.")
- if height:facts.append(f"{artist} is {height} tall.")
- if weight:facts.append(f"{artist} weighs {weight}.")
- if waist:facts.append(f"{artist}'s listed waist measurement is {waist}.")
- if shoe_size:facts.append(f"{artist}'s listed shoe size is {shoe_size}.")
+ if birth_year:facts.append(f"Born in {birth_year}.")
+ if height:facts.append(f"She is {height} tall.")
+ if weight:facts.append(f"Her listed weight is {weight}.")
+ if waist:facts.append(f"Her listed waist measurement is {waist}.")
+ if shoe_size:facts.append(f"Her listed shoe size is {shoe_size}.")
  if body_size:facts.append(f"The listed body measurements are {body_size}.")
- if position:facts.append(f"Within the group, {artist}'s position is {position}.")
- if nickname:facts.append(f"Fans also know {artist} as {nickname}.")
- if hobby:facts.append(f"Outside of performing, {artist} enjoys {hobby}.")
+ if position:facts.append(f"Her position in the group is {position}.")
+ if nickname:facts.append(f"Fans also call her {nickname}.")
+ if hobby:facts.append(f"Outside performing, she enjoys {hobby}.")
  if personality:facts.append(f"Her profile describes her as {personality}.")
  def relevant(title,description):
   blob=(title+" "+description).casefold()
@@ -497,28 +497,35 @@ def profile(filename, target_hint=""):
     sentences.append(f"Other reporting also noted that {detail2}")
    news_explanation=" ".join(sentences);facts.append(news_explanation)
   print(f"News research: collected={len(articles)}; top_issue={news_title or 'omitted'}; articles={news_article_count}; independent_outlets={len(news_outlets)}.")
- # Keep narration concise; measured speech duration determines the final video length (up to 50 seconds).
- # Prioritize core identity and useful profile facts, then add a concise news summary.
+ # Build a concise intro, reserve room for the leading news issue, then add extra profile facts.
  news_fact=facts[-1] if news_explanation else ""
  base_facts=facts[:-1] if news_explanation else facts
- preferred=base_facts[:]
- # Avoid overloading the narration with secondary measurements when a news item exists.
- if news_fact:
-  preferred=base_facts[:8]
-  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",news_fact) if x.strip()]
-  compact_news=" ".join(news_sentences[:2])
-  preferred.append(compact_news)
+ intro_facts=base_facts[:5]
+ extra_facts=base_facts[5:]
  narration_parts=[]
  word_budget=72
- for sentence in preferred:
+ def add_if_fits(sentence, force=False):
   candidate=" ".join(narration_parts+[sentence])
-  if len(candidate.split())<=word_budget:
+  if len(candidate.split())<=word_budget or (force and not narration_parts):
    narration_parts.append(sentence)
-  elif not narration_parts:
-   narration_parts.append(" ".join(sentence.split()[:word_budget]))
-   break
+   return True
+  return False
+ for sentence in intro_facts:
+  add_if_fits(sentence)
+ if news_fact:
+  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",news_fact) if x.strip()]
+  # Keep the main issue and its key verified explanation ahead of secondary profile trivia.
+  compact_news=" ".join(news_sentences[:2])
+  if not add_if_fits(compact_news):
+   # Shorten only the news wording if needed; retain the issue rather than dropping it.
+   compact_news=" ".join(news_sentences[:1])
+   if not add_if_fits(compact_news):
+    compact_news="The main recent story is "+(news_title or "a widely covered development")+"."
+    add_if_fits(compact_news)
+ for sentence in extra_facts:
+  add_if_fits(sentence)
  narration=" ".join(narration_parts)
- print(f"Narration budget: {len(narration.split())} words; target video maximum: 50 seconds.")
+ print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
  for item in articles:
