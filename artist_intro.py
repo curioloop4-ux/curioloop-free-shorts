@@ -80,7 +80,55 @@ Title max 85 chars. tags array 4-8 strings."""
   except (KeyError,IndexError,ValueError) as e:
    errors.append(f"{model}: invalid response ({type(e).__name__})")
    print(f"Gemini response from {model} was invalid; trying fallback.")
- raise RuntimeError("All Gemini profile models failed: "+"; ".join(errors))
+ # Offline fallback: known filename aliases can still produce an intro when Gemini is rate-limited.
+ aliases = {
+  "eunha":("EUNHA","VIVIZ"), "은하":("EUNHA","VIVIZ"),
+  "sinb":("SINB","VIVIZ"), "신비":("SINB","VIVIZ"),
+  "umji":("UMJI","VIVIZ"), "엄지":("UMJI","VIVIZ"),
+  "karina":("KARINA","aespa"), "카리나":("KARINA","aespa"),
+  "ningning":("NINGNING","aespa"), "닝닝":("NINGNING","aespa"),
+  "winter":("WINTER","aespa"), "윈터":("WINTER","aespa"),
+  "giselle":("GISELLE","aespa"), "지젤":("GISELLE","aespa"),
+  "jennie":("JENNIE","BLACKPINK"), "제니":("JENNIE","BLACKPINK"),
+  "lisa":("LISA","BLACKPINK"), "리사":("LISA","BLACKPINK"),
+  "jisoo":("JISOO","BLACKPINK"), "지수":("JISOO","BLACKPINK"),
+  "rose":("ROSÉ","BLACKPINK"), "로제":("ROSÉ","BLACKPINK"),
+  "sakura":("SAKURA","LE SSERAFIM"), "사쿠라":("SAKURA","LE SSERAFIM"),
+  "chaewon":("CHAEWON","LE SSERAFIM"), "채원":("CHAEWON","LE SSERAFIM"),
+  "yunjin":("YUNJIN","LE SSERAFIM"), "윤진":("YUNJIN","LE SSERAFIM"),
+  "kazuha":("KAZUHA","LE SSERAFIM"), "카즈하":("KAZUHA","LE SSERAFIM"),
+  "eunchae":("EUNCHAE","LE SSERAFIM"), "은채":("EUNCHAE","LE SSERAFIM"),
+  "wonyoung":("WONYOUNG","IVE"), "원영":("WONYOUNG","IVE"),
+  "yujin":("YUJIN","IVE"), "유진":("YUJIN","IVE"),
+  "rei":("REI","IVE"), "레이":("REI","IVE"),
+  "liz":("LIZ","IVE"), "리즈":("LIZ","IVE"),
+  "leeseo":("LEESEO","IVE"), "이서":("LEESEO","IVE"),
+  "gaeul":("GAEUL","IVE"), "가을":("GAEUL","IVE"),
+  "tzuyu":("TZUYU","TWICE"), "쯔위":("TZUYU","TWICE"),
+  "nayeon":("NAYEON","TWICE"), "나연":("NAYEON","TWICE"),
+  "sana":("SANA","TWICE"), "사나":("SANA","TWICE"),
+  "momo":("MOMO","TWICE"), "모모":("MOMO","TWICE"),
+  "yuqi":("YUQI","(G)I-DLE"), "우기":("YUQI","(G)I-DLE"),
+  "haerin":("HAERIN","NewJeans"), "해린":("HAERIN","NewJeans"),
+  "natty":("NATTY","KISS OF LIFE"), "나띠":("NATTY","KISS OF LIFE"),
+  "nancy":("NANCY","MOMOLAND"), "낸시":("NANCY","MOMOLAND"),
+  "kwon eunbi":("KWON EUNBI","Solo"), "권은비":("KWON EUNBI","Solo")
+ }
+ stem=Path(filename).stem.casefold()
+ matches=[v for k,v in aliases.items() if k in stem]
+ # Prefer the longest alias to avoid matching a short token inside another name.
+ if matches:
+  artist,group=sorted(matches,key=lambda v:len(v[0]),reverse=True)[0]
+  narration=(f"Meet {artist}, a performer from {group}. In this spotlight, the focus is on the energy, "
+   f"stage presence, and expressive details that make this performance memorable. Watch the way "
+   f"{artist} connects movement with the rhythm and brings confidence to every moment. "
+   f"This introduction celebrates the performance itself and offers a quick look at the artist "
+   f"for fans discovering or revisiting {artist}.")
+  print(f"Gemini unavailable; generated a safe local artist profile for {artist} ({group}).")
+  return {"artist":artist,"group":group,"narration":narration,
+   "title":f"{artist} | {group} Artist Spotlight #Shorts",
+   "tags":[artist,group,"K-pop","artist spotlight","performance","fancam"]}
+ raise RuntimeError("All Gemini profile models failed and no safe filename alias matched: "+"; ".join(errors))
 
 def render(src,p,hist):
  length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
