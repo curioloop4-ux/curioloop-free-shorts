@@ -279,7 +279,7 @@ def profile(filename, target_hint=""):
  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
   for pattern in birth_patterns:
    m=re.search(pattern,document["text"],re.I)
-   if m:birth=re.sub(r"\\s+","",m.group(1));break
+   if m:birth=re.sub(r"\s+","",m.group(1));break
   if birth:break
  if birth and re.fullmatch(r"\d{4}\.\d{1,2}\.\d{1,2}",birth):
   birth=birth.replace(".","-")
