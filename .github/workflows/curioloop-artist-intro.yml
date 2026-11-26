@@ -14,8 +14,11 @@ on:
         default: false
         type: boolean
   schedule:
-    # Korea Standard Time: 23:00, 02:00, 05:00 (UTC 14:00, 17:00, 20:00)
-    - cron: "0 14,17,20 * * *"
+    # Korea Standard Time: 02:00, 03:40, 05:20, 07:00 (UTC 17:00, 18:40, 20:20, 22:00)
+    - cron: "0 17 * * *"
+    - cron: "40 18 * * *"
+    - cron: "20 20 * * *"
+    - cron: "0 22 * * *"
 
 permissions:
   contents: write
