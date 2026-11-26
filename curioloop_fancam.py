@@ -335,6 +335,9 @@ def parse_gemini_json(response, task_name):
     except (KeyError, IndexError, TypeError, ValueError) as exc:
         raise RuntimeError(f"Gemini {task_name} response did not contain text.") from exc
     cleaned = re.sub(r"^\s*```(?:json)?\s*|\s*```\s*$", "", raw.strip(), flags=re.IGNORECASE)
+    # Gemini occasionally appends a stray suffix (e.g. 136.7k) to a numeric
+    # timestamp. Strip only a trailing k immediately before JSON delimiters.
+    cleaned = re.sub(r"(?<=\d)k(?=\s*[,}\]])", "", cleaned, flags=re.IGNORECASE)
     try:
         value = json.loads(cleaned)
         if isinstance(value, dict):
@@ -553,7 +556,14 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     return outputs
 
 def identify_artist(filename):
-    value = filename.casefold()
+    value = Path(filename).stem.casefold()
+    # Explicit high-priority aliases for common Latin/Korean filename variants.
+    if any(token in value for token in ("blackpink jennie", "jennie", "제니")):
+        return "JENNIE", "BLACKPINK", [
+            "Jennie", "BLACKPINK Jennie", "Jennie fancam", "BLACKPINK fancam",
+            "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+            "female idol", "Jennie performance", CHANNEL_BRAND, "Shorts"
+        ]
     if any(token in value for token in ("사쿠라", "sakura", "miyawaki")):
         return "SAKURA", "LE SSERAFIM", [
             "Sakura", "LE SSERAFIM Sakura", "Sakura fancam", "LE SSERAFIM fancam",
