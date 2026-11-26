@@ -51,6 +51,16 @@ def download(drive,item):
  if not p.exists() or not p.stat().st_size:raise RuntimeError("Empty Drive download")
  return p
 def profile(filename):
+ stem=Path(filename).stem.casefold()
+ if "eunha" in stem or "은하" in stem:
+  narration=("Meet Eunha, born Jung Eun-bi in 1997. She debuted in January 2015 as a member of GFRIEND, "
+   "then returned to the stage in 2022 as part of VIVIZ with SinB and Umji. Known for her clear, expressive "
+   "vocals, she has also contributed to drama soundtracks. In October 2026, the trio signed with UNCORE, "
+   "while their future group name remains under discussion. In November, they won a court ruling over unpaid "
+   "earnings from their former agency.")
+  return {"artist":"EUNHA","group":"GFRIEND / VIVIZ","narration":narration,
+   "title":"EUNHA | Artist Spotlight #Shorts",
+   "tags":["EUNHA","GFRIEND","VIVIZ","UNCORE","K-pop","artist spotlight","Shorts"]}
  prompt=f"""Source filename: {Path(filename).stem}
 Return JSON only with artist, group, narration, title, tags.
 Identify the artist only from clear filename clues, never face recognition. If unclear return artist "Unknown Artist".
@@ -202,7 +212,7 @@ def render(src,p,hist):
  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,"
- f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=8,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=1,Outline=1,Shadow=0,Alignment=2,MarginL=90,MarginR=90,MarginV=340'[v1];"
+ f"subtitles=filename='{sub}':charenc=UTF-8:fontsdir=/usr/share/fonts/truetype/dejavu:force_style='FontName=DejaVu Sans,FontSize=32,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=1,Outline=2,Shadow=0,Alignment=2,MarginL=90,MarginR=90,MarginV=320'[v1];"
  "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v];[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
@@ -222,7 +232,11 @@ def main():
  drive,yt=services();folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
  done={x.get("drive_file_id") for x in h["processed"]}
+ target=os.getenv("TARGET_ARTIST","").strip().casefold()
  candidates=[x for x in scan(drive,folder) if x["id"] not in done]
+ if target:
+  candidates=[x for x in candidates if target in x["name"].casefold() or (target=="eunha" and "은하" in x["name"])]
+  if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested artist: {target}")
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
  item=candidates[0];print("Selected Drive source:",item["name"])
  src=download(drive,item);p=profile(item["name"]);out=render(src,p,h)
