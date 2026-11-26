@@ -222,16 +222,22 @@ def main():
  drive,yt=services();folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
  done={x.get("drive_file_id") for x in h["processed"]}
- target=os.getenv("TARGET_ARTIST","").strip().casefold()
+ target=os.getenv("TARGET_ARTIST","").strip()
  candidates=[x for x in scan(drive,folder) if x["id"] not in done]
- if target:
-  aliases={"wonyoung":["wonyoung","장원영","원영"],"eunha":["eunha","은하"]}
-  needles=aliases.get(target,[target])
-  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
-  if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested artist: {target}")
  if not candidates:raise RuntimeError("No new unprocessed Drive video")
+ # Manual test may prioritize one requested artist; scheduled runs leave TARGET_ARTIST empty.
+ if target:
+  aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
+  needles=aliases.get(target.casefold(),[target.casefold()])
+  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
+  if not candidates:raise RuntimeError(f"No new unprocessed Drive video found for requested test artist: {target}")
+ else:
+  import random
+  random.shuffle(candidates)
  item=candidates[0];print("Selected Drive source:",item["name"])
- src=download(drive,item);p=profile(item["name"],target_hint=os.getenv("TARGET_ARTIST","").strip())
+ src=download(drive,item)
+ # Identify the artist from the selected filename first; then research that identity via Google Search grounding.
+ p=profile(item["name"],target_hint=target)
  research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
  research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
  print("Verified research saved:",research_path.name)
