@@ -304,6 +304,9 @@ def profile(filename, target_hint=""):
    if news_title: break
  except Exception as e:
   print("Recent news search unavailable:",type(e).__name__,str(e)[:160])
+ for item in web_facts[:2]:
+  spoken=item.get("spoken","").strip()
+  if spoken and len(spoken)>35:facts.append(spoken.rstrip(".")+" .")
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
