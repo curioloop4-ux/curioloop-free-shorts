@@ -205,18 +205,22 @@ def profile(filename, target_hint=""):
   birth=birth.replace(".","-")
  # Extract physical profile data and personal characteristics only when explicitly labelled.
  def labelled_number(labels, unit_pattern):
-  # NamuWiki profile tables are commonly serialized as ||label||value||.
-  # Also accept newline/space-separated labels and colon-style biographies.
-  for label in labels:
-   escaped=re.escape(label)
-   patterns=[
-    r"(?:^|\|\|)\s*"+escaped+r"\s*\|\|\s*("+unit_pattern+r")",
-    r"(?:^|\n)\s*"+escaped+r"\s*(?::|：)\s*("+unit_pattern+r")",
-    r"(?:^|\s)"+escaped+r"\s*(?:\|\|?|:|：)?\s*("+unit_pattern+r")"
-   ]
-   for pattern in patterns:
-    m=re.search(pattern,raw,re.I)
-    if m:return re.sub(r"\s+","",m.group(1))
+  # NamuWiki raw documents vary: profile cells may use || delimiters,
+  # HTML tables, newlines, or plain label/value text. Search raw and cleaned
+  # text, accepting only explicitly labelled values with measurement units.
+  readable=plain(raw)
+  for source in (raw,readable):
+   for label in labels:
+    escaped=re.escape(label)
+    patterns=[
+     r"(?:^|\\|\\|)\\s*"+escaped+r"\\s*\\|\\|\\s*("+unit_pattern+r")",
+     r"(?:^|\\n)\\s*"+escaped+r"\\s*(?::|：|\\|\\|?)\\s*("+unit_pattern+r")",
+     r"(?:^|\\s)"+escaped+r"\\s*(?:\\|\\|?|:|：)?\\s*("+unit_pattern+r")",
+     r"(?:^|\\s)"+escaped+r"[^0-9]{0,100}("+unit_pattern+r")"
+    ]
+    for pattern in patterns:
+     m=re.search(pattern,source,re.I)
+     if m:return re.sub(r"\\s+","",m.group(1))
   return None
  height=labelled_number(["신장","키","height"],r"\d{2,3}(?:\.\d+)?\s*(?:cm|센티미터)")
  weight=labelled_number(["몸무게","체중","weight"],r"\d{2,3}(?:\.\d+)?\s*(?:kg|킬로그램)")
