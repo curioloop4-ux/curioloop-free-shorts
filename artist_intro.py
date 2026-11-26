@@ -576,7 +576,7 @@ def profile(filename, target_hint=""):
  narration=" ".join(narration_parts)
  if len(narration.split())<95:
   raise RuntimeError(f"Research produced only {len(narration.split())} narration words; refusing to publish an under-researched short intro (minimum 95 words).")
- print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
+ print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 65 seconds.")
  sources=[]
  if source_base and raw:
   source_url=source_base+"/w/"+quote(chosen,safe="")
