@@ -252,8 +252,7 @@ def profile(filename, target_hint=""):
  if hobby:facts.append(f"One profile detail is their {hobby}.")
  if personality:facts.append(f"They are described for {personality}.")
  if news_title:facts.append(f"Recent news: {news_title}.")
- else:facts.append("Follow the artist's official channels for their latest announcements.")
- facts.append("Which detail about this artist did you already know?")
+ # No generic filler is added when there is no verified recent news.
  narration=" ".join(facts)
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"NamuWiki: {chosen}","url":source_url}]
@@ -304,8 +303,7 @@ def create_background_music(path, seconds=36, sample_rate=22050):
  print("Original background music generated:",path.name,"duration:",seconds,"seconds")
 
 def render(src,p,hist):
- length=36.; intro=1.5; footage=length-intro; source_len=dur(src)
- if source_len<footage+1:raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least 36.5s")
+ intro=1.5; source_len=dur(src)
  audio=W/"voice.mp3";bgm=W/"background_music.wav";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
   # Generate each spoken sentence separately so subtitle timing is based on
@@ -327,10 +325,7 @@ def render(src,p,hist):
   concat_list.write_text(chr(10).join("file '" + str(x.resolve()).replace("\\","/") + "'" for x in parts) + chr(10), encoding="utf-8")
   run(["ffmpeg","-y","-f","concat","-safe","0","-i",str(concat_list),"-c:a","libmp3lame","-q:a","3",str(audio)])
   voice_seconds=dur(audio)
-  if voice_seconds<18:
-   print(f"NOTICE: verified profile produced a concise {voice_seconds:.1f}s narration; the remaining video continues with original background music.")
-  else:
-   print(f"Validated narration audio: {voice_seconds:.1f}s for a 36s video.")
+  print(f"Measured narration duration: {voice_seconds:.1f}s.")
   def stamp(seconds):
    ms=max(0,int(round(seconds*1000)))
    hh,ms=divmod(ms,3600000); mm,ms=divmod(ms,60000); ss,ms=divmod(ms,1000)
@@ -363,6 +358,13 @@ def render(src,p,hist):
   print("Sentence-synced subtitle file ready:",vtt.name,"segments:",len(sentences))
   print("Subtitle preview:",subtitle[:400].replace("\n"," | "))
  asyncio.run(make_voice_and_subtitles())
+ # Runtime follows spoken content: title + narration + short musical ending.
+ voice_seconds=dur(audio)
+ length=min(36.0,max(10.0,intro+voice_seconds+1.5))
+ footage=length-intro
+ if source_len<footage+1:
+  raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least {footage+1:.1f}s for this {length:.1f}s intro")
+ print(f"Dynamic video duration: {length:.1f}s (narration {voice_seconds:.1f}s + title and ending).")
  create_background_music(bgm,length)
  # Select a different still-frame timestamp for repeat appearances of the same artist.
  used=hist.setdefault("opening_frames",{}).setdefault(p["artist"].casefold(),[])
@@ -380,7 +382,7 @@ def render(src,p,hist):
  for i,cue in enumerate(cue_data):
   cue_file=W/f"subtitle_{i:03d}.txt"
   cue_file.write_text(cue["text"],encoding="utf-8")
-  cue_start=max(1.5,float(cue["start"]));cue_end=min(36.0,float(cue["end"]))
+  cue_start=max(1.5,float(cue["start"]));cue_end=min(length,float(cue["end"]))
   if cue_end<=cue_start: continue
   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
   subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=40:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:box=1:boxcolor=black@0.58:boxborderw=18:text_align=center:x=(w-text_w)/2:y=h-text_h-340:line_spacing=8:enable='{enable}'")
@@ -391,12 +393,12 @@ def render(src,p,hist):
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
  f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[v];"
- "[2:a]adelay=1500|1500,apad,atrim=duration=36[voice];"
- "[3:a]volume=0.16,afade=t=in:st=0:d=1.2,afade=t=out:st=33:d=3,atrim=duration=36[bgm];"
+ f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
+ f"[3:a]volume=0.16,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0.0,length-1.5):.3f}:d=1.5,atrim=duration={length:.3f}[bgm];"
  "[voice][bgm]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]")
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-i",str(bgm),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-i",str(bgm),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
- if (int(check["width"]),int(check["height"]))!=(1080,1800) or not 30<=dur(out)<=40:raise RuntimeError("Output validation failed")
+ if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
 def publish(yt,out,p,source):
  brand=os.getenv("FANCAMVERSE_CHANNEL_BRAND","CurioLoop").strip()
