@@ -497,7 +497,7 @@ def profile(filename, target_hint=""):
     sentences.append(f"Other reporting also noted that {detail2}")
    news_explanation=" ".join(sentences);facts.append(news_explanation)
   print(f"News research: collected={len(articles)}; top_issue={news_title or 'omitted'}; articles={news_article_count}; independent_outlets={len(news_outlets)}.")
- # Keep the spoken script within the 45-second Short limit.
+ # Keep narration concise; measured speech duration determines the final video length (up to 50 seconds).
  # Prioritize core identity and useful profile facts, then add a concise news summary.
  news_fact=facts[-1] if news_explanation else ""
  base_facts=facts[:-1] if news_explanation else facts
@@ -505,11 +505,11 @@ def profile(filename, target_hint=""):
  # Avoid overloading the narration with secondary measurements when a news item exists.
  if news_fact:
   preferred=base_facts[:8]
-  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\\s+",news_fact) if x.strip()]
+  news_sentences=[x.strip() for x in re.split(r"(?<=[.!?])\s+",news_fact) if x.strip()]
   compact_news=" ".join(news_sentences[:2])
   preferred.append(compact_news)
  narration_parts=[]
- word_budget=96
+ word_budget=72
  for sentence in preferred:
   candidate=" ".join(narration_parts+[sentence])
   if len(candidate.split())<=word_budget:
@@ -518,7 +518,7 @@ def profile(filename, target_hint=""):
    narration_parts.append(" ".join(sentence.split()[:word_budget]))
    break
  narration=" ".join(narration_parts)
- print(f"Narration budget: {len(narration.split())} words; target video maximum: 45 seconds.")
+ print(f"Narration budget: {len(narration.split())} words; target video maximum: 50 seconds.")
  source_url=(source_base or "https://namu.moe")+"/w/"+quote(chosen,safe="")
  sources=[{"title":f"Profile: {chosen}","url":source_url}]
  for item in articles:
@@ -666,7 +666,7 @@ def render(src,p,hist):
  asyncio.run(make_voice_and_subtitles())
  # Runtime follows spoken content: title + narration + brief ending.
  voice_seconds=dur(audio)
- length=min(45.0,max(10.0,intro+voice_seconds+1.5))
+ length=min(50.0,max(10.0,intro+voice_seconds+1.5))
  footage=length-intro
  if source_len<footage+1:
   raise RuntimeError(f"Source too short ({source_len:.1f}s); need at least {footage+1:.1f}s for this {length:.1f}s intro")
