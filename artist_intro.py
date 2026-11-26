@@ -3,6 +3,7 @@ import unicodedata
 from datetime import datetime,timezone
 from pathlib import Path
 import requests,edge_tts,time
+from PIL import Image, ImageDraw, ImageFont
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload,MediaIoBaseDownload
@@ -731,6 +732,21 @@ def render(src,p,hist):
  name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
  font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+ # Matching polished CTA end card for artist-introduction Shorts.
+ cta=W/"cta_artist_intro.png"
+ card=Image.new("RGBA",(1080,1800),(0,0,0,0));draw=ImageDraw.Draw(card)
+ regular=ImageFont.truetype(bold,38);heavy=ImageFont.truetype(bold,46)
+ draw.rounded_rectangle((58,1325,1022,1695),radius=38,fill=(12,17,34,224),outline=(255,255,255,95),width=3)
+ draw.rounded_rectangle((94,1358,986,1370),radius=6,fill=(90,220,255,245))
+ def center_card(text,y,face,fill):
+  b=draw.textbbox((0,0),text,font=face)
+  draw.text(((1080-(b[2]-b[0]))/2,y),text,font=face,fill=fill)
+ center_card("WHO SHOULD WE FEATURE NEXT?",1400,regular,(205,220,255,255))
+ center_card("COMMENT YOUR PICK",1460,heavy,(255,255,255,255))
+ center_card("SUBSCRIBE FOR MORE K-POP",1538,regular,(110,225,255,255))
+ center_card("NEW K-POP SHORTS EVERY DAY",1610,ImageFont.truetype(bold,23),(185,195,215,255))
+ card.save(cta)
+ cta_start=max(1.5,length-3.0)
  cue_data=json.loads((W/"subtitle_cues.json").read_text(encoding="utf-8"))
  subtitle_filters=[]
  for i,cue in enumerate(cue_data):
@@ -746,7 +762,9 @@ def render(src,p,hist):
  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
  f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB[v1];"
- f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[v];")
+ f"[v0][v1]concat=n=2:v=1:a=0,format=yuv420p{''.join(subtitle_filters)}[vbase];"
+ fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
+ fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
  # Retain the source performance sound at a reduced level under the narration.
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
@@ -756,7 +774,7 @@ def render(src,p,hist):
   fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
  else:
   fc+="[voice]anull[a]"
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
