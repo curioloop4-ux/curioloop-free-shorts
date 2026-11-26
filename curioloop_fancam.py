@@ -880,6 +880,15 @@ def main():
             state["complete"] = True
 
     files = list_source_videos(drive, folder_id)
+    coordinated_source_id = os.getenv("FANCAMVERSE_COORDINATED_SOURCE_ID", "").strip()
+    if coordinated_source_id:
+        files = [item for item in files if item["id"] == coordinated_source_id]
+        if not files:
+            raise RuntimeError(
+                "The coordinated artist-intro source is no longer available in the Drive inbox; "
+                "refusing to publish a fancam from a different original."
+            )
+        print("Using the exact Drive original selected for the preceding artist intro:", files[0]["name"])
     source_filter = os.getenv("FANCAMVERSE_SOURCE_FILTER", "").strip()
     if source_filter:
         raw_terms = [term.strip() for term in re.split(r"[,;]", source_filter) if term.strip()]
