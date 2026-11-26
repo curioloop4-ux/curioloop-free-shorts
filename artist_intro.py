@@ -57,13 +57,13 @@ The explicitly requested target artist is: {target_hint!r}. Treat this target as
 You MUST use Google Search grounding for current, verifiable research. Do not rely on memory alone.
 Use the explicitly requested target to resolve the artist when provided; otherwise identify the person only from clear filename clues. Never identify by face.
 Return JSON only with these keys:
-artist (stage name), group (current/relevant group or Solo), narration (English, 55-70 words),
+artist (official English stage name/transliteration for on-screen text; do not return Hangul unless no official Romanized form exists), group (official English group name or Solo), narration (English, 55-70 words),
 title (max 85 chars), tags (4-8 strings), sources (array of 3-6 objects with title and url).
 Research structure for the narration:
 1) Artist profile: full/stage name and verified birth date/year, plus debut group/date(s) when reliably sourced.
 2) Key characteristics: documented performance strengths, roles, notable work or songwriting credits.
 3) Latest update: a relevant dated update from the last 12 months when available; otherwise use a well-established career milestone and do not pretend it is recent.
-Use official agency/artist/group sources first, then reputable established media. Never invent facts, dates, positions, credits, awards, or releases.
+Use the Korean target name and filename as search identifiers, but render the artist name, group name, title, narration, and subtitles in their official English/Romanized forms. Use official agency/artist/group sources first, then reputable established media. Never invent facts, dates, positions, credits, awards, or releases.
 Every factual claim in narration must be supported by at least one returned source URL. Exclude uncertain claims rather than guessing.
 If the requested target and filename clues cannot be reconciled confidently, return artist "Unknown Artist".
 The narration must be natural spoken English, suitable for a 30-36 second voiceover.
