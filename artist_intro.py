@@ -158,7 +158,7 @@ def render(src,p,hist):
  fc=("[0:v]scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,trim=duration=1.5,setpts=PTS-STARTPTS,"
  f"drawtext=fontfile={bold}:text='{name}':fontcolor=white:fontsize=76:borderw=3:bordercolor=black@0.8:x=(w-text_w)/2:y=h-390,"
  f"drawtext=fontfile={font}:text='{group}':fontcolor=white:fontsize=38:borderw=2:bordercolor=black@0.8:x=(w-text_w)/2:y=h-300[v0];"
- f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,"
+ f"[1:v]trim=start={start:.3f}:duration={footage:.3f},setpts=PTS-STARTPTS,scale=1080:1800:force_original_aspect_ratio=increase,crop=1080:1800,setsar=1,fps=30,format=yuv420p,settb=AVTB,"
  f"subtitles='{sub}':force_style='FontName=DejaVu Sans,FontSize=22,PrimaryColour=&H00FFFFFF,OutlineColour=&H80000000,BackColour=&H50000000,BorderStyle=3,Outline=1,Alignment=2,MarginL=90,MarginR=90,MarginV=250'[v1];"
  "[v0][v1]concat=n=2:v=1:a=0,format=yuv420p[v];[2:a]adelay=1500|1500,apad,atrim=duration=36[a]")
  run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t","36","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
