@@ -134,6 +134,10 @@ def profile(filename, target_hint=""):
     rr=session.get(page_url,headers=headers,timeout=40)
    rr.raise_for_status()
    candidate=rr.text.strip()
+   if "<html" in candidate[:500].lower():
+    from html import unescape
+    candidate=re.sub(r"<(script|style)\\b[^>]*>.*?</\\1>"," ",candidate,flags=re.I|re.S)
+    candidate=unescape(re.sub(r"<[^>]+>"," ",candidate))
    if len(candidate)>=300 and "문서를 찾을 수 없습니다" not in candidate:
     raw=candidate;source_base=base;break
    errors.append(f"{base}: article response was empty or too short")
