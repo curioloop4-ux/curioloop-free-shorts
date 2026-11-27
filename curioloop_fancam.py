@@ -975,6 +975,17 @@ def main():
     output_only = os.getenv("FANCAMVERSE_OUTPUT_ONLY", "false").lower() in {"1", "true", "yes"}
     privacy = os.getenv("FANCAMVERSE_PRIVACY_STATUS", "private").lower()
     publish_time = os.getenv("FANCAMVERSE_PUBLISH_TIME_KST", "").strip()
+    trigger_event = os.getenv("FANCAMVERSE_TRIGGER_EVENT", "unknown").strip()
+    trigger_schedule = os.getenv("FANCAMVERSE_TRIGGER_SCHEDULE", "").strip()
+    print(
+        f"Upload trigger: event={trigger_event}, schedule={trigger_schedule or 'manual/unspecified'}, "
+        f"privacy={privacy}, publish_slot_KST={publish_time or 'none'}"
+    )
+    if trigger_event == "schedule":
+        if privacy != "public":
+            raise RuntimeError("Scheduled upload must be configured as public; refusing private scheduled upload.")
+        if not publish_time:
+            raise RuntimeError("Scheduled upload has no recognized KST publish slot; refusing ambiguous publication.")
     publish_at = next_publish_at_kst(publish_time) if publish_time and not output_only else None
     if publish_at:
         privacy = "private"
@@ -1149,7 +1160,7 @@ def main():
             json.dumps(history, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8"
         )
-        print(f"Recorded successful upload {video_id}; progress saved immediately.")
+        print(f"Recorded YouTube upload acknowledgement {video_id}; progress saved to prevent duplicate upload.")
 
     if output_only:
         print("OUTPUT_ONLY run finished; no uploads or progress changes were made.")
