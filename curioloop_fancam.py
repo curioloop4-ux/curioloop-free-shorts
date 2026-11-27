@@ -1053,13 +1053,15 @@ def main():
             for candidate in identifiable
         }
         artist_cycle = list(history.get("artist_cycle", []))
-        # Migrate prior successful uploads into the current rotation cycle.
-        for source_id, prior_state in source_state.items():
-            if prior_state.get("used_clip_indices"):
-                prior_name = prior_state.get("name", "")
-                prior_artist, prior_group, _ = identify_artist(prior_name)
-                if prior_artist and prior_artist.casefold() not in artist_cycle:
-                    artist_cycle.append(prior_artist.casefold())
+        # One-time migration only. Rebuilding this list on every run would
+        # prevent the rotation cycle from ever resetting after all artists had a turn.
+        if "artist_cycle" not in history:
+            for prior_state in source_state.values():
+                if prior_state.get("used_clip_indices"):
+                    prior_name = prior_state.get("name", "")
+                    prior_artist, prior_group, _ = identify_artist(prior_name)
+                    if prior_artist and prior_artist.casefold() not in artist_cycle:
+                        artist_cycle.append(prior_artist.casefold())
         available_artist_keys = set(artist_by_source.values())
         unfeatured_artist_keys = available_artist_keys - set(artist_cycle)
         if unfeatured_artist_keys:
