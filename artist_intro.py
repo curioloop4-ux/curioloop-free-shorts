@@ -274,6 +274,31 @@ def profile(filename, target_hint=""):
     if len(profile_documents)>=13:break
   except Exception as e:print("Profile web search unavailable:",type(e).__name__)
   time.sleep(0.6)
+ # Add Korean and English Wikipedia as independent biography fallbacks. Search
+ # with both the stage name and group to avoid same-name collisions.
+ for wiki_lang,wiki_query in [("ko",f"{target} {group} 가수"),("en",f"{artist} {group} singer")]:
+  try:
+   api=f"https://{wiki_lang}.wikipedia.org/w/api.php"
+   found=session.get(api,params={"action":"query","list":"search","srsearch":wiki_query,"srlimit":5,"format":"json"},timeout=15)
+   found.raise_for_status()
+   for hit in found.json().get("query",{}).get("search",[]):
+    page_id=hit.get("pageid")
+    if not page_id:continue
+    detail=session.get(api,params={"action":"query","pageids":page_id,"prop":"extracts","explaintext":1,"exsectionformat":"plain","format":"json"},timeout=15)
+    detail.raise_for_status()
+    page=detail.json().get("query",{}).get("pages",{}).get(str(page_id),{})
+    extract=plain(page.get("extract",""))
+    title=plain(page.get("title",""))
+    if len(extract)<300:continue
+    identity=(target.casefold() in (title+" "+extract).casefold() or artist.casefold() in (title+" "+extract).casefold())
+    group_match=group=="Group affiliation not confirmed" or group.casefold() in (title+" "+extract).casefold()
+    if not identity or not group_match:continue
+    url=f"https://{wiki_lang}.wikipedia.org/?curid={page_id}"
+    if not any(x["url"]==url for x in profile_documents):
+     profile_documents.append({"title":f"Wikipedia ({wiki_lang}): {title}","url":url,"text":extract[:30000],"priority":1})
+     print(f"Wikipedia biography retrieved: {wiki_lang} / {title} ({len(extract)} characters).")
+    break
+  except Exception as e:print(f"Wikipedia biography search unavailable ({wiki_lang}):",type(e).__name__)
  # Keep a compact audit trail; the individual values are extracted below
  # only when the source explicitly labels the relevant attribute.
  web_facts=[{"title":x["title"],"url":x["url"]} for x in profile_documents[1:] if x.get("title") and x.get("url")]
@@ -370,8 +395,8 @@ def profile(filename, target_hint=""):
     if candidate in article_highlights:continue
     if re.search(r"나무위키|편집|문서|분류|각주|출처|틀:",candidate):continue
     article_highlights.append(candidate)
-    if len(article_highlights)>=5:break
-   if len(article_highlights)>=5:break
+    if len(article_highlights)>=12:break
+   if len(article_highlights)>=12:break
  # When the wiki page is blocked, recover biographical detail from independently
  # fetched public pages/snippets. Keep only substantial text tied to this artist.
  # Supplement sparse wiki sections with independently fetched profile pages.
@@ -381,7 +406,7 @@ def profile(filename, target_hint=""):
   return re.sub(r"[^가-힣a-z0-9]","",value.casefold())
  existing_highlight_keys={highlight_key(x) for x in article_highlights}
  for document in sorted(profile_documents,key=lambda x:x.get("priority",2)):
-  if len(article_highlights)>=7:break
+  if len(article_highlights)>=12:break
   if document.get("priority",2)==0:continue
   title=plain(document.get("title",""))
   detail=plain(document.get("text",""))
@@ -411,7 +436,7 @@ def profile(filename, target_hint=""):
     translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
     if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
    except Exception as e:print("Biography highlight translation unavailable; retaining other English source material:",type(e).__name__)
-  if len(translated_highlights)>=5:break
+  if len(translated_highlights)>=10:break
  print("Biography highlights extracted:",len(article_highlights),"; translated:",len(translated_highlights),"from NamuWiki and independent profile pages")
  print("PROFILE RESEARCH RESULT")
  print("Artist:",artist,"| Group:",group)
@@ -584,8 +609,8 @@ def profile(filename, target_hint=""):
  # Build a concise intro, reserve room for the leading news issue, then add extra profile facts.
  news_fact=facts[-1] if news_explanation else ""
  base_facts=facts[:-1] if news_explanation else facts
- intro_facts=base_facts[:5]
- extra_facts=base_facts[5:]
+ intro_facts=base_facts
+ extra_facts=[]
  narration_parts=[]
  word_budget=125
  def add_if_fits(sentence, force=False):
@@ -611,12 +636,12 @@ def profile(filename, target_hint=""):
  narration=" ".join(narration_parts)
  # Sparse research must not produce an unusably short video. Add a transparent
  # editorial bridge (not invented biography) only when verified facts are scarce.
- if len(narration.split())<55:
-  bridge=("This artist spotlight brings together publicly documented profile information, career context, and recent coverage. "
-          "Details that could not be confirmed across reliable sources are intentionally left out. "
-          "The aim is to give viewers a clear introduction without repeating rumors or presenting uncertain information as fact.")
-  narration=(narration+" "+bridge).strip()
-  print("Sparse-research narration bridge added; no unverified biographical claims were introduced.")
+ if len(narration.split())<75:
+  raise RuntimeError(
+   f"Insufficient verified biography for a 30-second intro: only {len(narration.split())} narration words "
+   f"from {len(profile_documents)} profile sources and {len(translated_highlights)} translated career highlights. "
+   "Research must be expanded; generic filler will not be used to reach the duration target."
+  )
  print(f"Research narration collected: {len(narration.split())} words; final acceptance is based on measured video duration (minimum 30 seconds).")
  print(f"Narration budget: {len(narration.split())} words; news included: {'yes' if news_fact and any(news_title and news_title.casefold() in x.casefold() for x in narration_parts) else 'priority news summary' if news_fact else 'no supported issue'}; target video maximum: 50 seconds.")
  sources=[]
