@@ -973,7 +973,7 @@ def publish(yt,out,p,source):
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
  returned_status=v.get("status") or {}
  returned_publish_at=returned_status.get("publishAt")
- if publish_at and (returned_status.get("privacyStatus")!="private" or returned_publish_at!=publish_at):
+ if publish_at and (returned_status.get("privacyStatus")!="private" or not returned_publish_at or datetime.fromisoformat(returned_publish_at.replace("Z","+00:00"))!=datetime.fromisoformat(publish_at.replace("Z","+00:00"))):
   raise RuntimeError(f"Artist-intro upload {v.get('id')} was accepted but scheduled publication was not confirmed (requested {publish_at}, returned {returned_publish_at}).")
  print(f"{'SCHEDULED '+publish_at if publish_at else privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"])
  return v["id"],("scheduled" if publish_at else privacy)
