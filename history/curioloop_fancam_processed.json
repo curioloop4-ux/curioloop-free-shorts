@@ -135,7 +135,37 @@
       "used_clip_indices": [
         5
       ]
+    },
+    "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch": {
+      "name": "블랙핑크 LISA 리사  직캠 FANCAM Ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 15.0,
+          "end": 40.0,
+          "hook": "Powerful dance moves on stage"
+        },
+        {
+          "start": 75.0,
+          "end": 100.0,
+          "hook": "Stunning stage presence and energy"
+        },
+        {
+          "start": 110.0,
+          "end": 135.0,
+          "hook": "Incredible performance and charisma"
+        },
+        {
+          "start": 155.0,
+          "end": 180.0,
+          "hook": "Epic finale dance moments"
+        }
+      ],
+      "used_clip_indices": [
+        1
+      ]
     }
   },
-  "last_source_id": "1jsRnlSlyyzFA4bc4Wb1LXvAxX64fRnBe"
+  "last_source_id": "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch"
 }
