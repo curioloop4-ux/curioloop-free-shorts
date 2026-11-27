@@ -1013,6 +1013,19 @@ def main():
     publish_time = os.getenv("FANCAMVERSE_PUBLISH_TIME_KST", "").strip()
     trigger_event = os.getenv("FANCAMVERSE_TRIGGER_EVENT", "unknown").strip()
     trigger_schedule = os.getenv("FANCAMVERSE_TRIGGER_SCHEDULE", "").strip()
+    schedule_slot_key = ""
+    if trigger_event == "schedule" and publish_time:
+        schedule_slot_key = (
+            datetime.now(ZoneInfo("Asia/Seoul")).date().isoformat()
+            + "|" + publish_time
+        )
+        completed_slots = history.setdefault("completed_schedule_slots", [])
+        if schedule_slot_key in completed_slots:
+            print(
+                f"Scheduled slot {schedule_slot_key} was already processed; "
+                "skipping this duplicate/fallback trigger."
+            )
+            return
     print(
         f"Upload trigger: event={trigger_event}, schedule={trigger_schedule or 'manual/unspecified'}, "
         f"privacy={privacy}, publish_slot_KST={publish_time or 'none'}"
@@ -1193,6 +1206,11 @@ def main():
         )
         history["last_source_id"] = item["id"]
         history["sources"] = source_state
+        if schedule_slot_key:
+            completed_slots = history.setdefault("completed_schedule_slots", [])
+            if schedule_slot_key not in completed_slots:
+                completed_slots.append(schedule_slot_key)
+                history["completed_schedule_slots"] = completed_slots[-90:]
         history["processed"] = [
             sid for sid, state in source_state.items() if state.get("complete")
         ][-2000:]
