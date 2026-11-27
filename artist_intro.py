@@ -952,8 +952,13 @@ def main():
  done_names={source_name_key(x.get("source_name","")) for x in h["processed"] if x.get("source_name")}
  target=os.getenv("TARGET_ARTIST","").strip()
  scanned=scan(drive,folder)
- candidates=[x for x in scanned if x["id"] not in done and (not x.get("md5Checksum") or x.get("md5Checksum") not in done_hashes) and source_name_key(x["name"]) not in done_names]
- print(f"New-source filter: {len(candidates)} candidates remain after ID, MD5, and normalized filename duplicate checks.")
+ # Keep prior-used originals eligible, but place them after all never-used sources.
+ candidates=scanned
+ def source_was_used(item):
+  return (item["id"] in done
+   or bool(item.get("md5Checksum") and item.get("md5Checksum") in done_hashes)
+   or source_name_key(item["name"]) in done_names)
+ print(f"Drive source pool: {len(candidates)} total; previously used originals will be fallback-only.")
  # Only choose sources that the companion fancam pipeline can identify too.
  from curioloop_fancam import identify_artist as identify_fancam_artist
  blocked=("김채원","chaewon")
@@ -966,7 +971,7 @@ def main():
    compatible.append(candidate)
  candidates=compatible
  print(f"Sources compatible with both intro and fancam pipelines: {len(candidates)}")
- if not candidates:raise RuntimeError("No new unprocessed Drive video")
+ if not candidates:raise RuntimeError("No compatible Drive video sources found")
  # Fail closed: random selection only considers filenames with a known artist and group.
  known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
  known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
@@ -984,22 +989,24 @@ def main():
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
   needles=aliases.get(target.casefold(),[target.casefold()])
   candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles) and identifiable(x)]
-  if not candidates:raise RuntimeError(f"No identifiable, unprocessed Drive video found for requested test artist: {target}")
+  if not candidates:raise RuntimeError(f"No identifiable Drive video found for requested test artist: {target}")
  else:
   candidates=[x for x in candidates if identifiable(x)]
   print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
-  if not candidates:raise RuntimeError("No unprocessed Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
+  if not candidates:raise RuntimeError("No Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
   recent_artist_keys=[x.get("source_artist_key") or x.get("artist","").casefold() for x in h["processed"][-2:]]
   diversified=[x for x in candidates if source_artist_key(x) not in recent_artist_keys]
   if diversified:
    candidates=diversified
    print("Recent-artist repeat prevention active; excluded artists:",", ".join(recent_artist_keys))
-  # No artist is permanently demoted: after recent-repeat filtering,
-  # preserve newest-first Drive order across all eligible artists.
-  # scan() already sorts by Drive createdTime descending. Keep that order:
-  # newest eligible source is always attempted first; fallback moves forward
-  # through the remaining newest-to-oldest candidates without random reshuffling.
-  print("Source selection order: newest eligible Drive uploads first.")
+  # Random selection is the default; every never-used original ranks ahead of all used ones.
+  import random
+  fresh_candidates=[x for x in candidates if not source_was_used(x)]
+  used_candidates=[x for x in candidates if source_was_used(x)]
+  random.shuffle(fresh_candidates)
+  random.shuffle(used_candidates)
+  candidates=fresh_candidates+used_candidates
+  print(f"Random source rotation: {len(fresh_candidates)} never-used first, {len(used_candidates)} previously-used fallback sources second.")
  # Retry another unused Drive original whenever research, download, rendering,
  # or validation fails. A source is not marked processed until YouTube accepts it.
  # This allows newly added Drive videos to act as same-run fallback candidates.
