@@ -22,7 +22,10 @@ WORK.mkdir(exist_ok=True)
 HISTORY = ROOT / os.getenv("FANCAMVERSE_HISTORY_FILE", "history/curioloop_fancam_processed.json")
 CHANNEL_BRAND = os.getenv("FANCAMVERSE_CHANNEL_BRAND", "CurioLoop").strip() or "CurioLoop"
 DRIVE_SCOPES = ["https://www.googleapis.com/auth/drive.readonly"]
-YOUTUBE_SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
+YOUTUBE_SCOPES = [
+    "https://www.googleapis.com/auth/youtube.readonly",
+    "https://www.googleapis.com/auth/youtube.upload",
+]
 SUPPORTED = {"video/mp4", "video/quicktime", "video/x-msvideo", "video/webm", "video/x-matroska"}
 SHORTS_PER_SOURCE = 5
 MIN_SHORT_SECONDS = 25
@@ -910,8 +913,41 @@ def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     return {"video_id": video_id, "verified": verified, "privacy": returned_privacy,
             "channel_title": returned_channel}
 
+def verify_upload_channel(youtube):
+    """Fail closed before uploading unless OAuth is connected to the intended channel."""
+    expected = os.getenv("FANCAMVERSE_EXPECTED_CHANNEL_TITLE", CHANNEL_BRAND).strip()
+    if not expected:
+        raise RuntimeError("Expected YouTube channel title is empty; refusing upload.")
+    response = youtube.channels().list(part="id,snippet", mine=True, maxResults=5).execute()
+    channels = response.get("items", [])
+    if len(channels) != 1:
+        names = [((item.get("snippet") or {}).get("title") or "unknown") for item in channels]
+        raise RuntimeError(
+            "Could not uniquely verify the authenticated YouTube channel "
+            f"(found {len(channels)}: {names}); refusing upload."
+        )
+    channel = channels[0]
+    snippet = channel.get("snippet") or {}
+    actual = (snippet.get("title") or "").strip()
+    channel_id = (channel.get("id") or "").strip()
+    print(
+        f"YouTube OAuth preflight: expected_channel={expected!r}, "
+        f"actual_channel={actual!r}, channel_id={channel_id!r}"
+    )
+    if actual.casefold() != expected.casefold():
+        raise RuntimeError(
+            f"YouTube OAuth channel mismatch: expected {expected!r}, "
+            f"but credentials authenticate as {actual!r} ({channel_id}). "
+            "No video was uploaded. Update the YOUTUBE_* OAuth credentials "
+            "for the intended channel before retrying."
+        )
+    print(f"YouTube OAuth channel verified: {actual} ({channel_id}).")
+    return {"channel_id": channel_id, "channel_title": actual}
+
+
 def main():
     drive, youtube = make_services()
+    verify_upload_channel(youtube)
     folder_id = required("FANCAMVERSE_DRIVE_FOLDER_ID")
     history = load_history()
     source_state = history.setdefault("sources", {})
