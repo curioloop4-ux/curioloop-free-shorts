@@ -1159,7 +1159,10 @@ def main():
             f"requested visibility verified for {verified_count}/{uploaded_count}."
         )
         if verified_count != uploaded_count:
-            print("::error::One or more uploads were accepted but their requested visibility was not verified.")
+            raise RuntimeError(
+                "One or more uploads were accepted but their requested visibility was not verified. "
+                "The uploaded video IDs and source progress were saved to prevent duplicate uploads."
+            )
 
 if __name__ == "__main__":
     main()
