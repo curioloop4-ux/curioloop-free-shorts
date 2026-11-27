@@ -69,6 +69,18 @@
       "intro_footage_start": 64.0,
       "intro_footage_end": 110.308,
       "published_at": "2026-11-27T03:59:40.185653+00:00"
+    },
+    {
+      "drive_file_id": "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch",
+      "source_md5": "3972e1b61f12dfa51f3c05c734882f17",
+      "source_artist_key": "리사",
+      "source_name": "블랙핑크 LISA 리사  직캠 FANCAM Ver KpopHots.mp4",
+      "artist": "Lisa",
+      "youtube_video_id": "AG6kT1CCjI4",
+      "privacy": "public",
+      "intro_footage_start": 51.5,
+      "intro_footage_end": 99.981,
+      "published_at": "2026-11-27T04:04:44.886033+00:00"
     }
   ],
   "opening_frames": {
@@ -89,8 +101,11 @@
     ],
     "karina": [
       22.68
+    ],
+    "lisa": [
+      14.76
     ]
   },
-  "last_render_source_start": 64.0,
-  "last_render_source_duration": 46.308
+  "last_render_source_start": 51.5,
+  "last_render_source_duration": 48.481
 }
