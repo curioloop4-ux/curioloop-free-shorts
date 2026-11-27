@@ -997,29 +997,57 @@ def main():
    candidates=preferred_candidates
    print("Low-priority artist rotation active; deferred:",", ".join(sorted({source_artist_key(x) for x in deferred})))
   random.shuffle(candidates)
- # Do not skip a recognized artist because some profile fields are unavailable.
- item=candidates[0]
- selected_artist_key=source_artist_key(item)
- print("Selected source artist key:",selected_artist_key or "manual target")
- print("Selected source for profile research:",item["name"])
- p=profile(item["name"],target_hint=target)
- print("Selected Drive source:",item["name"])
- src=download(drive,item)
- research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
- research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
- print("Verified research saved:",research_path.name)
- out=render(src,p,h)
- rendered_source_start=float(h.get("last_render_source_start",0.0))
- rendered_source_duration=float(h.get("last_render_source_duration",0.0))
- if rendered_source_duration<=0: raise RuntimeError("Could not determine the exact source segment used in the artist intro")
- vid,privacy=publish(yt,out,p,item["name"])
- pending=h.pop("pending_opening_frame",None)
- if pending:
-  h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
- h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"published_at":datetime.now(timezone.utc).isoformat()})
- H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
- # Hand off the exact same Drive original to the companion fancam workflow.
- queue_path=R/"history"/"artist_intro_fancam_queue.json"
- queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
- print("Fancam handoff queued for the exact same Drive source:",item["name"])
+ # Retry another unused Drive original whenever research, download, rendering,
+ # or validation fails. A source is not marked processed until YouTube accepts it.
+ # This allows newly added Drive videos to act as same-run fallback candidates.
+ import random
+ random.shuffle(candidates)
+ failures=[]
+ uploaded=False
+ for attempt,item in enumerate(candidates,1):
+  selected_artist_key=source_artist_key(item)
+  print(f"FALLBACK ATTEMPT {attempt}/{len(candidates)}: {item['name']}")
+  print("Selected source artist key:",selected_artist_key or "manual target")
+  try:
+   p=profile(item["name"],target_hint=target)
+   print("Selected Drive source:",item["name"])
+   src=download(drive,item)
+   research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
+   research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
+   print("Verified research saved:",research_path.name)
+   out=render(src,p,h)
+   rendered_source_start=float(h.get("last_render_source_start",0.0))
+   rendered_source_duration=float(h.get("last_render_source_duration",0.0))
+   if rendered_source_duration<=0:
+    raise RuntimeError("Could not determine the exact source segment used in the artist intro")
+  except Exception as exc:
+   failure=f"{item['name']}: {type(exc).__name__}: {exc}"
+   failures.append(failure)
+   print("SOURCE FAILED; moving to the next unused Drive video:",failure)
+   continue
+  # Do not retry another source after entering the YouTube insert call: a
+  # network timeout can occur after YouTube accepted the upload, risking duplicates.
+  try:
+   vid,privacy=publish(yt,out,p,item["name"])
+  except Exception as exc:
+   raise RuntimeError(
+    f"YouTube upload result is uncertain for {item['name']}; stopping to prevent duplicate uploads. "
+    f"Earlier source failures: {' | '.join(failures[-5:])}"
+   ) from exc
+  pending=h.pop("pending_opening_frame",None)
+  if pending:
+   h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
+  h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"published_at":datetime.now(timezone.utc).isoformat()})
+  H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
+  # Hand off the exact same Drive original to the companion fancam workflow.
+  queue_path=R/"history"/"artist_intro_fancam_queue.json"
+  queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
+  print("Fancam handoff queued for the exact same Drive source:",item["name"])
+  print(f"UPLOAD SUCCESS on fallback attempt {attempt}: {vid}")
+  uploaded=True
+  break
+ if not uploaded:
+  summary=" | ".join(failures[-8:])
+  raise RuntimeError(f"All {len(candidates)} eligible Drive sources failed before upload. No source was marked processed. Failures: {summary}")
+
 if __name__=="__main__":main()
