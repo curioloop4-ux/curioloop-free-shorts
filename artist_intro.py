@@ -994,41 +994,63 @@ def main():
  candidates=compatible
  print(f"Sources compatible with both intro and fancam pipelines: {len(candidates)}")
  if not candidates:raise RuntimeError("No compatible Drive video sources found")
- # Fail closed: random selection only considers filenames with a known artist and group.
- known_artists=["장원영","원영","wonyoung","은하","권은비","카리나","닝닝","윈터","지젤","사쿠라","김채원","허윤진","카즈하","홍은채","안유진","유진","레이","리즈","이서","민지","하니","다니엘","해린","혜인","나연","정연","모모","사나","지효","미나","다현","채영","쯔위","아이린","슬기","웬디","조이","예리","예지","리아","류진","채령","유나","지수","제니","jennie","로제","리사","엄지","신비","소원","예린","유주","츄","희진","김립","진솔","최리"]
- known_groups=["아이브","ive","에스파","aespa","르세라핌","le sserafim","비비지","viviz","여자친구","gfriend","아이즈원","iz*one","izone","트와이스","twice","블랙핑크","blackpink","레드벨벳","red velvet","소녀시대","girls' generation","오마이걸","oh my girl","있지","itzy","엔믹스","nmixx","뉴진스","newjeans","아일릿","illit","스테이씨","stayc","키스오브라이프","kiss of life","베이비몬스터","babymonster","프로미스나인","fromis_9","트리플에스","triples"]
- alias_to_key={a.casefold():a.casefold() for a in known_artists}
- for canonical,aliases in {"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"],"sakura":["사쿠라","sakura"],"kazuha":["카즈하","kazuha"],"jennie":["제니","jennie"],"haerin":["해린","혜린","haerin"]}.items():
-  for alias in aliases:alias_to_key[alias.casefold()]=canonical
- def source_artist_key(item):
-  name=item["name"].casefold()
-  matches=[alias for alias in alias_to_key if alias in name]
-  return alias_to_key[max(matches,key=len)] if matches else ""
- def identifiable(item):
-  return bool(source_artist_key(item))
- # Manual target may prioritize one artist, but identity validation remains mandatory.
+ # Use the companion fancam identity parser as the single source of truth.
+ from curioloop_fancam import identify_artist as identify_fancam_artist
+ artist_key_by_id={}
+ for candidate in candidates:
+  artist_name,group_name,_=identify_fancam_artist(candidate["name"])
+  if artist_name and group_name:
+   artist_key_by_id[candidate["id"]]=artist_name.casefold()
+ candidates=[x for x in candidates if x["id"] in artist_key_by_id]
+ print(f"Identifiable source videos: {len(candidates)}; unknown/ambigous videos skipped.")
+ if not candidates:raise RuntimeError("No Drive video has a recognizable artist name; refusing to guess identity.")
+
+ def history_artist_key(record):
+  source_name=record.get("source_name","")
+  if source_name:
+   old_artist,old_group,_=identify_fancam_artist(source_name)
+   if old_artist and old_group:return old_artist.casefold()
+  raw=str(record.get("source_artist_key") or record.get("artist") or "").casefold().strip()
+  aliases={"wonyoung":"wonyoung","jang wonyoung":"wonyoung","sakura":"sakura","miyawaki sakura":"sakura",
+   "karina":"karina","lisa":"lisa","tzuyu":"tzuyu","haerin":"haerin","kazuha":"kazuha",
+   "nancy":"nancy","momo":"momo","jennie":"jennie","eunha":"eunha","chaeryeong":"chaeryeong"}
+  return aliases.get(raw,raw)
+
  if target:
+  # An explicit manual test target takes precedence over rotation history.
+  target_key=target.casefold()
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
-  needles=aliases.get(target.casefold(),[target.casefold()])
-  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles) and identifiable(x)]
+  needles=aliases.get(target_key,[target_key])
+  candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
   if not candidates:raise RuntimeError(f"No identifiable Drive video found for requested test artist: {target}")
+  print(f"Manual artist target: {target}; automatic artist rotation bypassed.")
  else:
-  candidates=[x for x in candidates if identifiable(x)]
-  print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
-  if not candidates:raise RuntimeError("No Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
-  recent_artist_keys=[x.get("source_artist_key") or x.get("artist","").casefold() for x in h["processed"][-2:]]
-  diversified=[x for x in candidates if source_artist_key(x) not in recent_artist_keys]
-  if diversified:
-   candidates=diversified
-   print("Recent-artist repeat prevention active; excluded artists:",", ".join(recent_artist_keys))
-  # Random selection is the default; every never-used original ranks ahead of all used ones.
+  processed_records=h.get("processed",[])
+  seen_artist_keys={history_artist_key(record) for record in processed_records}
+  seen_artist_keys.discard("")
+  fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
+  if fresh_artist_keys:
+   candidates=[x for x in candidates if artist_key_by_id[x["id"]] in fresh_artist_keys]
+   print("Artist rotation: excluding every previously featured artist while new artists remain.")
+   print("Previously featured artist keys:",", ".join(sorted(seen_artist_keys)) or "none")
+   print("Eligible new artist keys:",", ".join(sorted(fresh_artist_keys)))
+  else:
+   # Once every available artist has appeared, restart with the least-recently featured artist.
+   latest_seen={}
+   for index,record in enumerate(processed_records):
+    key=history_artist_key(record)
+    if key:latest_seen[key]=index
+   oldest_key=min({artist_key_by_id[x["id"]] for x in candidates},
+    key=lambda key:latest_seen.get(key,-1))
+   candidates=[x for x in candidates if artist_key_by_id[x["id"]]==oldest_key]
+   print(f"Artist rotation cycle complete; restarting with least-recently featured artist: {oldest_key}.")
   import random
   fresh_candidates=[x for x in candidates if not source_was_used(x)]
   used_candidates=[x for x in candidates if source_was_used(x)]
   random.shuffle(fresh_candidates)
   random.shuffle(used_candidates)
   candidates=fresh_candidates+used_candidates
-  print(f"Random source rotation: {len(fresh_candidates)} never-used first, {len(used_candidates)} previously-used fallback sources second.")
+  print(f"Source rotation within selected artist pool: {len(fresh_candidates)} unused originals, {len(used_candidates)} previously used originals.")
  # Retry another unused Drive original whenever research, download, rendering,
  # or validation fails. A source is not marked processed until YouTube accepts it.
  # This allows newly added Drive videos to act as same-run fallback candidates.
