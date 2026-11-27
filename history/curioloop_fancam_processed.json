@@ -260,7 +260,46 @@
       "used_clip_indices": [
         4
       ]
+    },
+    "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ": {
+      "name": "[페이스캠4K] 에스파 카리나 'Drama' (aespa KARINA FaceCam) @SBS Inkigayo 231112.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 24.0,
+          "end": 49.5,
+          "hook": "Sharp choreography to open the stage"
+        },
+        {
+          "start": 72.0,
+          "end": 97.5,
+          "hook": "Powerful center moves during the chorus"
+        },
+        {
+          "start": 110.0,
+          "end": 135.5,
+          "hook": "Expressive vocals and captivating presence"
+        },
+        {
+          "start": 160.0,
+          "end": 185.5,
+          "hook": "Fierce dance moves in the spotlight"
+        },
+        {
+          "start": 213.0,
+          "end": 238.5,
+          "hook": "Dramatic vocals leading into the finale"
+        }
+      ],
+      "used_clip_indices": [
+        2
+      ]
     }
   },
-  "last_source_id": "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ"
+  "last_source_id": "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ",
+  "last_artist_key": "karina",
+  "artist_cycle": [
+    "karina"
+  ]
 }
