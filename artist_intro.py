@@ -751,9 +751,12 @@ def render(src,p,hist):
   # A valid script can still be too short if a voice provider speaks unusually
   # quickly. Re-synthesize more slowly before rejecting the video.
   if voice_seconds<28.5:
-   for slow_rate in ["-10%","-18%","-25%"]:
+   # Retry progressively slower natural speech rates until narration meets
+   # the 30-second minimum. Never pad a short script with empty footage.
+   for slow_rate in ["-10%","-18%","-25%","-35%","-45%","-50%"]:
     print(f"Narration is shorter than the 30-second video minimum ({voice_seconds:.1f}s); retrying at {slow_rate}.")
     durations,voice_seconds=await generate_segments(slow_rate)
+    print(f"Measured narration after {slow_rate}: {voice_seconds:.1f}s.")
     if voice_seconds>=28.5:break
   for rate in tts_rates[1:]:
    if voice_seconds<=47.0:break
