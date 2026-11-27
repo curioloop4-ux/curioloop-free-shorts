@@ -64,6 +64,7 @@ jobs:
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
           TARGET_ARTIST: ${{ inputs.artist }}
           INTRO_PUBLIC_ONCE: ${{ github.event_name == 'schedule' || inputs.public_once }}
+          INTRO_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 23 * * *' && '08:00' || (github.event.schedule == '0 3 * * *' && '12:00' || (github.event.schedule == '0 13 * * *' && '22:00' || ''))) }}
         run: python artist_intro.py
 
       - name: Save rendered video artifact
