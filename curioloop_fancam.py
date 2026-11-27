@@ -170,6 +170,8 @@ def list_source_videos(drive, folder_id):
     pending = [folder_id]
     visited = set()
     candidates = []
+    mime_counts = {}
+    ignored_files = []
     while pending:
         parent_id = pending.pop(0)
         if parent_id in visited:
@@ -189,21 +191,32 @@ def list_source_videos(drive, folder_id):
                 params["pageToken"] = page_token
             result = drive.files().list(**params).execute()
             for item in result.get("files", []):
-                if item.get("mimeType") == "application/vnd.google-apps.folder":
+                mime = item.get("mimeType", "unknown")
+                mime_counts[mime] = mime_counts.get(mime, 0) + 1
+                if mime == "application/vnd.google-apps.folder":
                     pending.append(item["id"])
-                elif item.get("mimeType") in SUPPORTED:
+                elif mime in SUPPORTED:
                     candidates.append(item)
+                else:
+                    ignored_files.append(item)
             page_token = result.get("nextPageToken")
             if not page_token:
                 break
     candidates.sort(key=lambda f: (f.get("createdTime", ""), f.get("id", "")))
     print(f"Drive inbox scan: {len(candidates)} supported video(s) found across {len(visited)} folder(s).")
-    if not candidates:
-        folder = drive.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
-        print(f"Configured Drive inbox: {folder.get('name')} ({folder.get('id')})")
-    else:
-        for item in candidates:
-            print(f"Drive source: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
+    folder = drive.files().get(fileId=folder_id, fields="id,name,mimeType").execute()
+    print(
+        f"Configured Drive inbox: {folder.get('name')} "
+        f"({folder.get('id')}) | mimeType={folder.get('mimeType')}"
+    )
+    print(f"Drive MIME summary: {json.dumps(mime_counts, ensure_ascii=False, sort_keys=True)}")
+    for item in ignored_files:
+        print(
+            f"Drive ignored unsupported file: {item.get('name')} | "
+            f"{item.get('mimeType')} | {item.get('size', 'unknown')} bytes"
+        )
+    for item in candidates:
+        print(f"Drive source: {item['name']} | {item.get('mimeType')} | {item.get('size', 'unknown')} bytes")
     return candidates
 
 
