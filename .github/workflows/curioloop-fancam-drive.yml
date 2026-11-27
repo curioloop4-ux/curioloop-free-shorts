@@ -121,7 +121,7 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
-          FANCAMVERSE_EXPECTED_CHANNEL_TITLE: CurioLoop
+          FANCAMVERSE_EXPECTED_CHANNEL_TITLE: DailyNibble
           FANCAMVERSE_EXCLUDE_ARTISTS: 김채원,chaewon
           FANCAMVERSE_WORK_DIR: work_curioloop_fancam
           FANCAMVERSE_HISTORY_FILE: history/curioloop_fancam_processed.json
