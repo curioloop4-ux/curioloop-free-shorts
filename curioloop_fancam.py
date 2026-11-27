@@ -870,10 +870,13 @@ def next_publish_at_kst(publish_time):
         raise ValueError("FANCAMVERSE_PUBLISH_TIME_KST must use HH:MM format.")
     now = datetime.now(ZoneInfo("Asia/Seoul"))
     publish_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(minutes=30)
+    # GitHub scheduled workflows can start late. If today's fixed slot has
+    # passed, move to the next day's same slot instead of failing or publishing now.
     if publish_at <= now + timedelta(minutes=2):
-        raise RuntimeError(
-            f"Scheduled slot {publish_time} + 30 minutes ({publish_at:%H:%M} KST) "
-            "has passed or is too close. Refusing an immediate upload so the fixed schedule is preserved."
+        publish_at += timedelta(days=1)
+        print(
+            f"Today's fixed slot {publish_time} + 30 minutes has passed; "
+            f"moving safely to the next day at {publish_at:%Y-%m-%d %H:%M} KST."
         )
     print(f"Fixed publication slot: {publish_time} + 30 minutes = {publish_at:%H:%M} KST.")
     return publish_at.isoformat(timespec="seconds")
