@@ -295,11 +295,47 @@
       "used_clip_indices": [
         2
       ]
+    },
+    "10qFttq7VbEyoYO9PGG-_Mk6JhUlmazhS": {
+      "name": "Kwon Eunbi Waterbomb 직캠 FANCAM Ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 20.0,
+          "end": 46.0,
+          "hook": "Energetic live performance with bright stage presence"
+        },
+        {
+          "start": 50.0,
+          "end": 76.0,
+          "hook": "Dynamic choreography and captivating expressions"
+        },
+        {
+          "start": 98.0,
+          "end": 124.0,
+          "hook": "Powerful stage moments and engaged crowd reaction"
+        },
+        {
+          "start": 145.0,
+          "end": 171.0,
+          "hook": "Expressive performance with sharp rhythm"
+        },
+        {
+          "start": 220.0,
+          "end": 246.0,
+          "hook": "Fierce finale showcase and lasting impression"
+        }
+      ],
+      "used_clip_indices": [
+        1
+      ]
     }
   },
-  "last_source_id": "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ",
-  "last_artist_key": "karina",
+  "last_source_id": "10qFttq7VbEyoYO9PGG-_Mk6JhUlmazhS",
+  "last_artist_key": "eunbi",
   "artist_cycle": [
-    "karina"
+    "karina",
+    "eunbi"
   ]
 }
