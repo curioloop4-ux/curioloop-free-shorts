@@ -195,7 +195,37 @@
       "used_clip_indices": [
         1
       ]
+    },
+    "12BfsGnuoboNyMwxcOL_4q7FubLqJG5rO": {
+      "name": "((G)I-DLE YUQI 여자 아이들 우기 클락션 (Klaxon)' Ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 22.0,
+          "end": 47.0,
+          "hook": "Energetic beach dance performance"
+        },
+        {
+          "start": 65.0,
+          "end": 90.0,
+          "hook": "Vibrant choreography on stage"
+        },
+        {
+          "start": 110.0,
+          "end": 135.0,
+          "hook": "Catchy rhythm and dance moves"
+        },
+        {
+          "start": 145.0,
+          "end": 170.0,
+          "hook": "Stunning stage presence and energy"
+        }
+      ],
+      "used_clip_indices": [
+        2
+      ]
     }
   },
-  "last_source_id": "1U3xhPXGGWHkvqH83nfi15oKcYScqskC7"
+  "last_source_id": "12BfsGnuoboNyMwxcOL_4q7FubLqJG5rO"
 }
