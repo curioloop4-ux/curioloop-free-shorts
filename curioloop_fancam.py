@@ -905,7 +905,7 @@ def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     returned_publish_at = returned_status.get("publishAt")
     returned_channel = (result.get("snippet") or {}).get("channelTitle", "")
     verified = returned_privacy == privacy
-    if publish_at and returned_publish_at != publish_at:
+    if publish_at and (not returned_publish_at or datetime.fromisoformat(returned_publish_at.replace('Z', '+00:00')) != datetime.fromisoformat(publish_at.replace('Z', '+00:00'))):
         verified = False
     print(
         "YouTube API response: "
