@@ -5,6 +5,7 @@ on:
     # Target US evening and Indonesia evening: KST 00:00, 02:00, 04:00, 10:00, 20:00.
     - cron: "0 15 * * *"
     - cron: "0 17 * * *"
+    - cron: "15 17 * * *" # 02:15 KST fallback for the 02:00 slot
     - cron: "0 19 * * *"
     - cron: "0 1 * * *"
     - cron: "0 11 * * *"
@@ -130,7 +131,7 @@ jobs:
           FANCAMVERSE_TRIGGER_EVENT: ${{ github.event_name }}
           FANCAMVERSE_TRIGGER_SCHEDULE: ${{ github.event.schedule || '' }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_run') && 'public' || inputs.privacy_status || 'private' }}
-          FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 15 * * *' && '00:00' || (github.event.schedule == '0 17 * * *' && '02:00' || (github.event.schedule == '0 19 * * *' && '04:00' || (github.event.schedule == '0 1 * * *' && '10:00' || (github.event.schedule == '0 11 * * *' && '20:00' || ''))))) }}
+          FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 15 * * *' && '00:00' || (github.event.schedule == '0 17 * * *' && '02:00' || (github.event.schedule == '15 17 * * *' && '02:00' || (github.event.schedule == '0 19 * * *' && '04:00' || (github.event.schedule == '0 1 * * *' && '10:00' || (github.event.schedule == '0 11 * * *' && '20:00' || '')))))) }}
         run: python curioloop_fancam.py
 
       - name: Save CurioLoop preview videos
