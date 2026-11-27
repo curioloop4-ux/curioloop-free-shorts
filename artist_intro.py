@@ -1,6 +1,7 @@
 import asyncio,json,os,re,subprocess,textwrap,math,struct,wave
 import unicodedata
-from datetime import datetime,timezone
+from datetime import datetime,timezone,timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import requests,edge_tts,time
 from PIL import Image, ImageDraw, ImageFont
@@ -938,6 +939,18 @@ def render(src,p,hist):
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
+def intro_publish_at_kst(publish_time):
+ try:
+  hour,minute=[int(part) for part in publish_time.split(":",1)]
+  if not (0<=hour<=23 and 0<=minute<=59):raise ValueError
+ except (TypeError,ValueError):
+  raise ValueError("INTRO_PUBLISH_TIME_KST must use HH:MM format.")
+ now=datetime.now(ZoneInfo("Asia/Seoul"))
+ publish_at=now.replace(hour=hour,minute=minute,second=0,microsecond=0)+timedelta(minutes=30)
+ if publish_at<=now+timedelta(minutes=2):
+  raise RuntimeError(f"Artist-intro slot {publish_time} + 30 minutes ({publish_at:%H:%M} KST) has passed or is too close. Refusing immediate publication.")
+ print(f"Artist-intro fixed publication slot: {publish_time} + 30 minutes = {publish_at:%H:%M} KST.")
+ return publish_at.isoformat(timespec="seconds")
 def publish(yt,out,p,source):
  brand=os.getenv("FANCAMVERSE_CHANNEL_BRAND","CurioLoop").strip()
  if brand.casefold() not in {"curioloop","dailyneedle"}:raise RuntimeError("Artist intro upload blocked: unexpected channel brand "+brand)
@@ -946,15 +959,24 @@ def publish(yt,out,p,source):
  approved_once=os.getenv("INTRO_PUBLIC_ONCE","").strip().lower() in {"1","true","yes"}
  approved_file=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
  approved=approved_once or approved_file
- privacy="public" if approved else "private"
+ scheduled_slot=os.getenv("INTRO_PUBLISH_TIME_KST","").strip()
+ publish_at=intro_publish_at_kst(scheduled_slot) if scheduled_slot else None
+ privacy="private" if publish_at else ("public" if approved else "private")
  print("One-time public approval:", "enabled" if approved_once else "disabled")
- research_links="\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
- description=f"Meet {p['artist']} from {p['group']}.\nArtist profile, career highlights, and recent update.\nOriginal footage source: {source}\nResearch sources:\n{research_links}\n#Kpop #ArtistSpotlight #Shorts"
- upload_stamp=datetime.now().strftime("%m%d-%H%M%S")
+ research_links="\\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
+ description=f"Meet {p['artist']} from {p['group']}.\\nArtist profile, career highlights, and recent update.\\nOriginal footage source: {source}\\nResearch sources:\\n{research_links}\\n#Kpop #ArtistSpotlight #Shorts"
+ upload_stamp=datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
  unique_title=f"{p['title']} | {upload_stamp}"[:100]
- body={"snippet":{"title":unique_title,"description":description[:4900],"tags":[x for x in p.get("tags",[]) if "curioloop" not in str(x).casefold()]+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":{"privacyStatus":privacy,"selfDeclaredMadeForKids":False}}
+ status={"privacyStatus":privacy,"selfDeclaredMadeForKids":False}
+ if publish_at:status["publishAt"]=publish_at
+ body={"snippet":{"title":unique_title,"description":description[:4900],"tags":[x for x in p.get("tags",[]) if "curioloop" not in str(x).casefold()]+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":status}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
- print(f"{privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"]);return v["id"],privacy
+ returned_status=v.get("status") or {}
+ returned_publish_at=returned_status.get("publishAt")
+ if publish_at and (returned_status.get("privacyStatus")!="private" or returned_publish_at!=publish_at):
+  raise RuntimeError(f"Artist-intro upload {v.get('id')} was accepted but scheduled publication was not confirmed (requested {publish_at}, returned {returned_publish_at}).")
+ print(f"{'SCHEDULED '+publish_at if publish_at else privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"])
+ return v["id"],("scheduled" if publish_at else privacy)
 def main():
  drive,yt=services();verify_upload_channel(yt);folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
