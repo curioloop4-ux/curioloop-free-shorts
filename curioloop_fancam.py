@@ -864,6 +864,7 @@ def generate_metadata(filename, hook, index):
     return title[:100], description[:5000], clean
 
 def next_publish_at_kst(publish_time):
+    """Return the fixed KST slot plus 30 minutes; never publish a missed slot immediately."""
     try:
         hour, minute = [int(part) for part in publish_time.split(":", 1)]
         if not (0 <= hour <= 23 and 0 <= minute <= 59):
@@ -871,15 +872,13 @@ def next_publish_at_kst(publish_time):
     except (TypeError, ValueError):
         raise ValueError("FANCAMVERSE_PUBLISH_TIME_KST must use HH:MM format.")
     now = datetime.now(ZoneInfo("Asia/Seoul"))
-    publish_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0)
-    # If Actions starts late (or less than 15 minutes before the slot), do not
-    # silently defer the missed upload by 24 hours. Upload it immediately as public.
-    if publish_at <= now + timedelta(minutes=15):
-        print(
-            f"Scheduled slot {publish_time} is already due or too close; "
-            "publishing this Short immediately instead of deferring it to tomorrow."
+    publish_at = now.replace(hour=hour, minute=minute, second=0, microsecond=0) + timedelta(minutes=30)
+    if publish_at <= now + timedelta(minutes=2):
+        raise RuntimeError(
+            f"Scheduled slot {publish_time} + 30 minutes ({publish_at:%H:%M} KST) "
+            "has passed or is too close. Refusing an immediate upload so the fixed schedule is preserved."
         )
-        return None
+    print(f"Fixed publication slot: {publish_time} + 30 minutes = {publish_at:%H:%M} KST.")
     return publish_at.isoformat(timespec="seconds")
 
 
