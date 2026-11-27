@@ -1020,28 +1020,33 @@ def main():
             print("No unused source videos with a recognized artist/group remain.")
             break
 
-        # Deprioritize these frequently featured artists; use them only when
-        # no other identifiable, unused artist source is available.
-        low_priority_artists = {"HAERIN", "KAZUHA", "SAKURA", "WONYOUNG"}
-        preferred = [
+        # Random is the default. Prefer never-used originals, then fall back to
+        # previously used originals that still have unconsumed highlight windows.
+        used_source_ids = set(source_state) | set(history.get("processed", []))
+        fresh_sources = [
             candidate for candidate in identifiable
-            if identify_artist(candidate["name"])[0] not in low_priority_artists
+            if candidate["id"] not in used_source_ids
         ]
-        if preferred:
-            deferred_count = len(identifiable) - len(preferred)
-            identifiable = preferred
-            print(
-                "Low-priority artist rotation active; deferred "
-                f"{deferred_count} source(s) for Haerin, Kazuha, Sakura, and Wonyoung."
-            )
-
+        previously_used_sources = [
+            candidate for candidate in identifiable
+            if candidate["id"] in used_source_ids
+        ]
+        random.shuffle(fresh_sources)
+        random.shuffle(previously_used_sources)
+        selection_pool = fresh_sources if fresh_sources else previously_used_sources
+        print(
+            f"Random source rotation: {len(fresh_sources)} never-used source(s) first; "
+            f"{len(previously_used_sources)} previously-used source(s) held as fallback "
+            "(only sources with unused highlight windows are eligible)."
+        )
         # Rotate across different originals before returning to the previous source.
         last_source_id = history.get("last_source_id")
-        alternatives = [candidate for candidate in identifiable if candidate["id"] != last_source_id]
-        item = random.choice(alternatives or identifiable)
+        alternatives = [candidate for candidate in selection_pool if candidate["id"] != last_source_id]
+        item = random.choice(alternatives or selection_pool)
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
-            f"Batch {batch_number}/{batch_size} | Random unused source: "
+            f"Batch {batch_number}/{batch_size} | Random "
+            f"{'never-used' if item['id'] not in used_source_ids else 'previously-used fallback'} source: "
             f"{item['name']} ({item['id']})"
         )
 
