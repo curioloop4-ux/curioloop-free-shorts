@@ -1057,7 +1057,7 @@ def main():
  failures=[]
  uploaded=False
  for attempt,item in enumerate(candidates,1):
-  selected_artist_key=source_artist_key(item)
+  selected_artist_key=artist_key_by_id.get(item["id"], "")
   print(f"FALLBACK ATTEMPT {attempt}/{len(candidates)}: {item['name']}")
   print("Selected source artist key:",selected_artist_key or "manual target")
   try:
