@@ -57,6 +57,18 @@
       "intro_footage_start": 114.5,
       "intro_footage_end": 162.416,
       "published_at": "2026-11-26T21:49:57.866747+00:00"
+    },
+    {
+      "drive_file_id": "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ",
+      "source_md5": "c94f858804405fdb0930319d7f991696",
+      "source_artist_key": "카리나",
+      "source_name": "[페이스캠4K] 에스파 카리나 'Drama' (aespa KARINA FaceCam) @SBS Inkigayo 231112.mp4",
+      "artist": "Karina",
+      "youtube_video_id": "ghD06T5Kiq8",
+      "privacy": "public",
+      "intro_footage_start": 64.0,
+      "intro_footage_end": 110.308,
+      "published_at": "2026-11-27T03:59:40.185653+00:00"
     }
   ],
   "opening_frames": {
@@ -74,8 +86,11 @@
     ],
     "jang wonyoung": [
       26.59
+    ],
+    "karina": [
+      22.68
     ]
   },
-  "last_render_source_start": 114.5,
-  "last_render_source_duration": 47.916
+  "last_render_source_start": 64.0,
+  "last_render_source_duration": 46.308
 }
