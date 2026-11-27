@@ -225,7 +225,42 @@
       "used_clip_indices": [
         2
       ]
+    },
+    "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ": {
+      "name": "TWICE 트와이스 Tzuyu 쯔위 Fancam Ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 25.0,
+          "end": 51.0,
+          "hook": "Energetic choreography on stage"
+        },
+        {
+          "start": 60.0,
+          "end": 86.0,
+          "hook": "Stunning stage presence"
+        },
+        {
+          "start": 96.0,
+          "end": 122.0,
+          "hook": "Captivating performance moment"
+        },
+        {
+          "start": 197.0,
+          "end": 223.0,
+          "hook": "Dynamic dance routine"
+        },
+        {
+          "start": 276.0,
+          "end": 302.0,
+          "hook": "Powerful concert highlights"
+        }
+      ],
+      "used_clip_indices": [
+        4
+      ]
     }
   },
-  "last_source_id": "12BfsGnuoboNyMwxcOL_4q7FubLqJG5rO"
+  "last_source_id": "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ"
 }
