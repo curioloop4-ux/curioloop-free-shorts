@@ -882,11 +882,33 @@ def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     video_id = result.get("id")
     if not video_id:
         raise RuntimeError("YouTube upload completed without returning a video ID.")
-    if publish_at:
-        print(f"Uploaded and scheduled: https://www.youtube.com/shorts/{video_id} (publishAt={publish_at})")
+
+    # Treat the insert response as an API acknowledgement, not proof that the
+    # requested visibility was applied. Inspect the returned resource fields.
+    returned_status = result.get("status") or {}
+    returned_privacy = returned_status.get("privacyStatus")
+    returned_publish_at = returned_status.get("publishAt")
+    returned_channel = (result.get("snippet") or {}).get("channelTitle", "")
+    verified = returned_privacy == privacy
+    if publish_at and returned_publish_at != publish_at:
+        verified = False
+    print(
+        "YouTube API response: "
+        f"video_id={video_id}, channel={returned_channel or 'not returned'}, "
+        f"requested_privacy={privacy}, returned_privacy={returned_privacy or 'not returned'}, "
+        f"requested_publishAt={publish_at or 'none'}, "
+        f"returned_publishAt={returned_publish_at or 'none'}, "
+        f"visibility_verified={verified}"
+    )
+    if not verified:
+        print(
+            f"::warning::Upload {video_id} was accepted by videos.insert, but the API response "
+            "did not confirm the requested privacy/schedule. Do not treat this as a verified publish."
+        )
     else:
-        print(f"Uploaded: https://www.youtube.com/shorts/{video_id} (privacy={privacy})")
-    return video_id
+        print(f"Upload API response verified: https://www.youtube.com/shorts/{video_id}")
+    return {"video_id": video_id, "verified": verified, "privacy": returned_privacy,
+            "channel_title": returned_channel}
 
 def main():
     drive, youtube = make_services()
@@ -961,6 +983,7 @@ def main():
         print("Upload destination: CurioLoop, using the existing YOUTUBE_* OAuth token.")
 
     uploaded_count = 0
+    verified_count = 0
 
     for batch_number in range(1, batch_size + 1):
         eligible = [
@@ -1097,8 +1120,11 @@ def main():
             # Preview mode does not consume a clip or advance rotation history.
             continue
 
-        video_id = upload(youtube, path, title, description, tags, privacy, publish_at=publish_at)
+        upload_result = upload(youtube, path, title, description, tags, privacy, publish_at=publish_at)
+        video_id = upload_result["video_id"]
         uploaded_count += 1
+        if upload_result["verified"]:
+            verified_count += 1
 
         updated_used_indices = sorted(used_indices | {selected_index})
         source_complete = len(updated_used_indices) >= len(clips)
@@ -1128,7 +1154,12 @@ def main():
     if output_only:
         print("OUTPUT_ONLY run finished; no uploads or progress changes were made.")
     else:
-        print(f"CurioLoop batch complete: {uploaded_count}/{batch_size} Shorts uploaded.")
+        print(
+            f"CurioLoop batch finished: YouTube API accepted {uploaded_count}/{batch_size} upload(s); "
+            f"requested visibility verified for {verified_count}/{uploaded_count}."
+        )
+        if verified_count != uploaded_count:
+            print("::error::One or more uploads were accepted but their requested visibility was not verified.")
 
 if __name__ == "__main__":
     main()
