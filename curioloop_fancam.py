@@ -1210,6 +1210,12 @@ def main():
             f"{'completed' if source_complete else 'will rotate back later'}."
         )
         history["last_source_id"] = item["id"]
+        selected_artist_key = artist_by_source[item["id"]]
+        history["last_artist_key"] = selected_artist_key
+        artist_cycle = list(history.get("artist_cycle", []))
+        if selected_artist_key not in artist_cycle:
+            artist_cycle.append(selected_artist_key)
+        history["artist_cycle"] = artist_cycle
         history["sources"] = source_state
         if schedule_slot_key:
             completed_slots = history.setdefault("completed_schedule_slots", [])
