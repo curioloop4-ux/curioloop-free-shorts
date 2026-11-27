@@ -108,7 +108,7 @@ jobs:
       - name: Validate restored and CurioLoop scripts
         run: python -m py_compile fancamverse.py curioloop_fancam.py
 
-      - name: Read Drive and upload to CurioLoop
+      - name: Verify CurioLoop OAuth identity, then read Drive and upload
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.8-flash
@@ -120,6 +120,7 @@ jobs:
           YOUTUBE_CLIENT_SECRET: ${{ secrets.YOUTUBE_CLIENT_SECRET }}
           YOUTUBE_REFRESH_TOKEN: ${{ secrets.YOUTUBE_REFRESH_TOKEN }}
           FANCAMVERSE_CHANNEL_BRAND: CurioLoop
+          FANCAMVERSE_EXPECTED_CHANNEL_TITLE: CurioLoop
           FANCAMVERSE_EXCLUDE_ARTISTS: 김채원,chaewon
           FANCAMVERSE_WORK_DIR: work_curioloop_fancam
           FANCAMVERSE_HISTORY_FILE: history/curioloop_fancam_processed.json
