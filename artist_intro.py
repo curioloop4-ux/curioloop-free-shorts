@@ -945,8 +945,15 @@ def main():
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
  done={x.get("drive_file_id") for x in h["processed"]}
  done_hashes={x.get("source_md5") for x in h["processed"] if x.get("source_md5")}
+ def source_name_key(value):
+  stem=Path(value or "").stem.casefold()
+  stem=re.sub(r"(?:[_ .-]*(?:ver(?:sion)?[_ .-]*[a-z0-9]*|fancam|fan[_ .-]*cam|직캠|팬캠|페이스캠|풀캠|가로캠|세로캠|4k|8k|60fps|long[_ .-]*ver))+$","",stem,flags=re.I)
+  return re.sub(r"[^0-9a-z가-힣]+","",stem)
+ done_names={source_name_key(x.get("source_name","")) for x in h["processed"] if x.get("source_name")}
  target=os.getenv("TARGET_ARTIST","").strip()
- candidates=[x for x in scan(drive,folder) if x["id"] not in done and (not x.get("md5Checksum") or x.get("md5Checksum") not in done_hashes)]
+ scanned=scan(drive,folder)
+ candidates=[x for x in scanned if x["id"] not in done and (not x.get("md5Checksum") or x.get("md5Checksum") not in done_hashes) and source_name_key(x["name"]) not in done_names]
+ print(f"New-source filter: {len(candidates)} candidates remain after ID, MD5, and normalized filename duplicate checks.")
  # Only choose sources that the companion fancam pipeline can identify too.
  from curioloop_fancam import identify_artist as identify_fancam_artist
  blocked=("김채원","chaewon")
@@ -982,7 +989,6 @@ def main():
   candidates=[x for x in candidates if identifiable(x)]
   print(f"Identifiable source videos: {len(candidates)}; unknown/ambiguous videos skipped.")
   if not candidates:raise RuntimeError("No unprocessed Drive video has a recognizable artist name in its filename; source identity is required to avoid misattribution.")
-  import random
   recent_artist_keys=[x.get("source_artist_key") or x.get("artist","").casefold() for x in h["processed"][-2:]]
   diversified=[x for x in candidates if source_artist_key(x) not in recent_artist_keys]
   if diversified:
@@ -996,12 +1002,13 @@ def main():
    deferred=[x for x in candidates if source_artist_key(x) in low_priority_artists]
    candidates=preferred_candidates
    print("Low-priority artist rotation active; deferred:",", ".join(sorted({source_artist_key(x) for x in deferred})))
-  random.shuffle(candidates)
+  # scan() already sorts by Drive createdTime descending. Keep that order:
+  # newest eligible source is always attempted first; fallback moves forward
+  # through the remaining newest-to-oldest candidates without random reshuffling.
+  print("Source selection order: newest eligible Drive uploads first.")
  # Retry another unused Drive original whenever research, download, rendering,
  # or validation fails. A source is not marked processed until YouTube accepts it.
  # This allows newly added Drive videos to act as same-run fallback candidates.
- import random
- random.shuffle(candidates)
  failures=[]
  uploaded=False
  for attempt,item in enumerate(candidates,1):
