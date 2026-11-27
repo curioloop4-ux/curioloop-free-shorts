@@ -81,6 +81,18 @@
       "intro_footage_start": 51.5,
       "intro_footage_end": 99.981,
       "published_at": "2026-11-27T04:04:44.886033+00:00"
+    },
+    {
+      "drive_file_id": "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ",
+      "source_md5": "37475bb58825be0ce4dbd0261236d37e",
+      "source_artist_key": "쯔위",
+      "source_name": "TWICE 트와이스 Tzuyu 쯔위 Fancam Ver KpopHots.mp4",
+      "artist": "Tzuyu",
+      "youtube_video_id": "FUP6-T0k16I",
+      "privacy": "public",
+      "intro_footage_start": 259.5,
+      "intro_footage_end": 307.968,
+      "published_at": "2026-11-27T12:00:46.531579+00:00"
     }
   ],
   "opening_frames": {
@@ -104,8 +116,11 @@
     ],
     "lisa": [
       14.76
+    ],
+    "tzuyu": [
+      25.61
     ]
   },
-  "last_render_source_start": 51.5,
-  "last_render_source_duration": 48.481
+  "last_render_source_start": 259.5,
+  "last_render_source_duration": 48.468
 }
