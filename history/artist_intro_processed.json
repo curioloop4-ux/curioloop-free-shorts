@@ -93,6 +93,18 @@
       "intro_footage_start": 259.5,
       "intro_footage_end": 307.968,
       "published_at": "2026-11-27T12:00:46.531579+00:00"
+    },
+    {
+      "drive_file_id": "1Kq0ERkQVDRYEA7cyqimLKWmfm_I2Z5wL",
+      "source_md5": "20561d1df2a7f1b7d5c121ac49f46c0b",
+      "source_artist_key": "jennie",
+      "source_name": "BLACKPINK JENNIE 제니 직캠 FANCAM Ver KpopHots.mp4",
+      "artist": "Jennie",
+      "youtube_video_id": "yElLffHS3HQ",
+      "privacy": "public",
+      "intro_footage_start": 12.0,
+      "intro_footage_end": 58.668,
+      "published_at": "2026-11-27T15:21:59.454483+00:00"
     }
   ],
   "opening_frames": {
@@ -119,8 +131,11 @@
     ],
     "tzuyu": [
       25.61
+    ],
+    "jennie": [
+      16.17
     ]
   },
-  "last_render_source_start": 259.5,
-  "last_render_source_duration": 48.468
+  "last_render_source_start": 12.0,
+  "last_render_source_duration": 46.668
 }
