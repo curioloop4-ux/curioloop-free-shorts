@@ -1045,28 +1045,57 @@ def main():
             print("No unused source videos with a recognized artist/group remain.")
             break
 
-        # Random is the default. Prefer never-used originals, then fall back to
-        # previously used originals that still have unconsumed highlight windows.
+        # Rotate by ARTIST, not merely by Drive file ID. One artist's multiple
+        # source files must not crowd out other artists in the inbox.
         used_source_ids = set(source_state) | set(history.get("processed", []))
+        artist_by_source = {
+            candidate["id"]: identify_artist(candidate["name"])[0].casefold()
+            for candidate in identifiable
+        }
+        artist_cycle = list(history.get("artist_cycle", []))
+        # Migrate prior successful uploads into the current rotation cycle.
+        for source_id, prior_state in source_state.items():
+            if prior_state.get("used_clip_indices"):
+                prior_name = prior_state.get("name", "")
+                prior_artist, prior_group, _ = identify_artist(prior_name)
+                if prior_artist and prior_artist.casefold() not in artist_cycle:
+                    artist_cycle.append(prior_artist.casefold())
+        available_artist_keys = set(artist_by_source.values())
+        unfeatured_artist_keys = available_artist_keys - set(artist_cycle)
+        if unfeatured_artist_keys:
+            selection_pool = [
+                candidate for candidate in identifiable
+                if artist_by_source[candidate["id"]] in unfeatured_artist_keys
+            ]
+            print(
+                "Artist rotation active: prioritizing artists not yet featured in this cycle:",
+                ", ".join(sorted(unfeatured_artist_keys))
+            )
+        else:
+            # Every currently available artist has had a turn; start a new cycle.
+            artist_cycle = []
+            selection_pool = identifiable
+            print("Artist rotation cycle complete; starting a new cycle across all available artists.")
         fresh_sources = [
-            candidate for candidate in identifiable
+            candidate for candidate in selection_pool
             if candidate["id"] not in used_source_ids
         ]
         previously_used_sources = [
-            candidate for candidate in identifiable
+            candidate for candidate in selection_pool
             if candidate["id"] in used_source_ids
         ]
         random.shuffle(fresh_sources)
         random.shuffle(previously_used_sources)
         selection_pool = fresh_sources if fresh_sources else previously_used_sources
         print(
-            f"Random source rotation: {len(fresh_sources)} never-used source(s) first; "
-            f"{len(previously_used_sources)} previously-used source(s) held as fallback "
-            "(only sources with unused highlight windows are eligible)."
+            f"Source rotation within artist pool: {len(fresh_sources)} never-used source(s); "
+            f"{len(previously_used_sources)} previously-used source(s) with remaining unused clips."
         )
-        # Rotate across different originals before returning to the previous source.
-        last_source_id = history.get("last_source_id")
-        alternatives = [candidate for candidate in selection_pool if candidate["id"] != last_source_id]
+        last_artist_key = history.get("last_artist_key", "")
+        alternatives = [
+            candidate for candidate in selection_pool
+            if artist_by_source[candidate["id"]] != last_artist_key
+        ]
         item = random.choice(alternatives or selection_pool)
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
