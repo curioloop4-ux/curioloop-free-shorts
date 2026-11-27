@@ -126,6 +126,8 @@ jobs:
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
           FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
           FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
+          FANCAMVERSE_TRIGGER_EVENT: ${{ github.event_name }}
+          FANCAMVERSE_TRIGGER_SCHEDULE: ${{ github.event.schedule || '' }}
           FANCAMVERSE_PRIVACY_STATUS: ${{ (github.event_name == 'schedule' || github.event_name == 'workflow_run') && 'public' || inputs.privacy_status || 'private' }}
           FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 15 * * *' && '00:00' || (github.event.schedule == '0 17 * * *' && '02:00' || (github.event.schedule == '0 19 * * *' && '04:00' || (github.event.schedule == '0 1 * * *' && '10:00' || (github.event.schedule == '0 11 * * *' && '20:00' || ''))))) }}
         run: python curioloop_fancam.py
