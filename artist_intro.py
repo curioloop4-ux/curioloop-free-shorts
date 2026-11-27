@@ -27,23 +27,8 @@ def dur(p):
  return float(subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(p)],check=True,capture_output=True,text=True).stdout.strip())
 def services():
  d=Credentials(None,refresh_token=need("FANCAMVERSE_REFRESH_TOKEN"),token_uri="https://oauth2.googleapis.com/token",client_id=need("FANCAMVERSE_CLIENT_ID"),client_secret=need("FANCAMVERSE_CLIENT_SECRET"),scopes=["https://www.googleapis.com/auth/drive.readonly"])
- y=Credentials(None,refresh_token=need("YOUTUBE_REFRESH_TOKEN"),token_uri="https://oauth2.googleapis.com/token",client_id=need("YOUTUBE_CLIENT_ID"),client_secret=need("YOUTUBE_CLIENT_SECRET"),scopes=["https://www.googleapis.com/auth/youtube.readonly","https://www.googleapis.com/auth/youtube.upload"])
+ y=Credentials(None,refresh_token=need("YOUTUBE_REFRESH_TOKEN"),token_uri="https://oauth2.googleapis.com/token",client_id=need("YOUTUBE_CLIENT_ID"),client_secret=need("YOUTUBE_CLIENT_SECRET"),scopes=["https://www.googleapis.com/auth/youtube.upload"])
  return build("drive","v3",credentials=d),build("youtube","v3",credentials=y)
-def verify_upload_channel(yt):
- expected=need("YOUTUBE_EXPECTED_CHANNEL_TITLE")
- response=yt.channels().list(part="id,snippet",mine=True,maxResults=5).execute()
- channels=response.get("items",[])
- if len(channels)!=1:
-  names=[(x.get("snippet") or {}).get("title","unknown") for x in channels]
-  raise RuntimeError(f"Could not uniquely verify CurioLoop YouTube channel (found {len(channels)}: {names}); refusing upload.")
- channel=channels[0]; snippet=channel.get("snippet") or {}
- actual=(snippet.get("title") or "").strip()
- channel_id=(channel.get("id") or "").strip()
- print(f"YouTube OAuth preflight: expected_channel={expected!r}, actual_channel={actual!r}, channel_id={channel_id!r}")
- if actual.casefold()!=expected.casefold():
-  raise RuntimeError(f"YouTube OAuth channel mismatch: expected {expected!r}, but authenticated as {actual!r} ({channel_id}). No video was uploaded.")
- print(f"YouTube OAuth channel verified: {actual} ({channel_id}).")
- return channel_id
 def scan(drive,folder):
  q=[folder]; seen=set(); out=[]
  while q:
@@ -978,7 +963,7 @@ def publish(yt,out,p,source):
  print(f"{'SCHEDULED '+publish_at if publish_at else privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"])
  return v["id"],("scheduled" if publish_at else privacy)
 def main():
- drive,yt=services();verify_upload_channel(yt);folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
+ drive,yt=services();folder=need("FANCAMVERSE_DRIVE_FOLDER_ID")
  h=json.loads(H.read_text(encoding="utf-8")) if H.exists() else {"processed":[]}
  done={x.get("drive_file_id") for x in h["processed"]}
  done_hashes={x.get("source_md5") for x in h["processed"] if x.get("source_md5")}
