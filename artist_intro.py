@@ -994,14 +994,8 @@ def main():
   if diversified:
    candidates=diversified
    print("Recent-artist repeat prevention active; excluded artists:",", ".join(recent_artist_keys))
-  # Keep these repeatedly featured artists at the bottom of the rotation.
-  # They remain eligible only when no other identifiable source is available.
-  low_priority_artists={"haerin","kazuha","sakura","wonyoung"}
-  preferred_candidates=[x for x in candidates if source_artist_key(x) not in low_priority_artists]
-  if preferred_candidates:
-   deferred=[x for x in candidates if source_artist_key(x) in low_priority_artists]
-   candidates=preferred_candidates
-   print("Low-priority artist rotation active; deferred:",", ".join(sorted({source_artist_key(x) for x in deferred})))
+  # No artist is permanently demoted: after recent-repeat filtering,
+  # preserve newest-first Drive order across all eligible artists.
   # scan() already sorts by Drive createdTime descending. Keep that order:
   # newest eligible source is always attempted first; fallback moves forward
   # through the remaining newest-to-oldest candidates without random reshuffling.
