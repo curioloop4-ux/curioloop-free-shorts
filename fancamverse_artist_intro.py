@@ -945,7 +945,6 @@ def render(src,p,hist,drive,folder):
  )
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
- fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
  # Preserve the original stage audio quietly; add a licensed Drive music bed below narration.
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
