@@ -909,20 +909,45 @@ def render(src,p,hist,drive,folder):
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
- # Use creator-supplied YouTube Audio Library tracks stored in the source Drive folder tree.
+ # YouTube Audio Library tracks must be downloaded by the channel owner and placed
+ # in the source Drive folder tree. Prefer a track explicitly tagged with this artist;
+ # otherwise rotate through the supplied royalty-free library tracks.
+ import random
  music_files=scan_audio(drive,folder)
  used_music=hist.setdefault("used_background_music_ids",[])
- available_music=[item for item in music_files if item["id"] not in used_music]
- if not available_music:
+ artist_key=re.sub(r"[^a-z0-9]+","",str(p.get("artist","")).casefold())
+ artist_tracks=[]
+ if artist_key:
+  for item in music_files:
+   track_key=re.sub(r"[^a-z0-9]+","",Path(item.get("name","")).stem.casefold())
+   if artist_key in track_key:
+    artist_tracks.append(item)
+ artist_tracks=[item for item in artist_tracks if item["id"] not in used_music] or artist_tracks
+ pool=artist_tracks if artist_tracks else [item for item in music_files if item["id"] not in used_music]
+ if not pool and music_files:
   used_music.clear()
-  available_music=music_files
- music_item=available_music[0] if available_music else None
+  pool=artist_tracks if artist_tracks else music_files
+ music_item=random.choice(pool) if pool else None
  if music_item:
   music_path=download(drive,music_item)
-  print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"])
-  fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.06,afade=t=in:st=0:d=1.0,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
+  music_duration=dur(music_path)
+  if music_duration<=0.5:
+   raise RuntimeError("Background music is too short to select a middle section.")
+  if music_duration>=length:
+   music_start=(music_duration-length)/2.0
+   music_loop_samples=max(1,int(length*48000))
+  else:
+   # Use the central half of a shorter track and loop that excerpt to fit the video.
+   music_start=music_duration*0.25
+   music_loop_samples=max(1,int(music_duration*0.5*48000))
+  print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"],
+        "artist_match:",bool(artist_tracks),"middle_start_seconds:",round(music_start,2),
+        "track_duration_seconds:",round(music_duration,2))
+  fc+=f"[4:a]atrim=start={music_start:.3f},asetpts=PTS-STARTPTS,aloop=loop=-1:size={music_loop_samples},atrim=duration={length:.3f},volume=0.045,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
   used_music.append(music_item["id"])
-  if len(used_music)>len(music_files):del used_music[:-len(music_files)]
+  if len(used_music)>max(1,len(music_files)):del used_music[:-len(music_files)]
+ else:
+  print("No supplied YouTube Audio Library track found; rendering without background music.")
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
  mix_labels=["[voice]"]
