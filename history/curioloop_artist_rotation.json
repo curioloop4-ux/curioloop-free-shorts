@@ -1,7 +1,7 @@
 {
   "events": [
     {
-      "artist_key": "모모",
+      "artist_key": "momo",
       "format": "artist_intro",
       "source_id": "1U3xhPXGGWHkvqH83nfi15oKcYScqskC7",
       "youtube_video_id": "LeQZc_XErWc",
@@ -15,14 +15,14 @@
       "published_at": "2026-11-26T18:58:53.560544+00:00"
     },
     {
-      "artist_key": "해린",
+      "artist_key": "haerin",
       "format": "artist_intro",
       "source_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs",
       "youtube_video_id": "tx6NV-UH-oE",
       "published_at": "2026-11-26T19:56:47.250951+00:00"
     },
     {
-      "artist_key": "카즈하",
+      "artist_key": "kazuha",
       "format": "artist_intro",
       "source_id": "1DMZ0CxlNGd1XGJY2mI6HeaSsnyVleQiV",
       "youtube_video_id": "tsoyWks84rg",
@@ -36,21 +36,21 @@
       "published_at": "2026-11-26T21:49:57.866747+00:00"
     },
     {
-      "artist_key": "카리나",
+      "artist_key": "karina",
       "format": "artist_intro",
       "source_id": "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ",
       "youtube_video_id": "ghD06T5Kiq8",
       "published_at": "2026-11-27T03:59:40.185653+00:00"
     },
     {
-      "artist_key": "리사",
+      "artist_key": "lisa",
       "format": "artist_intro",
       "source_id": "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch",
       "youtube_video_id": "AG6kT1CCjI4",
       "published_at": "2026-11-27T04:04:44.886033+00:00"
     },
     {
-      "artist_key": "쯔위",
+      "artist_key": "tzuyu",
       "format": "artist_intro",
       "source_id": "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ",
       "youtube_video_id": "FUP6-T0k16I",
