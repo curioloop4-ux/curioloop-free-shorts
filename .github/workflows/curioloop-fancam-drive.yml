@@ -36,7 +36,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: curioloop-fancam-drive-upload
+  group: curioloop-shared-upload-rotation
   cancel-in-progress: false
 
 jobs:
