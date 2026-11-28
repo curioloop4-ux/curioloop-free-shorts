@@ -330,12 +330,46 @@
       "used_clip_indices": [
         1
       ]
+    },
+    "17X9JJaMbUfGKDkBmAi9kCJfJK1rQcYo3": {
+      "name": "KiiiKiii KYA 키키 키야 Fancam ver KpopHots.mp4",
+      "next_clip": 1,
+      "complete": false,
+      "clips": [
+        {
+          "start": 10.5,
+          "end": 36.0,
+          "hook": "Starting off with intense stage energy"
+        },
+        {
+          "start": 101.0,
+          "end": 126.5,
+          "hook": "Captivating stage presence and smooth moves"
+        },
+        {
+          "start": 130.0,
+          "end": 155.5,
+          "hook": "Unstoppable rhythm and flawless choreography"
+        },
+        {
+          "start": 167.0,
+          "end": 192.5,
+          "hook": "Powerful dance moves and bright smiles"
+        }
+      ],
+      "used_clip_indices": [
+        3
+      ]
     }
   },
-  "last_source_id": "10qFttq7VbEyoYO9PGG-_Mk6JhUlmazhS",
-  "last_artist_key": "eunbi",
+  "last_source_id": "17X9JJaMbUfGKDkBmAi9kCJfJK1rQcYo3",
+  "last_artist_key": "kya",
   "artist_cycle": [
     "karina",
-    "eunbi"
+    "eunbi",
+    "kya"
+  ],
+  "completed_schedule_slots": [
+    "2026-11-28|10:00"
   ]
 }
