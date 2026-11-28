@@ -847,7 +847,7 @@ def render(src,p,hist,drive,folder):
    clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
    clean_caption=re.sub(r"[!！()（）\[\]{}:：;；]+","",clean_caption)
    clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
-   wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
+   wrapped=textwrap.wrap(clean_caption,width=24,break_long_words=True,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
    weights=[max(1,len(group.replace("\n"," ").split())) for group in groups]
@@ -935,7 +935,7 @@ def render(src,p,hist,drive,folder):
   cue_start=max(1.5,float(cue["start"]));cue_end=min(length,float(cue["end"]))
   if cue_end<=cue_start: continue
   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
-  subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=40:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:box=1:boxcolor=black@0.58:boxborderw=18:text_align=center:x=(w-text_w)/2:y=h-text_h-340:line_spacing=8:enable='{enable}'")
+  subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=36:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:box=1:boxcolor=black@0.58:boxborderw=18:text_align=center:x=(w-text_w)/2:y=h-text_h-340:line_spacing=8:enable='{enable}'")
  if not subtitle_filters: raise RuntimeError("No timed subtitle overlays were generated")
  print("Burn-in subtitle overlays:",len(subtitle_filters))
  fc=(
@@ -947,39 +947,16 @@ def render(src,p,hist,drive,folder):
  )
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
- # Preserve the original stage audio quietly; add a licensed Drive music bed below narration.
+ # Keep only the source performance audio and narration. No external background track.
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
- music_files=scan_background_music(drive,folder)
- music_path=None
- if music_files:
-  import random
-  # Match a descriptive filename tag to the editorial tone; otherwise rotate randomly.
-  mood_terms=("bright","upbeat","happy","fresh","cute","energetic","power","cool","elegant","chill","ambient","soft","inspiring")
-  narration_text=(p.get("narration","")+" "+p.get("artist","")+" "+p.get("group","")).casefold()
-  mood_map={"bright":("bright","upbeat","happy","fresh","cute"),"energetic":("energetic","power","dynamic"),"cool":("cool","modern","electronic"),"soft":("soft","chill","ambient","calm","elegant")}
-  preferred=[]
-  if any(x in narration_text for x in ("debut","bright","cute","fresh","youth")):preferred=mood_map["bright"]
-  elif any(x in narration_text for x in ("performance","dance","powerful","strong")):preferred=mood_map["energetic"]
-  elif any(x in narration_text for x in ("ballad","vocal","emotional","soft")):preferred=mood_map["soft"]
-  tagged=[x for x in music_files if any(tag in x.get("name","").casefold() for tag in preferred)]
-  music_path=download_background_music(drive,random.choice(tagged or music_files))
- else:
-  # Temporary original instrumental fallback until licensed MP3s are added to Drive.
-  music_path=W/"background_music_fallback.wav"
-  create_background_music(music_path,seconds=length)
-  print("NOTICE: No licensed Drive track found; using the existing original instrumental fallback.")
- # Inputs: 0 still, 1 source video, 2 narration, 3 CTA overlay, 4 background music.
- audio_inputs=["-i",str(music_path)]
- mix_parts=[]
  if has_source_audio:
   fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.12,apad,atrim=duration={length:.3f}[original];"
-  mix_parts.append("[original]")
- fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f},volume=1.0[voice];"
- fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.10,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
- mix_parts.extend(["[voice]","[music]"])
- fc+="".join(mix_parts)+f"amix=inputs={len(mix_parts)}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),*audio_inputs,"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","slow","-crf","17","-maxrate","12M","-bufsize","24M","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f},volume=1.0[voice];"
+  fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+ else:
+  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f},volume=1.0,alimiter=limit=0.95[a]"
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","slow","-crf","17","-maxrate","12M","-bufsize","24M","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
