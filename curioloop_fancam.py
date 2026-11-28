@@ -981,9 +981,21 @@ def main():
             str(event.get("source_id")) for event in rotation_data.get("events", [])
             if event.get("source_id")
         )
+    # Legacy history entries may predate md5Checksum persistence. Resolve each
+    # consumed Drive ID directly so byte-identical copies under new IDs are blocked.
+    for used_id in sorted(used_original_ids):
+        try:
+            metadata = drive.files().get(
+                fileId=used_id, fields="id,md5Checksum", supportsAllDrives=True
+            ).execute()
+            checksum = str(metadata.get("md5Checksum", "")).strip()
+            if checksum:
+                used_original_md5s.add(checksum)
+        except Exception as exc:
+            print(f"Legacy source hash lookup unavailable for {used_id}: {type(exc).__name__}")
     print(
         f"Cross-format original exclusion loaded: {len(used_original_ids)} used Drive ID(s), "
-        f"{len(used_original_md5s)} content hash(es)."
+        f"{len(used_original_md5s)} content hash(es), including legacy hash backfill."
     )
     coordinated_source_id = os.getenv("FANCAMVERSE_COORDINATED_SOURCE_ID", "").strip()
     if coordinated_source_id:
