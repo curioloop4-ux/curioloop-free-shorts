@@ -153,6 +153,18 @@
       "intro_footage_start": 29.0,
       "intro_footage_end": 77.348,
       "published_at": "2026-11-28T12:22:25.969107+00:00"
+    },
+    {
+      "drive_file_id": "1pHBBA79fO-khrKbkfcTF-ItJjr1CsiGs",
+      "source_md5": "3104450f7aa00059a52dfe1b9290753c",
+      "source_artist_key": "an yujin",
+      "source_name": "[4K60P]231008 아이브(IVE) - LOVE DIVE 안유진 직캠 fancam  @잠실실내체육관 아이브 서울 콘서트.mp4",
+      "artist": "An Yujin",
+      "youtube_video_id": "DZskFKF0roM",
+      "privacy": "public",
+      "intro_footage_start": 17.5,
+      "intro_footage_end": 65.968,
+      "published_at": "2026-11-28T14:22:15.967365+00:00"
     }
   ],
   "opening_frames": {
@@ -192,8 +204,11 @@
     ],
     "eunha": [
       17.65
+    ],
+    "an yujin": [
+      13.68
     ]
   },
-  "last_render_source_start": 29.0,
-  "last_render_source_duration": 48.348
+  "last_render_source_start": 17.5,
+  "last_render_source_duration": 48.468
 }
