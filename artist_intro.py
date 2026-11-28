@@ -817,7 +817,7 @@ def render(src,p,hist):
    clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
    clean_caption=re.sub(r"[^A-Za-z0-9\s.,!?;:'()-]+"," ",clean_caption)
    clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
-   wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
+   wrapped=textwrap.wrap(clean_caption,width=24,break_long_words=True,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
    if not groups: continue
    weights=[max(1,len(group.replace("\n"," ").split())) for group in groups]
@@ -913,7 +913,7 @@ def render(src,p,hist):
   cue_start=max(1.5,float(cue["start"]));cue_end=min(length,float(cue["end"]))
   if cue_end<=cue_start: continue
   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
-  subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=40:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:box=1:boxcolor=black@0.58:boxborderw=18:text_align=center:x=(w-text_w)/2:y=h-text_h-340:line_spacing=8:enable='{enable}'")
+  subtitle_filters.append(f",drawtext=fontfile={font}:textfile='{cue_file}':fontcolor=white:fontsize=36:borderw=3:bordercolor=black@0.85:shadowcolor=black@0.5:shadowx=1:shadowy=1:box=1:boxcolor=black@0.58:boxborderw=18:text_align=center:x=(w-text_w)/2:y=h-text_h-340:line_spacing=8:enable='{enable}'")
  if not subtitle_filters: raise RuntimeError("No timed subtitle overlays were generated")
  print("Burn-in subtitle overlays:",len(subtitle_filters))
  fc=(
