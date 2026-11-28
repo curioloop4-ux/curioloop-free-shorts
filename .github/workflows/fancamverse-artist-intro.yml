@@ -14,10 +14,9 @@ on:
         default: true
         type: boolean
   schedule:
-    # Match CurioLoop: KST 08:00, 12:00, 22:00.
+    # FANCAMVERSE daily plan: 2 artist intros at KST 08:00 and 12:00.
     - cron: "0 23 * * *"
     - cron: "0 3 * * *"
-    - cron: "0 13 * * *"
 
 permissions:
   contents: write
@@ -64,7 +63,7 @@ jobs:
           FANCAMVERSE_CHANNEL_BRAND: FANCAMVERSE
           TARGET_ARTIST: ${{ inputs.artist }}
           INTRO_PUBLIC_ONCE: ${{ github.event_name == 'schedule' || inputs.public_once }}
-          INTRO_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 23 * * *' && '08:00' || (github.event.schedule == '0 3 * * *' && '12:00' || (github.event.schedule == '0 13 * * *' && '22:00' || ''))) }}
+          INTRO_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 23 * * *' && '08:00' || (github.event.schedule == '0 3 * * *' && '12:00' || '')) }}
         run: python fancamverse_artist_intro.py
 
       - name: Save rendered video artifact
