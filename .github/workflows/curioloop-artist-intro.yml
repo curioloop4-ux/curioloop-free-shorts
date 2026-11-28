@@ -13,11 +13,10 @@ on:
         required: false
         default: true
         type: boolean
-  schedule:
-    # Target US evening and Indonesia evening: KST 08:00, 12:00, 22:00.
-    - cron: "0 23 * * *"
-    - cron: "0 3 * * *"
-    - cron: "0 13 * * *"
+  # TEMPORARILY PAUSED through 2026-11-29 (KST).
+  # Previous schedule: 23:00, 03:00, 13:00 UTC (KST 08:00, 12:00, 22:00).
+  # Restore the schedule block after the pause.
+
 
 permissions:
   contents: write
