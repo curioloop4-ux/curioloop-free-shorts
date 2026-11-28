@@ -42,7 +42,7 @@ jobs:
       - name: Install FFmpeg and subtitle renderer
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg fonts-dejavu-core
+          sudo apt-get install -y ffmpeg fonts-noto-cjk
 
       - name: Install dependencies
         run: pip install -r requirements.txt
