@@ -1,5 +1,7 @@
 {
-  "processed": [],
+  "processed": [
+    "13vzocJfDz-rAomFrZBIlsAeblfM_ldTa"
+  ],
   "sources": {
     "1ZQvFiV_0cBcjJjcTlnakOHBYChLYXR6d": {
       "name": "LE SSERAFIM 르세라핌 SAKURA 사쿠라 Fancam Ver KpopHots_B.mp4",
@@ -360,14 +362,51 @@
       "used_clip_indices": [
         3
       ]
+    },
+    "13vzocJfDz-rAomFrZBIlsAeblfM_ldTa": {
+      "name": "[4K60P]231225 ITZY(있지) - Kill shot & CAKE 유나 직캠 fancam @2023 SBS 가요대전.mp4",
+      "source_md5": "b47f985701412d4eb92c71ac0f0a92de",
+      "next_clip": 6,
+      "complete": true,
+      "clips": [
+        {
+          "start": 34.0,
+          "end": 59.5,
+          "hook": "Energetic choreography in bright lights"
+        },
+        {
+          "start": 62.0,
+          "end": 87.5,
+          "hook": "Powerful stage presence and dance"
+        },
+        {
+          "start": 101.0,
+          "end": 126.5,
+          "hook": "Dynamic moves under spotlight"
+        },
+        {
+          "start": 146.0,
+          "end": 171.5,
+          "hook": "Intense rhythm and sharp styling"
+        },
+        {
+          "start": 195.0,
+          "end": 220.5,
+          "hook": "Captivating performance and stage energy"
+        }
+      ],
+      "used_clip_indices": [
+        5
+      ]
     }
   },
-  "last_source_id": "17X9JJaMbUfGKDkBmAi9kCJfJK1rQcYo3",
-  "last_artist_key": "kya",
+  "last_source_id": "13vzocJfDz-rAomFrZBIlsAeblfM_ldTa",
+  "last_artist_key": "yuna",
   "artist_cycle": [
     "karina",
     "eunbi",
-    "kya"
+    "kya",
+    "yuna"
   ],
   "completed_schedule_slots": [
     "2026-11-28|10:00"
