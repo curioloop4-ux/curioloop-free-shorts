@@ -1,17 +1,9 @@
 name: CurioLoop Fancam Drive Upload
 
 on:
-  schedule:
-    # Target US evening and Indonesia evening: KST 00:00, 02:00, 04:00, 10:00, 20:00.
-    - cron: "0 15 * * *"
-    - cron: "0 17 * * *"
-    - cron: "15 17 * * *" # 02:15 KST fallback for the 02:00 slot
-    - cron: "0 19 * * *"
-    - cron: "0 1 * * *"
-    - cron: "0 11 * * *"
-  workflow_run:
-    workflows: ["CurioLoop Artist Intro"]
-    types: [completed]
+  # TEMPORARILY PAUSED through 2026-11-29 (KST).
+  # Previous cron schedule and artist-intro workflow_run trigger are intentionally disabled.
+  # Restore both triggers after the pause.
   workflow_dispatch:
     inputs:
       output_only:
