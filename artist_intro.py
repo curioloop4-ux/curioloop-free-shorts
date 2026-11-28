@@ -815,7 +815,7 @@ def render(src,p,hist):
    clean_caption=unicodedata.normalize("NFKD",sentence)
    clean_caption=clean_caption.translate(str.maketrans({"’":"'","‘":"'","“":'"',"”":'"',"–":"-","—":"-","…":"...","•":"-"," ":" ","‐":"-","‑":"-"}))
    clean_caption=clean_caption.encode("ascii","ignore").decode("ascii")
-   clean_caption=re.sub(r"[^A-Za-z0-9\s]+"," ",clean_caption)
+   clean_caption=re.sub(r"[^A-Za-z0-9\s.,!?;:'()-]+"," ",clean_caption)
    clean_caption=re.sub(r"\s+"," ",clean_caption).strip()
    wrapped=textwrap.wrap(clean_caption,width=30,break_long_words=False,break_on_hyphens=False)
    groups=["\n".join(wrapped[j:j+2]) for j in range(0,len(wrapped),2)]
@@ -907,7 +907,9 @@ def render(src,p,hist):
  subtitle_filters=[]
  for i,cue in enumerate(cue_data):
   cue_file=W/f"subtitle_{i:03d}.txt"
-  cue_file.write_text(cue["text"],encoding="utf-8")
+  safe_caption=re.sub(r"[^A-Za-z0-9\s.,!?;:'()-]+"," ",str(cue["text"]))
+  safe_caption=re.sub(r"\s+"," ",safe_caption).strip()
+  cue_file.write_text(safe_caption,encoding="ascii")
   cue_start=max(1.5,float(cue["start"]));cue_end=min(length,float(cue["end"]))
   if cue_end<=cue_start: continue
   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
