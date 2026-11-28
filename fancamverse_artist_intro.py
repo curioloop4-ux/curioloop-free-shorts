@@ -963,8 +963,8 @@ def publish(yt,out,p,source):
  publish_at=intro_publish_at_kst(scheduled_slot) if scheduled_slot else None
  privacy="private" if publish_at else ("public" if approved else "private")
  print("One-time public approval:", "enabled" if approved_once else "disabled")
- # Keep the YouTube description empty; do not publish research/source notes.
- description=""
+ # Concise viewer-facing description only; never include research/source URLs.
+ description=f"{p['artist']} of {p['group']} ✨\nArtist spotlight featuring career highlights, key achievements, and recent updates.\n\n#Kpop #{re.sub(r'[^A-Za-z0-9]', '', p['artist'])} #ArtistSpotlight #Shorts"
  upload_stamp=datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
  unique_title=f"{p['title']} | {upload_stamp}"[:100]
  status={"privacyStatus":privacy,"selfDeclaredMadeForKids":False}
