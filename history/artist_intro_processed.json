@@ -141,6 +141,18 @@
       "intro_footage_start": 171.5,
       "intro_footage_end": 216.176,
       "published_at": "2026-11-28T12:03:51.421188+00:00"
+    },
+    {
+      "drive_file_id": "1XN7CC5Pr_5vLAH4iu3A9XPDkIA4ddONK",
+      "source_md5": "2b7d44128314d217cf3e1f273e21e720",
+      "source_artist_key": "sakura",
+      "source_name": "LE SSERAFIM 르세라핌 SAKURA 사쿠라 Fancam Ver KpopHots.mp4",
+      "artist": "Sakura",
+      "youtube_video_id": "XeTPSh3z6g0",
+      "privacy": "public",
+      "intro_footage_start": 29.0,
+      "intro_footage_end": 77.348,
+      "published_at": "2026-11-28T12:22:25.969107+00:00"
     }
   ],
   "opening_frames": {
@@ -148,7 +160,8 @@
       17.9
     ],
     "sakura": [
-      15.2
+      15.2,
+      21.43
     ],
     "haerin": [
       53.93
@@ -181,6 +194,6 @@
       17.65
     ]
   },
-  "last_render_source_start": 171.5,
-  "last_render_source_duration": 44.676
+  "last_render_source_start": 29.0,
+  "last_render_source_duration": 48.348
 }
