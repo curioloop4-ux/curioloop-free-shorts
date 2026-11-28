@@ -1,0 +1,120 @@
+name: FANCAMVERSE Artist Intro
+
+on:
+  workflow_dispatch:
+    inputs:
+      artist:
+        description: '한글 아티스트 이름으로 Drive 검색 및 자료 조사 (예: 장원영)'
+        required: false
+        default: ''
+        type: string
+      public_once:
+        description: '수동 실행 영상 공개 여부 (예약 자동화는 공개 업로드)'
+        required: false
+        default: true
+        type: boolean
+  schedule:
+    # Match CurioLoop: KST 08:00, 12:00, 22:00.
+    - cron: "0 23 * * *"
+    - cron: "0 3 * * *"
+    - cron: "0 13 * * *"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: fancamverse-artist-intro
+  cancel-in-progress: false
+
+jobs:
+  create-artist-intro:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install FFmpeg and subtitle renderer
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Validate FANCAMVERSE intro generator
+        run: python -m py_compile fancamverse_artist_intro.py curioloop_fancam.py
+
+      - name: Generate and upload one new Drive artist spotlight
+        env:
+          FANCAMVERSE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          YOUTUBE_EXPECTED_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
+          FANCAMVERSE_CHANNEL_BRAND: FANCAMVERSE
+          TARGET_ARTIST: ${{ inputs.artist }}
+          INTRO_PUBLIC_ONCE: ${{ github.event_name == 'schedule' || inputs.public_once }}
+          INTRO_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 23 * * *' && '08:00' || (github.event.schedule == '0 3 * * *' && '12:00' || (github.event.schedule == '0 13 * * *' && '22:00' || ''))) }}
+        run: python fancamverse_artist_intro.py
+
+      - name: Save rendered video artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fancamverse-artist-intro
+          path: |
+            work_fancamverse_artist_intro/*_artist_intro.mp4
+            work_fancamverse_artist_intro/*_research.json
+            history/fancamverse_artist_intro_processed.json
+            history/fancamverse_artist_intro_fancam_queue.json
+          if-no-files-found: ignore
+          retention-days: 7
+
+      - name: Upload exact intro-to-fancam handoff
+        if: always() && hashFiles('history/fancamverse_artist_intro_fancam_queue.json') != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: fancamverse-artist-intro-handoff
+          path: history/fancamverse_artist_intro_fancam_queue.json
+          retention-days: 7
+
+      - name: Persist FANCAMVERSE intro history
+        if: always()
+        continue-on-error: true
+        run: |
+          if [ -f history/fancamverse_artist_intro_processed.json ] || [ -f history/fancamverse_artist_intro_fancam_queue.json ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add history/fancamverse_artist_intro_processed.json history/fancamverse_artist_intro_fancam_queue.json 2>/dev/null || true
+            if ! git diff --cached --quiet; then
+              git commit -m "Record FANCAMVERSE artist intro publication"
+              pushed=false
+              for attempt in 1 2 3; do
+                git fetch origin main
+                git rebase origin/main
+                if git push origin HEAD:main; then
+                  pushed=true
+                  break
+                fi
+                echo "History push attempt $attempt was rejected; rebasing on the latest main."
+              done
+              if [ "$pushed" != true ]; then
+                echo "::error::Upload succeeded, but FANCAMVERSE intro history could not be persisted after three safe rebase attempts."
+                exit 1
+              fi
+            else
+              echo "FANCAMVERSE intro history is already up to date."
+            fi
+          else
+            echo "No FANCAMVERSE intro history file was created."
+          fi
