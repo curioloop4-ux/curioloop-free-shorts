@@ -15,11 +15,25 @@
       "published_at": "2026-11-26T18:58:53.560544+00:00"
     },
     {
+      "artist_key": "sakura",
+      "format": "fancam",
+      "source_id": "1ZQvFiV_0cBcjJjcTlnakOHBYChLYXR6d",
+      "published_at": "2026-11-26T19:06:08Z",
+      "legacy_backfill": true
+    },
+    {
       "artist_key": "haerin",
       "format": "artist_intro",
       "source_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs",
       "youtube_video_id": "tx6NV-UH-oE",
       "published_at": "2026-11-26T19:56:47.250951+00:00"
+    },
+    {
+      "artist_key": "haerin",
+      "format": "fancam",
+      "source_id": "17FbIeK7EKYYPof0MHlcbh-V61J43Cnqs",
+      "published_at": "2026-11-26T20:04:25Z",
+      "legacy_backfill": true
     },
     {
       "artist_key": "kazuha",
@@ -29,11 +43,25 @@
       "published_at": "2026-11-26T20:51:14.000256+00:00"
     },
     {
+      "artist_key": "kazuha",
+      "format": "fancam",
+      "source_id": "1DMZ0CxlNGd1XGJY2mI6HeaSsnyVleQiV",
+      "published_at": "2026-11-26T20:59:16Z",
+      "legacy_backfill": true
+    },
+    {
       "artist_key": "wonyoung",
       "format": "artist_intro",
       "source_id": "1jsRnlSlyyzFA4bc4Wb1LXvAxX64fRnBe",
       "youtube_video_id": "CNy8ajgaMtM",
       "published_at": "2026-11-26T21:49:57.866747+00:00"
+    },
+    {
+      "artist_key": "wonyoung",
+      "format": "fancam",
+      "source_id": "1jsRnlSlyyzFA4bc4Wb1LXvAxX64fRnBe",
+      "published_at": "2026-11-26T21:57:35Z",
+      "legacy_backfill": true
     },
     {
       "artist_key": "karina",
@@ -48,6 +76,20 @@
       "source_id": "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch",
       "youtube_video_id": "AG6kT1CCjI4",
       "published_at": "2026-11-27T04:04:44.886033+00:00"
+    },
+    {
+      "artist_key": "lisa",
+      "format": "fancam",
+      "source_id": "10SW4eGcQYjbHRZC60B7FAaMRwaDYE_Ch",
+      "published_at": "2026-11-27T04:12:16Z",
+      "legacy_backfill": true
+    },
+    {
+      "artist_key": "nancy",
+      "format": "fancam",
+      "source_id": "1U3xhPXGGWHkvqH83nfi15oKcYScqskC7",
+      "published_at": "2026-11-27T04:23:32Z",
+      "legacy_backfill": true
     },
     {
       "artist_key": "yuqi",
@@ -78,10 +120,24 @@
       "published_at": "2026-11-27T15:21:59.454483+00:00"
     },
     {
+      "artist_key": "karina",
+      "format": "fancam",
+      "source_id": "180Hqp50Fevl6ocsxQqRQRYbvzS3RlgNJ",
+      "published_at": "2026-11-27T23:33:15Z",
+      "legacy_backfill": true
+    },
+    {
       "artist_key": "eunbi",
       "format": "fancam",
       "source_id": "10qFttq7VbEyoYO9PGG-_Mk6JhUlmazhS",
       "published_at": "2026-11-27T23:56:10Z",
+      "legacy_backfill": true
+    },
+    {
+      "artist_key": "kya",
+      "format": "fancam",
+      "source_id": "17X9JJaMbUfGKDkBmAi9kCJfJK1rQcYo3",
+      "published_at": "2026-11-28T02:11:07Z",
       "legacy_backfill": true
     },
     {
