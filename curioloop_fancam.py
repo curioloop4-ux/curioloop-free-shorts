@@ -616,6 +616,54 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
         outputs.append((output, clip))
     return outputs
 
+def search_artist_identity(filename):
+    """Use Gemini Google Search grounding as a last-resort resolver for unknown source names."""
+    try:
+        api_key = required("GEMINI_API_KEY")
+        model = (os.getenv("GEMINI_MODEL") or "gemini-3.8-flash").strip()
+        prompt = f"""
+Identify the K-pop performer and their official group from this exact video filename.
+Filename: {filename}
+Use Google Search grounding to verify the identity. Do not guess from an ambiguous first name.
+Return JSON only with keys: artist, group, confidence, evidence.
+artist must be the performer's stage name in uppercase English.
+group must be the official group name, or SOLO only for a confirmed soloist.
+confidence must be a number from 0 to 1.
+If identity is uncertain, return artist and group as empty strings and confidence 0.
+"""
+        response = gemini_generate_with_fallback(
+            model, api_key,
+            {
+                "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+                "tools": [{"google_search": {}}],
+                "generationConfig": {
+                    "temperature": 0,
+                    "responseMimeType": "application/json"
+                }
+            },
+            35, "artist identity web search"
+        )
+        data = parse_gemini_json(response, "artist identity web search")
+        artist = re.sub(r"[^A-Z0-9 ]", "", str(data.get("artist", "")).upper()).strip()
+        group = str(data.get("group", "")).strip()
+        confidence = float(data.get("confidence", 0))
+        if (confidence < 0.80 or not artist or not group
+                or not re.fullmatch(r"[A-Z][A-Z0-9 ]*", artist)
+                or not re.fullmatch(r"[A-Za-z0-9&!(). '-]+", group)):
+            print(f"Online artist lookup inconclusive for '{filename}'; refusing to guess.")
+            return "", "", []
+        print(
+            f"Online artist lookup verified: {artist} / {group} "
+            f"(confidence={confidence:.2f}); evidence={str(data.get('evidence', ''))[:240]}"
+        )
+        tags = [artist.title(), f"{group} {artist.title()}", f"{artist.title()} fancam",
+                f"{group} fancam", "K-pop", "K-pop fancam", "K-pop Shorts",
+                "Korean idol", "female idol", "Shorts"]
+        return artist, group, tags
+    except Exception as exc:
+        print(f"Online artist lookup failed safely for '{filename}': {type(exc).__name__}: {exc}")
+        return "", "", []
+
 def identify_artist(filename):
     value = Path(filename).stem.casefold()
 
@@ -822,7 +870,8 @@ def identify_artist(filename):
                     "female idol", "Shorts"]
             return canonical, team, tags
         print(f"Artist name recovery ambiguous for '{filename}'; refusing to guess.")
-    return "", "", []
+    # Deterministic aliases did not resolve this filename; search the web before skipping it.
+    return search_artist_identity(filename)
 
 def generate_metadata(filename, hook, index):
     artist, group, fixed_tags = identify_artist(filename)
