@@ -1087,12 +1087,12 @@ def main():
   combined_records=processed_records+fancam_records
   rotation_path=R/"history"/"curioloop_artist_rotation.json"
   rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
-  recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:10]
+  recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:20]
   recent_keys={str(e.get("artist_key","")).casefold().strip() for e in recent_events if e.get("artist_key")}
   cooled=[x for x in candidates if artist_key_by_id[x["id"]] not in recent_keys]
   if cooled:
    candidates=cooled
-   print("Recent-ten artist cooldown active:",", ".join(sorted(recent_keys)))
+   print("Recent-twenty artist cooldown active:",", ".join(sorted(recent_keys)))
   seen_artist_keys={history_artist_key(record) for record in combined_records}
   seen_artist_keys.discard("")
   fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
