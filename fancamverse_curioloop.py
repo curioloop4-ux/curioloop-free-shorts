@@ -154,7 +154,7 @@ def make_services():
         scopes=YOUTUBE_SCOPES)
     return build("drive", "v3", credentials=drive_creds), build("youtube", "v3", credentials=youtube_creds)
 
-def verify_upload_channel(youtube):
+def validate_upload_destination_config():
     # Keep the configured destination ID as a required deployment setting,
     # but do not call channels.list(mine=True): FANCAMVERSE uses an existing
     # youtube.upload-only refresh token, and that endpoint requires read scope.
@@ -1044,7 +1044,7 @@ def main():
         privacy = "private"
         print(f"Scheduled YouTube publication for {publish_at} (Asia/Seoul).")
     if not output_only:
-        verify_upload_channel(youtube)
+        validate_upload_destination_config()
         print(f"Upload destination: {CHANNEL_BRAND}, using its dedicated OAuth token.")
 
     uploaded_count = 0
