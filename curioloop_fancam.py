@@ -1081,10 +1081,14 @@ def main():
         recent_events = sorted(rotation_data.get("events", []), key=lambda e: str(e.get("published_at", "")), reverse=True)[:20]
         recent_keys = {str(e.get("artist_key", "")).casefold().strip() for e in recent_events if e.get("artist_key")}
         cooled = [c for c in identifiable if artist_by_source[c["id"]] not in recent_keys]
-        if cooled:
-            identifiable = cooled
-            artist_by_source = {c["id"]: artist_by_source[c["id"]] for c in identifiable}
-            print("Recent-twenty artist cooldown active:", ", ".join(sorted(recent_keys)))
+        if not cooled:
+            raise RuntimeError(
+                "Upload blocked: every eligible artist is among the twenty most recent successful uploads. "
+                "Add new artist sources or wait; repeating a recent artist is not permitted."
+            )
+        identifiable = cooled
+        artist_by_source = {c["id"]: artist_by_source[c["id"]] for c in identifiable}
+        print("Recent-twenty artist cooldown enforced:", ", ".join(sorted(recent_keys)))
         artist_cycle = list(history.get("artist_cycle", []))
         # Cross-format cooldown: artists featured by CurioLoop artist-intro
         # are also counted in the fancam rotation, preventing adjacent repeats.
