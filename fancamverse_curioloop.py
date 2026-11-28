@@ -866,8 +866,15 @@ def generate_metadata(filename, hook, index):
         key = tag.casefold()
         if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
             clean.append(tag); seen.add(key)
-    # Leave descriptions empty; do not add source notes or hashtags.
-    description = ""
+    # Short viewer-facing description: artist, clip context, and relevant hashtags only.
+    safe_artist = re.sub(r"[^A-Za-z0-9]", "", artist.title()) if artist else "Kpop"
+    safe_group = re.sub(r"[^A-Za-z0-9]", "", group.replace(" ", "")) if group else "Kpop"
+    clip_summary = re.sub(r"\\s+", " ", str(hook or "performance highlight")).strip()
+    description = (
+        f"{artist.title()} of {group} ✨ {clip_summary}.\n"
+        f"K-pop performance fancam.\n\n"
+        f"#{safe_artist} #{safe_group} #Fancam #Kpop #Shorts"
+    )
     upload_stamp = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
     title = f"{title.replace(' #Shorts', '')} | Clip {index:02d} · {upload_stamp} #Shorts"
     return title[:100], description[:5000], clean
