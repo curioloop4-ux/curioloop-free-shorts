@@ -165,6 +165,18 @@
       "intro_footage_start": 17.5,
       "intro_footage_end": 65.968,
       "published_at": "2026-11-28T14:22:15.967365+00:00"
+    },
+    {
+      "drive_file_id": "1zysMoQaHfIndQme9ghOs8gvEXuGt1Aaa",
+      "source_md5": "c4f343fb4bded3a61dc6dd21cdd99140",
+      "source_artist_key": "an yujin",
+      "source_name": "IVE 아이브 AN YUJIN 안유진 2026 MAMA AWARDS Fancam ver KpopHots.mp4",
+      "artist": "An Yujin",
+      "youtube_video_id": "e2h6IGHZWps",
+      "privacy": "public",
+      "intro_footage_start": 133.969,
+      "intro_footage_end": 180.661,
+      "published_at": "2026-11-28T14:50:29.363795+00:00"
     }
   ],
   "opening_frames": {
@@ -206,9 +218,10 @@
       17.65
     ],
     "an yujin": [
-      13.68
+      13.68,
+      14.45
     ]
   },
-  "last_render_source_start": 17.5,
-  "last_render_source_duration": 48.468
+  "last_render_source_start": 133.969,
+  "last_render_source_duration": 46.692
 }
