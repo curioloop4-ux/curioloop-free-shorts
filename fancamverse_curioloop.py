@@ -875,8 +875,8 @@ def generate_metadata(filename, hook, index):
         f"K-pop performance fancam.\n\n"
         f"#{safe_artist} #{safe_group} #Fancam #Kpop #Shorts"
     )
-    upload_stamp = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
-    title = f"{title.replace(' #Shorts', '')} | Clip {index:02d} · {upload_stamp} #Shorts"
+    # Keep titles clean: no clip index or upload timestamp suffix.
+    title = f"{title.replace(' #Shorts', '')} #Shorts"
     return title[:100], description[:5000], clean
 
 def next_publish_at_kst(publish_time):
