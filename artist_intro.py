@@ -960,13 +960,32 @@ def publish(yt,out,p,source):
  publish_at=intro_publish_at_kst(scheduled_slot) if scheduled_slot else None
  privacy="private" if publish_at else ("public" if approved else "private")
  print("One-time public approval:", "enabled" if approved_once else "disabled")
- research_links="\n".join(f"{x.get('title','Source')}: {x['url']}" for x in p.get("sources",[]))
- description=f"Meet {p['artist']} from {p['group']}.\nArtist profile, career highlights, and recent update.\nOriginal footage source: {source}\nResearch sources:\n{research_links}\n#Kpop #ArtistSpotlight #Shorts"
- upload_stamp=datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
- unique_title=f"{p['title']} | {upload_stamp}"[:100]
+ artist_tag=str(p.get("artist","")).strip()
+ group_tag=str(p.get("group","")).strip()
+ base_tags=[
+  "Kpop","K-pop","Kpop Shorts","Kpop Artist","Kpop Idol","Korean Idol",
+  "Kpop News","Kpop Profile","Kpop Facts","Kpop Spotlight","Kpop Update",
+  "Kpop Star","Korean Singer","Korean Music","Korean Pop","Girl Group",
+  "Female Idol","Idol Profile","Idol Facts","Idol Spotlight","Kpop Fans",
+  "Kpop Stan","Kpop Trending","Kpop Viral","Shorts"
+ ]
+ if artist_tag:base_tags.extend([artist_tag,artist_tag+" Kpop",artist_tag+" Profile"])
+ if group_tag:base_tags.extend([group_tag,group_tag+" Kpop",group_tag+" Members"])
+ clean_tags=[];seen_tags=set()
+ for tag in base_tags:
+  tag=re.sub(r"\\s+"," ",str(tag)).strip()
+  key=tag.casefold()
+  if tag and key not in seen_tags and len(",".join(clean_tags+[tag]))<=480:
+   clean_tags.append(tag);seen_tags.add(key)
+  if len(clean_tags)>=30:break
+ description=" ".join("#"+re.sub(r"[^A-Za-z0-9]","",tag) for tag in clean_tags)
+ clean_title=unicodedata.normalize("NFKC",str(p.get("title","")))
+ clean_title=re.sub(r"\\s*\\|\\s*\\d{4}-?\\d{2}.*$","",clean_title)
+ clean_title=re.sub(r"[^A-Za-z0-9가-힣| /&()'!?-]+","",clean_title)
+ clean_title=re.sub(r"\\s+"," ",clean_title).strip(" |")
  status={"privacyStatus":privacy,"selfDeclaredMadeForKids":False}
  if publish_at:status["publishAt"]=publish_at
- body={"snippet":{"title":unique_title,"description":description[:4900],"tags":[x for x in p.get("tags",[]) if "curioloop" not in str(x).casefold()]+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":status}
+ body={"snippet":{"title":clean_title[:100],"description":description[:4900],"tags":clean_tags,"categoryId":"10"},"status":status}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
  returned_status=v.get("status") or {}
  returned_publish_at=returned_status.get("publishAt")
