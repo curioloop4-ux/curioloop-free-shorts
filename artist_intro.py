@@ -10,6 +10,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload,MediaIoBaseDownload
 R=Path(__file__).parent; W=R/"work_artist_intro"; W.mkdir(exist_ok=True)
 H=R/"history"/"artist_intro_processed.json"; TYPES={"video/mp4","video/quicktime","video/x-msvideo","video/webm","video/x-matroska"}
+AUDIO_EXTS={".mp3",".wav",".m4a",".aac",".ogg",".flac"}
 def need(k):
  v=os.getenv(k,"").strip()
  if not v: raise RuntimeError("Missing secret "+k)
@@ -53,6 +54,23 @@ def download(drive,item):
   while not done:_,done=dl.next_chunk()
  if not p.exists() or not p.stat().st_size:raise RuntimeError("Empty Drive download")
  return p
+def scan_audio(drive,folder):
+ q=[folder];seen=set();out=[]
+ while q:
+  parent=q.pop(0)
+  if parent in seen:continue
+  seen.add(parent);token=None
+  while True:
+   args={"q":f"'{parent}' in parents and trashed=false","pageSize":100,"orderBy":"name","fields":"nextPageToken,files(id,name,mimeType,createdTime,size)","supportsAllDrives":True,"includeItemsFromAllDrives":True}
+   if token:args["pageToken"]=token
+   response=drive.files().list(**args).execute()
+   for item in response.get("files",[]):
+    if item.get("mimeType")=="application/vnd.google-apps.folder":q.append(item["id"])
+    elif Path(item.get("name","")).suffix.lower() in AUDIO_EXTS:out.append(item)
+   token=response.get("nextPageToken")
+   if not token:break
+ return sorted(out,key=lambda x:(x.get("name","").casefold(),x["id"]))
+
 def profile(filename, target_hint=""):
  # Read the public NamuWiki article directly; no Gemini/API key is used.
  # Keep requests polite and sequential (at least one second between requests).
@@ -669,7 +687,7 @@ def profile(filename, target_hint=""):
   "research_queries":[target]
  }
 
-def render(src,p,hist):
+def render(src,p,hist,drive,folder):
  intro=1.5; source_len=dur(src)
  audio=W/"voice.mp3";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
@@ -890,17 +908,36 @@ def render(src,p,hist):
  )
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
- fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
- # Retain the source performance sound at a reduced level under the narration.
- probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
- has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
- if has_source_audio:
-  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
-  fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
- else:
-  fc+="[voice]anull[a]"
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
- check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
+  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
+  # Use creator-supplied YouTube Audio Library tracks stored in the source Drive folder tree.
+  music_files=scan_audio(drive,folder)
+  used_music=hist.setdefault("used_background_music_ids",[])
+  available_music=[item for item in music_files if item["id"] not in used_music]
+  if not available_music:
+   used_music.clear()
+   available_music=music_files
+  music_item=available_music[0] if available_music else None
+  if music_item:
+   music_path=download(drive,music_item)
+   print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"])
+   fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.06,afade=t=in:st=0:d=1.0,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
+   used_music.append(music_item["id"])
+   if len(used_music)>len(music_files):del used_music[:-len(music_files)]
+  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
+  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
+  mix_labels=["[voice]"]
+  if has_source_audio:
+   fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
+   mix_labels.append("[original]")
+  if music_item:mix_labels.append("[music]")
+  if len(mix_labels)>1:
+   fc+="".join(mix_labels)+f"amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+  else:fc+="[voice]anull[a]"
+  ffmpeg_args=["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta)]
+  if music_item:ffmpeg_args+=["-i",str(music_path)]
+  ffmpeg_args+=["-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)]
+  run(ffmpeg_args)
+check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
 def intro_publish_at_kst(publish_time):
@@ -1084,7 +1121,7 @@ def main():
    research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
    research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
    print("Verified research saved:",research_path.name)
-   out=render(src,p,h)
+   out=render(src,p,h,drive,folder)
    rendered_source_start=float(h.get("last_render_source_start",0.0))
    rendered_source_duration=float(h.get("last_render_source_duration",0.0))
    if rendered_source_duration<=0:
