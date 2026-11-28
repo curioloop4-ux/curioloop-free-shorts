@@ -68,7 +68,7 @@ jobs:
       - name: Validate CurioLoop-grade FANCAMVERSE pipeline
         run: python -m py_compile fancamverse_curioloop.py
 
-      - name: Verify FANCAMVERSE OAuth identity, then read Drive and upload
+      - name: Validate configured FANCAMVERSE destination, then read Drive and upload
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.8-flash
