@@ -1058,13 +1058,13 @@ def main():
         # Cross-format cooldown: exclude artists in the five most recent successful uploads.
         rotation_path = ROOT / "history" / "curioloop_artist_rotation.json"
         rotation_data = json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events": []}
-        recent_events = sorted(rotation_data.get("events", []), key=lambda e: str(e.get("published_at", "")), reverse=True)[:5]
+        recent_events = sorted(rotation_data.get("events", []), key=lambda e: str(e.get("published_at", "")), reverse=True)[:10]
         recent_keys = {str(e.get("artist_key", "")).casefold().strip() for e in recent_events if e.get("artist_key")}
         cooled = [c for c in identifiable if artist_by_source[c["id"]] not in recent_keys]
         if cooled:
             identifiable = cooled
             artist_by_source = {c["id"]: artist_by_source[c["id"]] for c in identifiable}
-            print("Recent-five artist cooldown active:", ", ".join(sorted(recent_keys)))
+            print("Recent-ten artist cooldown active:", ", ".join(sorted(recent_keys)))
         artist_cycle = list(history.get("artist_cycle", []))
         # Cross-format cooldown: artists featured by CurioLoop artist-intro
         # are also counted in the fancam rotation, preventing adjacent repeats.
@@ -1239,18 +1239,18 @@ def main():
             f"Source progress: {len(updated_used_indices)}/{len(clips)} Shorts used; "
             f"{'completed' if source_complete else 'will rotate back later'}."
         )
+        selected_artist_key = artist_by_source[item["id"]]
         rotation_path = ROOT / "history" / "curioloop_artist_rotation.json"
         rotation_path.parent.mkdir(parents=True, exist_ok=True)
         rotation_data = json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events": []}
         rotation_data.setdefault("events", []).append({
-            "artist_key": artist_by_source[item["id"]], "format": "fancam",
+            "artist_key": selected_artist_key, "format": "fancam",
             "source_id": item["id"], "youtube_video_id": video_id,
             "published_at": datetime.now().astimezone().isoformat()
         })
         rotation_data["events"] = rotation_data["events"][-500:]
         rotation_path.write_text(json.dumps(rotation_data, ensure_ascii=False, indent=2), encoding="utf-8")
         history["last_source_id"] = item["id"]
-        selected_artist_key = artist_by_source[item["id"]]
         history["last_artist_key"] = selected_artist_key
         artist_cycle = list(history.get("artist_cycle", []))
         if selected_artist_key not in artist_cycle:
