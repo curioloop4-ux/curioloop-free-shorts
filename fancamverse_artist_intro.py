@@ -680,6 +680,25 @@ def profile(filename, target_hint=""):
   "research_queries":[target]
  }
 
+
+def scan_background_music(drive,folder):
+ # Licensed MP3/WAV files are placed in the same FANCAMVERSE Drive folder as source videos.
+ q=f"'{folder}' in parents and trashed=false"
+ result=drive.files().list(q=q,pageSize=100,orderBy="name",fields="files(id,name,mimeType,size)",supportsAllDrives=True,includeItemsFromAllDrives=True).execute()
+ audio=[x for x in result.get("files",[]) if x.get("mimeType") in {"audio/mpeg","audio/mp3","audio/wav","audio/x-wav","audio/mp4","audio/aac","audio/ogg"} or Path(x.get("name","")).suffix.casefold() in {".mp3",".wav",".m4a",".aac",".ogg"}]
+ print("Licensed background music files found in Drive:",len(audio))
+ return audio
+
+def download_background_music(drive,item):
+ path=W/("bgm_"+re.sub(r"[^A-Za-z0-9._-]+","_",item["name"]).strip("._"))
+ request=drive.files().get_media(fileId=item["id"],supportsAllDrives=True)
+ with path.open("wb") as handle:
+  downloader=MediaIoBaseDownload(handle,request,chunksize=4*1024*1024);done=False
+  while not done:_,done=downloader.next_chunk()
+ if not path.exists() or path.stat().st_size<1024:raise RuntimeError("Background music download is empty")
+ print("Selected licensed Drive background track:",item["name"])
+ return path
+
 def create_background_music(path, seconds=36, sample_rate=22050):
  # Original, royalty-free ambient pop bed synthesized locally for this channel.
  # Soft major-seventh chords and sparse plucks; intentionally unobtrusive.
@@ -715,7 +734,7 @@ def create_background_music(path, seconds=36, sample_rate=22050):
   wf.writeframes(frames)
  print("Original background music generated:",path.name,"duration:",seconds,"seconds")
 
-def render(src,p,hist):
+def render(src,p,hist,drive,folder):
  intro=1.5; source_len=dur(src)
  audio=W/"voice.mp3";vtt=W/"voice.srt"
  async def make_voice_and_subtitles():
@@ -927,15 +946,39 @@ def render(src,p,hist):
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
- # Retain the source performance sound at a reduced level under the narration.
+ # Preserve the original stage audio quietly; add a licensed Drive music bed below narration.
  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
- if has_source_audio:
-  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
-  fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+ music_files=scan_background_music(drive,folder)
+ music_path=None
+ if music_files:
+  import random
+  # Match a descriptive filename tag to the editorial tone; otherwise rotate randomly.
+  mood_terms=("bright","upbeat","happy","fresh","cute","energetic","power","cool","elegant","chill","ambient","soft","inspiring")
+  narration_text=(p.get("narration","")+" "+p.get("artist","")+" "+p.get("group","")).casefold()
+  mood_map={"bright":("bright","upbeat","happy","fresh","cute"),"energetic":("energetic","power","dynamic"),"cool":("cool","modern","electronic"),"soft":("soft","chill","ambient","calm","elegant")}
+  preferred=[]
+  if any(x in narration_text for x in ("debut","bright","cute","fresh","youth")):preferred=mood_map["bright"]
+  elif any(x in narration_text for x in ("performance","dance","powerful","strong")):preferred=mood_map["energetic"]
+  elif any(x in narration_text for x in ("ballad","vocal","emotional","soft")):preferred=mood_map["soft"]
+  tagged=[x for x in music_files if any(tag in x.get("name","").casefold() for tag in preferred)]
+  music_path=download_background_music(drive,random.choice(tagged or music_files))
  else:
-  fc+="[voice]anull[a]"
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","slow","-crf","17","-maxrate","12M","-bufsize","24M","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+  # Temporary original instrumental fallback until licensed MP3s are added to Drive.
+  music_path=W/"background_music_fallback.wav"
+  create_background_music(music_path,seconds=length)
+  print("NOTICE: No licensed Drive track found; using the existing original instrumental fallback.")
+ # Inputs: 0 still, 1 source video, 2 narration, 3 CTA overlay, 4 background music.
+ audio_inputs=["-i",str(music_path)]
+ mix_parts=[]
+ if has_source_audio:
+  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.12,apad,atrim=duration={length:.3f}[original];"
+  mix_parts.append("[original]")
+ fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f},volume=1.0[voice];"
+ fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.10,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
+ mix_parts.extend(["[voice]","[music]"])
+ fc+="".join(mix_parts)+f"amix=inputs={len(mix_parts)}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),*audio_inputs,"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","slow","-crf","17","-maxrate","12M","-bufsize","24M","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
@@ -1092,7 +1135,7 @@ def main():
    research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
    research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
    print("Verified research saved:",research_path.name)
-   out=render(src,p,h)
+   out=render(src,p,h,drive,folder)
    rendered_source_start=float(h.get("last_render_source_start",0.0))
    rendered_source_duration=float(h.get("last_render_source_duration",0.0))
    if rendered_source_duration<=0:
