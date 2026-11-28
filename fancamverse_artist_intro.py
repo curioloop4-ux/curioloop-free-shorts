@@ -25,6 +25,17 @@ def run(a):
  if r.stderr and "ffmpeg" not in str(a[0]).lower(): print(r.stderr[-2000:])
 def dur(p):
  return float(subprocess.run(["ffprobe","-v","error","-show_entries","format=duration","-of","default=noprint_wrappers=1:nokey=1",str(p)],check=True,capture_output=True,text=True).stdout.strip())
+def verify_source_quality(p):
+ probe=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(p)],check=True,capture_output=True,text=True).stdout)
+ streams=probe.get("streams",[])
+ if not streams: raise RuntimeError("Source has no video stream")
+ width=int(streams[0].get("width",0)); height=int(streams[0].get("height",0))
+ # Effective pixels remaining after a centered 9:15 crop. Reject blurry
+ # 480p/low-resolution landscape footage instead of enlarging it to 1080x1800.
+ crop_w=min(width,int(height*0.6)); crop_h=min(height,int(width/0.6))
+ print(f"Source quality check: {width}x{height}; effective 9:15 crop {crop_w}x{crop_h}")
+ if crop_w<720 or crop_h<1200:
+  raise RuntimeError(f"Source too low-resolution for a clean Short ({width}x{height}; effective crop {crop_w}x{crop_h}; minimum 720x1200).")
 def services():
  d=Credentials(None,refresh_token=need("FANCAMVERSE_REFRESH_TOKEN"),token_uri="https://oauth2.googleapis.com/token",client_id=need("FANCAMVERSE_CLIENT_ID"),client_secret=need("FANCAMVERSE_CLIENT_SECRET"),scopes=["https://www.googleapis.com/auth/drive.readonly"])
  y=Credentials(None,refresh_token=need("YOUTUBE_REFRESH_TOKEN"),token_uri="https://oauth2.googleapis.com/token",client_id=need("YOUTUBE_CLIENT_ID"),client_secret=need("YOUTUBE_CLIENT_SECRET"),scopes=["https://www.googleapis.com/auth/youtube.upload"])
@@ -920,7 +931,7 @@ def render(src,p,hist):
   fc+="[original][voice]amix=inputs=2:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
  else:
   fc+="[voice]anull[a]"
- run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
+ run(["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta),"-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","slow","-crf","17","-maxrate","12M","-bufsize","24M","-pix_fmt","yuv420p","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)])
  check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
@@ -1073,6 +1084,7 @@ def main():
    p=profile(item["name"],target_hint=target)
    print("Selected Drive source:",item["name"])
    src=download(drive,item)
+   verify_source_quality(src)
    research_path=W/(re.sub(r"[^A-Za-z0-9_-]+","_",p["artist"].lower())+"_research.json")
    research_path.write_text(json.dumps({"artist":p["artist"],"group":p["group"],"narration":p["narration"],"sources":p.get("sources",[]),"recent_news":p.get("recent_news",{}),"research_queries":p.get("research_queries",[])},ensure_ascii=False,indent=2),encoding="utf-8")
    print("Verified research saved:",research_path.name)
