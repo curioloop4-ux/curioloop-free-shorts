@@ -1002,28 +1002,27 @@ def main():
   stem=Path(value or "").stem.casefold()
   stem=re.sub(r"(?:[_ .-]*(?:ver(?:sion)?[_ .-]*[a-z0-9]*|fancam|fan[_ .-]*cam|직캠|팬캠|페이스캠|풀캠|가로캠|세로캠|4k|8k|60fps|long[_ .-]*ver))+$","",stem,flags=re.I)
   return re.sub(r"[^0-9a-z가-힣]+","",stem)
- done_names={source_name_key(x.get("source_name","")) for x in h["processed"] if x.get("source_name")}
  target=os.getenv("TARGET_ARTIST","").strip()
  scanned=scan(drive,folder)
- # Keep prior-used originals eligible, but place them after all never-used sources.
  candidates=scanned
- def source_was_used(item):
-  return (item["id"] in done
-   or bool(item.get("md5Checksum") and item.get("md5Checksum") in done_hashes)
-   or source_name_key(item["name"]) in done_names)
- # Treat originals already used by the fancam pipeline as previously used here too.
+ # Exact Drive IDs and content hashes are the cross-format deduplication keys.
+ used_original_ids=set(done)
+ used_original_md5s=set(done_hashes)
  fancam_history_path=R/"history"/"curioloop_fancam_processed.json"
- fancam_used_ids=set();fancam_used_names=set()
  if fancam_history_path.exists():
   fh=json.loads(fancam_history_path.read_text(encoding="utf-8"))
-  fancam_used_ids.update(fh.get("sources",{}).keys())
-  fancam_used_ids.update(fh.get("processed",[]))
+  used_original_ids.update(fh.get("sources",{}).keys())
+  used_original_ids.update(fh.get("processed",[]))
   for state in fh.get("sources",{}).values():
-   if state.get("name"):fancam_used_names.add(source_name_key(state["name"]))
- prior_source_was_used=source_was_used
+   if state.get("source_md5"):used_original_md5s.add(str(state["source_md5"]).strip())
+ rotation_path=R/"history"/"curioloop_artist_rotation.json"
+ if rotation_path.exists():
+  rotation_data=json.loads(rotation_path.read_text(encoding="utf-8"))
+  used_original_ids.update(str(e.get("source_id")) for e in rotation_data.get("events",[]) if e.get("source_id"))
  def source_was_used(item):
-  return prior_source_was_used(item) or item["id"] in fancam_used_ids or source_name_key(item["name"]) in fancam_used_names
- print(f"Drive source pool: {len(candidates)} total; previously used originals across both formats are fallback-only.")
+  return (item["id"] in used_original_ids
+   or bool(item.get("md5Checksum") and item.get("md5Checksum") in used_original_md5s))
+ print(f"Drive source pool: {len(candidates)} total; {len(used_original_ids)} original(s) already consumed across both formats are excluded.")
  # Only choose sources that the companion fancam pipeline can identify too.
  from curioloop_fancam import identify_artist as identify_fancam_artist
  blocked=("김채원","chaewon")
@@ -1048,82 +1047,26 @@ def main():
  print(f"Identifiable source videos: {len(candidates)}; unknown/ambigous videos skipped.")
  if not candidates:raise RuntimeError("No Drive video has a recognizable artist name; refusing to guess identity.")
 
- def history_artist_key(record):
-  source_name=record.get("source_name","")
-  if source_name:
-   old_artist,old_group,_=identify_fancam_artist(source_name)
-   if old_artist and old_group:return old_artist.casefold()
-  raw=str(record.get("source_artist_key") or record.get("artist") or "").casefold().strip()
-  aliases={"wonyoung":"wonyoung","jang wonyoung":"wonyoung","sakura":"sakura","miyawaki sakura":"sakura",
-   "karina":"karina","lisa":"lisa","tzuyu":"tzuyu","haerin":"haerin","kazuha":"kazuha",
-   "nancy":"nancy","momo":"momo","jennie":"jennie","eunha":"eunha","chaeryeong":"chaeryeong"}
-  return aliases.get(raw,raw)
-
  if target:
-  # An explicit manual test target takes precedence over rotation history.
   target_key=target.casefold()
   aliases={"wonyoung":["장원영","원영","wonyoung"],"eunha":["은하","eunha"]}
   needles=aliases.get(target_key,[target_key])
   candidates=[x for x in candidates if any(term in x["name"].casefold() for term in needles)]
   if not candidates:raise RuntimeError(f"No identifiable Drive video found for requested test artist: {target}")
-  print(f"Manual artist target: {target}; automatic artist rotation bypassed.")
- else:
-  processed_records=h.get("processed",[])
-  # Include the companion fancam history so both CurioLoop formats share
-  # artist-level rotation and do not repeatedly feature the same person.
-  fancam_history_path=R/"history"/"curioloop_fancam_processed.json"
-  fancam_records=[]
-  if fancam_history_path.exists():
-   try:
-    fancam_history=json.loads(fancam_history_path.read_text(encoding="utf-8"))
-    for source_state in fancam_history.get("sources",{}).values():
-     source_name=source_state.get("name","")
-     if source_name:
-      fancam_artist,_,_=identify_fancam_artist(source_name)
-      if fancam_artist:
-       fancam_records.append({"source_name":source_name,"source_artist_key":fancam_artist})
-   except Exception as exc:
-    print("Warning: could not read companion fancam artist history:",type(exc).__name__)
-  combined_records=processed_records+fancam_records
-  rotation_path=R/"history"/"curioloop_artist_rotation.json"
-  rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
-  seen_artist_keys={history_artist_key(record) for record in combined_records}
-  seen_artist_keys.discard("")
-  fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
-  if fresh_artist_keys:
-   candidates=[x for x in candidates if artist_key_by_id[x["id"]] in fresh_artist_keys]
-   print("Artist rotation: excluding every previously featured artist while new artists remain.")
-   print("Previously featured artist keys:",", ".join(sorted(seen_artist_keys)) or "none")
-   print("Eligible new artist keys:",", ".join(sorted(fresh_artist_keys)))
-  else:
-   # Once every available artist has appeared, restart with the least-recently featured artist.
-   latest_seen={}
-   for index,record in enumerate(combined_records):
-    key=history_artist_key(record)
-    if key:latest_seen[key]=index
-   oldest_key=min({artist_key_by_id[x["id"]] for x in candidates},
-    key=lambda key:latest_seen.get(key,-1))
-   candidates=[x for x in candidates if artist_key_by_id[x["id"]]==oldest_key]
-   print(f"Artist rotation cycle complete; restarting with least-recently featured artist: {oldest_key}.")
-  import random
-  fresh_candidates=[x for x in candidates if not source_was_used(x)]
-  used_candidates=[x for x in candidates if source_was_used(x)]
-  random.shuffle(fresh_candidates)
-  random.shuffle(used_candidates)
-  candidates=fresh_candidates+used_candidates
-  print(f"Source rotation within selected artist pool: {len(fresh_candidates)} unused originals, {len(used_candidates)} previously used originals.")
- # Enforce the shared twenty-upload cooldown for automatic and manual runs.
- rotation_path=R/"history"/"curioloop_artist_rotation.json"
- rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
- recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:20]
- recent_keys={str(e.get("artist_key","")).casefold().strip() for e in recent_events if e.get("artist_key")}
- candidates=[x for x in candidates if artist_key_by_id[x["id"]] not in recent_keys]
+  print(f"Manual artist filter: {target}; original-file deduplication remains active.")
+ # Exclude every original already uploaded by either format, including manual targets.
+ candidates=[x for x in candidates if not source_was_used(x)]
  if not candidates:
   raise RuntimeError(
-   "Upload blocked: every eligible artist is among the twenty most recent successful uploads. "
-   "Add new artist sources or wait; repeating a recent artist is not permitted."
+   "No unused original Drive videos remain. Previously uploaded originals are excluded "
+   "across both CurioLoop formats; add new source files to continue."
   )
- print("Recent-twenty artist cooldown enforced:",", ".join(sorted(recent_keys)))
+ import random
+ random.shuffle(candidates)
+ print(
+  f"Original-file deduplication enforced: {len(candidates)} unused source(s) remain; "
+  "same-artist videos are allowed when they are different original files."
+ )
  # Retry another unused Drive original whenever research, download, rendering,
  # or validation fails. A source is not marked processed until YouTube accepts it.
  # This allows newly added Drive videos to act as same-run fallback candidates.
@@ -1163,6 +1106,8 @@ def main():
   if pending:
    h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
   h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"published_at":datetime.now(timezone.utc).isoformat()})
+  used_original_ids.add(item["id"])
+  if item.get("md5Checksum"):used_original_md5s.add(item["md5Checksum"])
   H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
   rotation_path=R/"history"/"curioloop_artist_rotation.json"
   rotation_path.parent.mkdir(parents=True,exist_ok=True)
