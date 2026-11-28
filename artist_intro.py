@@ -1019,6 +1019,15 @@ def main():
  if rotation_path.exists():
   rotation_data=json.loads(rotation_path.read_text(encoding="utf-8"))
   used_original_ids.update(str(e.get("source_id")) for e in rotation_data.get("events",[]) if e.get("source_id"))
+ # Backfill hashes for historical source IDs written before MD5 was stored.
+ # This catches identical Drive copies even when Google assigned a new file ID.
+ for used_id in sorted(used_original_ids):
+  try:
+   metadata=drive.files().get(fileId=used_id,fields="id,md5Checksum",supportsAllDrives=True).execute()
+   checksum=str(metadata.get("md5Checksum","")).strip()
+   if checksum:used_original_md5s.add(checksum)
+  except Exception as exc:
+   print("Legacy source hash lookup unavailable:",used_id,type(exc).__name__)
  def source_was_used(item):
   return (item["id"] in used_original_ids
    or bool(item.get("md5Checksum") and item.get("md5Checksum") in used_original_md5s))
