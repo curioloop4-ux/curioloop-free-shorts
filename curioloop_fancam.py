@@ -1056,6 +1056,21 @@ def main():
             for candidate in identifiable
         }
         artist_cycle = list(history.get("artist_cycle", []))
+        # Cross-format cooldown: artists featured by CurioLoop artist-intro
+        # are also counted in the fancam rotation, preventing adjacent repeats.
+        intro_history_path = ROOT / "history" / "artist_intro_processed.json"
+        if intro_history_path.exists():
+            try:
+                intro_history = json.loads(intro_history_path.read_text(encoding="utf-8"))
+                for record in intro_history.get("processed", []):
+                    key = str(record.get("source_artist_key") or record.get("artist") or "").casefold().strip()
+                    if not key and record.get("source_name"):
+                        prior_artist, _, _ = identify_artist(record.get("source_name", ""))
+                        key = prior_artist.casefold() if prior_artist else ""
+                    if key and key not in artist_cycle:
+                        artist_cycle.append(key)
+            except Exception as exc:
+                print(f"Warning: could not read artist-intro rotation history: {exc}")
         # One-time migration only. Rebuilding this list on every run would
         # prevent the rotation cycle from ever resetting after all artists had a turn.
         if "artist_cycle" not in history:
