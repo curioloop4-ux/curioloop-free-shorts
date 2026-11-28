@@ -843,34 +843,41 @@ def generate_metadata(filename, hook, index):
         tags = ["performance highlight", "fan edit", "music", "entertainment",
                 "Shorts", "video highlight"]
 
-    # Add evidence-led discovery tags based on successful K-pop Shorts/fancam channels.
-    # Keep the metadata specific to this clip: artist + group + performance format,
-    # rather than stuffing unrelated group names into every upload.
+    # Keep titles clean and stable: no clip counters, dates, timestamps, emoji, or decorative symbols.
+    title = unicodedata.normalize("NFKC", str(title))
+    title = re.sub(r"\\s*\\|\\s*Clip\\s*\\d+.*$", "", title, flags=re.IGNORECASE)
+    title = re.sub(r"\\s*\\|\\s*\\d{4}-?\\d{2}.*$", "", title)
+    title = re.sub(r"[^A-Za-z0-9가-힣| /&()'!?-]+", "", title)
+    title = re.sub(r"\\s+", " ", title).strip(" |")
+    if "#Shorts" not in title:
+        title = title + " #Shorts"
+
+    # Description is intentionally hashtag-only. Keep the list focused on K-pop,
+    # the actual artist, and the actual group rather than unrelated trending names.
     artist_tag = artist.title() if artist else ""
     group_tag = group.strip() if group else ""
-    discovery_tags = [
-        "K-pop", "Kpop", "K-pop fancam", "Kpop fancam", "K-pop Shorts",
-        "Korean idol", "K-pop performance", "아이돌 직캠", "걸그룹 직캠",
-        "여자아이돌", "Korean girl group", "Shorts"
+    base_tags = [
+        "Kpop", "K-pop", "Kpop Shorts", "Kpop Fancam", "K-pop Fancam",
+        "Kpop Idol", "Korean Idol", "Kpop Performance", "Kpop Stage",
+        "Kpop Dance", "Kpop Girl Group", "Korean Girl Group", "Girl Group",
+        "Female Idol", "Idol Fancam", "Idol Performance", "Korean Music",
+        "Korean Pop", "Kpop Edit", "Kpop Video", "Kpop Fans",
+        "Kpop Stan", "Kpop Trending", "Kpop Viral", "Shorts"
     ]
     if artist_tag:
-        discovery_tags.extend([artist_tag, f"{artist_tag} fancam"])
+        base_tags.extend([artist_tag, artist_tag + " Fancam", artist_tag + " Kpop"])
     if group_tag:
-        discovery_tags.extend([group_tag, f"{group_tag} fancam"])
-    tags = discovery_tags + tags
-
-    # Strip channel branding from generated tags and descriptions.
-    tags = [tag for tag in tags if "curioloop" not in str(tag).casefold()]
+        base_tags.extend([group_tag, group_tag + " Kpop", group_tag + " Fancam"])
     clean, seen = [], set()
-    for tag in ["K-pop", "K-pop fancam", "Shorts"] + tags:
-        tag = re.sub(r"\s+", " ", str(tag)).strip().lstrip("#")
+    for tag in base_tags:
+        tag = re.sub(r"\\s+", " ", str(tag)).strip()
         key = tag.casefold()
         if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
-            clean.append(tag); seen.add(key)
-    hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:6])
-    description = (description + "\n\n" if description else "") + hashtags
-    upload_stamp = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
-    title = f"{title.replace(' #Shorts', '')} | Clip {index:02d} · {upload_stamp} #Shorts"
+            clean.append(tag)
+            seen.add(key)
+        if len(clean) >= 30:
+            break
+    description = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean)
     return title[:100], description[:5000], clean
 
 def next_publish_at_kst(publish_time):
