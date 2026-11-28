@@ -22,7 +22,7 @@ permissions:
   contents: write
 
 concurrency:
-  group: curioloop-artist-intro
+  group: curioloop-shared-upload-rotation
   cancel-in-progress: false
 
 jobs:
