@@ -948,6 +948,30 @@ def intro_publish_at_kst(publish_time):
   raise RuntimeError(f"Artist-intro slot {publish_time} + 30 minutes ({publish_at:%H:%M} KST) has passed or is too close. Refusing immediate publication.")
  print(f"Artist-intro fixed publication slot: {publish_time} + 30 minutes = {publish_at:%H:%M} KST.")
  return publish_at.isoformat(timespec="seconds")
+def set_start_frame_thumbnail(yt,video_id,video_path):
+ thumbnail_path=W/(video_id+"_start_frame.jpg")
+ try:
+  subprocess.run(["ffmpeg","-v","error","-y","-i",str(video_path),"-frames:v","1","-q:v","2",str(thumbnail_path)],check=True,capture_output=True,text=True)
+  if not thumbnail_path.exists() or not thumbnail_path.stat().st_size:raise RuntimeError("FFmpeg did not produce a start-frame thumbnail.")
+  # YouTube requires Shorts processing to finish before thumbnails.set.
+  for attempt in range(180):
+   response=yt.videos().list(part="processingDetails",id=video_id).execute()
+   items=response.get("items",[])
+   if not items:raise RuntimeError("Uploaded video was not returned by videos.list.")
+   processing=(items[0].get("processingDetails") or {}).get("processingStatus")
+   if processing=="succeeded":
+    result=yt.thumbnails().set(videoId=video_id,media_body=MediaFileUpload(str(thumbnail_path),mimetype="image/jpeg")).execute()
+    print("START-FRAME THUMBNAIL SET:",video_id,"response_items",len(result.get("items",[])))
+    return True
+   if processing=="failed":raise RuntimeError("YouTube reported video processing failure.")
+   if attempt%6==0:print("Waiting for YouTube processing before thumbnail set:",processing or "pending")
+   time.sleep(10)
+  raise TimeoutError("YouTube processing did not finish within 30 minutes.")
+ except Exception as exc:
+  # Never retry a completed upload merely because thumbnail setting failed.
+  print("WARNING: Could not set start-frame thumbnail:",video_id,type(exc).__name__,str(exc))
+  return False
+
 def publish(yt,out,p,source):
  brand=os.getenv("FANCAMVERSE_CHANNEL_BRAND","CurioLoop").strip()
  if brand.casefold() not in {"curioloop","dailyneedle"}:raise RuntimeError("Artist intro upload blocked: unexpected channel brand "+brand)
@@ -987,6 +1011,7 @@ def publish(yt,out,p,source):
  if publish_at:status["publishAt"]=publish_at
  body={"snippet":{"title":clean_title[:100],"description":description[:4900],"tags":clean_tags,"categoryId":"10"},"status":status}
  v=yt.videos().insert(part="snippet,status",body=body,media_body=MediaFileUpload(str(out),mimetype="video/mp4",resumable=True)).execute()
+ set_start_frame_thumbnail(yt,v["id"],out)
  returned_status=v.get("status") or {}
  returned_publish_at=returned_status.get("publishAt")
  if publish_at and (returned_status.get("privacyStatus")!="private" or not returned_publish_at or datetime.fromisoformat(returned_publish_at.replace("Z","+00:00"))!=datetime.fromisoformat(publish_at.replace("Z","+00:00"))):
