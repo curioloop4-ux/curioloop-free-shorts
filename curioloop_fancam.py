@@ -902,6 +902,49 @@ def next_publish_at_kst(publish_time):
     return publish_at.isoformat(timespec="seconds")
 
 
+def set_start_frame_thumbnail(youtube, video_id, video_path):
+    """Set the exact first decoded frame of the rendered Short as its thumbnail."""
+    thumbnail_path = WORK / f"{video_id}_start_frame.jpg"
+    try:
+        subprocess.run(
+            ["ffmpeg", "-v", "error", "-y", "-i", str(video_path),
+             "-frames:v", "1", "-q:v", "2", str(thumbnail_path)],
+            check=True, capture_output=True, text=True
+        )
+        if not thumbnail_path.exists() or thumbnail_path.stat().st_size == 0:
+            raise RuntimeError("FFmpeg did not produce a start-frame thumbnail.")
+        # YouTube requires Shorts processing to finish before thumbnails.set.
+        for attempt in range(180):
+            response = youtube.videos().list(
+                part="processingDetails", id=video_id
+            ).execute()
+            items = response.get("items", [])
+            if not items:
+                raise RuntimeError("Uploaded video was not returned by videos.list.")
+            processing = (items[0].get("processingDetails") or {}).get("processingStatus")
+            if processing == "succeeded":
+                result = youtube.thumbnails().set(
+                    videoId=video_id,
+                    media_body=MediaFileUpload(str(thumbnail_path), mimetype="image/jpeg")
+                ).execute()
+                print(
+                    f"START-FRAME THUMBNAIL SET: video_id={video_id}, "
+                    f"response_items={len(result.get('items', []))}"
+                )
+                return True
+            if processing == "failed":
+                raise RuntimeError("YouTube reported video processing failure.")
+            if attempt % 6 == 0:
+                print(f"Waiting for YouTube processing before thumbnail set: {processing or 'pending'}")
+            time.sleep(10)
+        raise TimeoutError("YouTube processing did not finish within 30 minutes.")
+    except Exception as exc:
+        # The video itself has already uploaded; do not turn a thumbnail failure
+        # into an upload retry that could duplicate the Short.
+        print(f"::warning::Could not set start-frame thumbnail for {video_id}: {type(exc).__name__}: {exc}")
+        return False
+
+
 def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     if privacy not in {"private", "unlisted", "public"}:
         raise ValueError("Privacy must be private, unlisted, or public.")
@@ -917,6 +960,8 @@ def upload(youtube, path, title, description, tags, privacy, publish_at=None):
     video_id = result.get("id")
     if not video_id:
         raise RuntimeError("YouTube upload completed without returning a video ID.")
+
+    set_start_frame_thumbnail(youtube, video_id, path)
 
     # Treat the insert response as an API acknowledgement, not proof that the
     # requested visibility was applied. Inspect the returned resource fields.
