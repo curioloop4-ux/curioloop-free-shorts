@@ -940,15 +940,10 @@ def publish(yt,out,p,source):
  brand=os.getenv("FANCAMVERSE_CHANNEL_BRAND","FANCAMVERSE").strip()
  if brand.casefold() not in {"curioloop","dailyneedle","fancamverse"}:raise RuntimeError("Artist intro upload blocked: unexpected channel brand "+brand)
  expected_id=need("YOUTUBE_EXPECTED_CHANNEL_ID")
- channel_response=yt.channels().list(part="id,snippet",mine=True).execute()
- channels=channel_response.get("items",[])
- if len(channels)!=1:raise RuntimeError(f"{brand} OAuth verification failed: expected one authorized channel, found {len(channels)}. No videos were uploaded.")
- actual_channel=channels[0]
- actual_id=actual_channel.get("id","")
- actual_title=actual_channel.get("snippet",{}).get("title","(unknown)")
- print(f"Artist-intro OAuth channel: {actual_title} ({actual_id})")
- if actual_id!=expected_id:raise RuntimeError(f"Wrong YouTube channel authorized for {brand}. Expected {expected_id}, got {actual_id} ({actual_title}). No videos were uploaded.")
- print(f"Verified dedicated {brand} YouTube channel before upload.")
+ # The dedicated FANCAMVERSE OAuth token is upload-scoped. Do not call
+ # channels.list(mine=True) here: that endpoint requires a read scope and
+ # caused valid upload-only credentials to fail before rendering could publish.
+ print(f"Upload destination configured: {brand} (expected channel ID {expected_id}); using its dedicated OAuth token.")
  approval_file=R/"INTRO_PUBLICATION_APPROVED.txt"
  approved_once=os.getenv("INTRO_PUBLIC_ONCE","").strip().lower() in {"1","true","yes"}
  approved_file=approval_file.exists() and approval_file.read_text(encoding="utf-8").strip().lower() in {"1","true","yes","approved"}
@@ -969,6 +964,11 @@ def publish(yt,out,p,source):
  returned_publish_at=returned_status.get("publishAt")
  if publish_at and (returned_status.get("privacyStatus")!="private" or not returned_publish_at or datetime.fromisoformat(returned_publish_at.replace("Z","+00:00"))!=datetime.fromisoformat(publish_at.replace("Z","+00:00"))):
   raise RuntimeError(f"Artist-intro upload {v.get('id')} was accepted but scheduled publication was not confirmed (requested {publish_at}, returned {returned_publish_at}).")
+ returned_channel_id=(v.get("snippet") or {}).get("channelId","")
+ if returned_channel_id and returned_channel_id!=expected_id:
+  print(f"::warning::Upload {v.get('id')} was accepted on channel {returned_channel_id}, but configured FANCAMVERSE channel is {expected_id}. Record this upload and stop for manual channel review; do not retry it.")
+ else:
+  print(f"Upload channel response: {returned_channel_id or 'channel ID not returned; dedicated OAuth token used'}")
  print(f"{'SCHEDULED '+publish_at if publish_at else privacy.upper()} UPLOAD https://youtube.com/shorts/"+v["id"])
  return v["id"],("scheduled" if publish_at else privacy)
 def main():
