@@ -965,8 +965,8 @@ def publish(yt,out,p,source):
  print("One-time public approval:", "enabled" if approved_once else "disabled")
  # Concise viewer-facing description only; never include research/source URLs.
  description=f"{p['artist']} of {p['group']} ✨\nArtist spotlight featuring career highlights, key achievements, and recent updates.\n\n#Kpop #{re.sub(r'[^A-Za-z0-9]', '', p['artist'])} #ArtistSpotlight #Shorts"
- upload_stamp=datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
- unique_title=f"{p['title']} | {upload_stamp}"[:100]
+ # Keep the artist spotlight title clean; omit upload timestamp suffix.
+ unique_title=p["title"][:100]
  status={"privacyStatus":privacy,"selfDeclaredMadeForKids":False}
  if publish_at:status["publishAt"]=publish_at
  body={"snippet":{"title":unique_title,"description":description[:4900],"tags":[x for x in p.get("tags",[]) if "curioloop" not in str(x).casefold()]+["K-pop","artist spotlight","Shorts"],"categoryId":"10"},"status":status}
