@@ -908,35 +908,35 @@ def render(src,p,hist,drive,folder):
  )
  fc+=f"[3:v]format=rgba,fade=t=in:st={cta_start:.3f}:d=0.4:alpha=1[cta];"
  fc+=f"[vbase][cta]overlay=0:0:enable='between(t,{cta_start:.3f},{length:.3f})'[v];"
-  fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
-  # Use creator-supplied YouTube Audio Library tracks stored in the source Drive folder tree.
-  music_files=scan_audio(drive,folder)
-  used_music=hist.setdefault("used_background_music_ids",[])
-  available_music=[item for item in music_files if item["id"] not in used_music]
-  if not available_music:
-   used_music.clear()
-   available_music=music_files
-  music_item=available_music[0] if available_music else None
-  if music_item:
-   music_path=download(drive,music_item)
-   print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"])
-   fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.06,afade=t=in:st=0:d=1.0,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
-   used_music.append(music_item["id"])
-   if len(used_music)>len(music_files):del used_music[:-len(music_files)]
-  probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
-  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
-  mix_labels=["[voice]"]
-  if has_source_audio:
-   fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
-   mix_labels.append("[original]")
-  if music_item:mix_labels.append("[music]")
-  if len(mix_labels)>1:
-   fc+="".join(mix_labels)+f"amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
-  else:fc+="[voice]anull[a]"
-  ffmpeg_args=["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta)]
-  if music_item:ffmpeg_args+=["-i",str(music_path)]
-  ffmpeg_args+=["-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)]
-  run(ffmpeg_args)
+ fc+=f"[2:a]adelay=1500|1500,apad,atrim=duration={length:.3f}[voice];"
+ # Use creator-supplied YouTube Audio Library tracks stored in the source Drive folder tree.
+ music_files=scan_audio(drive,folder)
+ used_music=hist.setdefault("used_background_music_ids",[])
+ available_music=[item for item in music_files if item["id"] not in used_music]
+ if not available_music:
+  used_music.clear()
+  available_music=music_files
+ music_item=available_music[0] if available_music else None
+ if music_item:
+  music_path=download(drive,music_item)
+  print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"])
+  fc+=f"[4:a]atrim=duration={length:.3f},asetpts=PTS-STARTPTS,volume=0.06,afade=t=in:st=0:d=1.0,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
+  used_music.append(music_item["id"])
+  if len(used_music)>len(music_files):del used_music[:-len(music_files)]
+ probe=json.loads(subprocess.run(["ffprobe","-v","error","-show_entries","stream=codec_type","-of","json",str(src)],check=True,capture_output=True,text=True).stdout)
+ has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
+ mix_labels=["[voice]"]
+ if has_source_audio:
+  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
+  mix_labels.append("[original]")
+ if music_item:mix_labels.append("[music]")
+ if len(mix_labels)>1:
+  fc+="".join(mix_labels)+f"amix=inputs={len(mix_labels)}:duration=longest:dropout_transition=0:normalize=0,alimiter=limit=0.95[a]"
+ else:fc+="[voice]anull[a]"
+ ffmpeg_args=["ffmpeg","-y","-loop","1","-t","1.5","-i",str(still),"-i",str(src),"-i",str(audio),"-loop","1","-i",str(cta)]
+ if music_item:ffmpeg_args+=["-i",str(music_path)]
+ ffmpeg_args+=["-filter_complex_threads","1","-filter_complex",fc,"-map","[v]","-map","[a]","-t",f"{length:.3f}","-r","30","-c:v","libx264","-preset","medium","-crf","20","-c:a","aac","-b:a","192k","-movflags","+faststart",str(out)]
+ run(ffmpeg_args)
 check=json.loads(subprocess.run(["ffprobe","-v","error","-select_streams","v:0","-show_entries","stream=width,height","-of","json",str(out)],check=True,capture_output=True,text=True).stdout)["streams"][0]
  if (int(check["width"]),int(check["height"]))!=(1080,1800) or not length-0.5<=dur(out)<=length+0.5:raise RuntimeError(f"Output validation failed: expected {length:.1f}s, got {dur(out):.1f}s")
  return out
