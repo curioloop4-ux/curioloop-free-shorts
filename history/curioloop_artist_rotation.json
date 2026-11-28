@@ -50,6 +50,13 @@
       "published_at": "2026-11-27T04:04:44.886033+00:00"
     },
     {
+      "artist_key": "yuqi",
+      "format": "fancam",
+      "source_id": "12BfsGnuoboNyMwxcOL_4q7FubLqJG5rO",
+      "published_at": "2026-11-27T04:33:56Z",
+      "legacy_backfill": true
+    },
+    {
       "artist_key": "tzuyu",
       "format": "artist_intro",
       "source_id": "1ydg7zWmaOOwm5NUJrdj6tKIsv-gd4vXQ",
@@ -57,11 +64,25 @@
       "published_at": "2026-11-27T12:00:46.531579+00:00"
     },
     {
+      "artist_key": "tzuyu",
+      "format": "fancam",
+      "source_id": "1ydg7zWmaOOwm5NUJrd6tKIsv-gd4vXQ",
+      "published_at": "2026-11-27T12:12:18Z",
+      "legacy_backfill": true
+    },
+    {
       "artist_key": "jennie",
       "format": "artist_intro",
       "source_id": "1Kq0ERkQVDRYEA7cyqimLKWmfm_I2Z5wL",
       "youtube_video_id": "yElLffHS3HQ",
       "published_at": "2026-11-27T15:21:59.454483+00:00"
+    },
+    {
+      "artist_key": "eunbi",
+      "format": "fancam",
+      "source_id": "10qFttq7VbEyoYO9PGG-_Mk6JhUlmazhS",
+      "published_at": "2026-11-27T23:56:10Z",
+      "legacy_backfill": true
     },
     {
       "artist_key": "kya",
