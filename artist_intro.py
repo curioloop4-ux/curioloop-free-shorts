@@ -1087,12 +1087,6 @@ def main():
   combined_records=processed_records+fancam_records
   rotation_path=R/"history"/"curioloop_artist_rotation.json"
   rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
-  recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:20]
-  recent_keys={str(e.get("artist_key","")).casefold().strip() for e in recent_events if e.get("artist_key")}
-  cooled=[x for x in candidates if artist_key_by_id[x["id"]] not in recent_keys]
-  if cooled:
-   candidates=cooled
-   print("Recent-twenty artist cooldown active:",", ".join(sorted(recent_keys)))
   seen_artist_keys={history_artist_key(record) for record in combined_records}
   seen_artist_keys.discard("")
   fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
@@ -1118,6 +1112,18 @@ def main():
   random.shuffle(used_candidates)
   candidates=fresh_candidates+used_candidates
   print(f"Source rotation within selected artist pool: {len(fresh_candidates)} unused originals, {len(used_candidates)} previously used originals.")
+ # Enforce the shared twenty-upload cooldown for automatic and manual runs.
+ rotation_path=R/"history"/"curioloop_artist_rotation.json"
+ rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
+ recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:20]
+ recent_keys={str(e.get("artist_key","")).casefold().strip() for e in recent_events if e.get("artist_key")}
+ candidates=[x for x in candidates if artist_key_by_id[x["id"]] not in recent_keys]
+ if not candidates:
+  raise RuntimeError(
+   "Upload blocked: every eligible artist is among the twenty most recent successful uploads. "
+   "Add new artist sources or wait; repeating a recent artist is not permitted."
+  )
+ print("Recent-twenty artist cooldown enforced:",", ".join(sorted(recent_keys)))
  # Retry another unused Drive original whenever research, download, rendering,
  # or validation fails. A source is not marked processed until YouTube accepts it.
  # This allows newly added Drive videos to act as same-run fallback candidates.
