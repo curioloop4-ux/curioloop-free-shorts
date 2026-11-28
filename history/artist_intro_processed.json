@@ -129,6 +129,18 @@
       "intro_footage_start": 169.0,
       "intro_footage_end": 216.292,
       "published_at": "2026-11-28T11:43:09.430186+00:00"
+    },
+    {
+      "drive_file_id": "1vhJ-2fvHpFQaT6bvaVQDOggIBbFLixmF",
+      "source_md5": "581f22f8c831e5dce7a3bc0d249650ab",
+      "source_artist_key": "eunha",
+      "source_name": "VIVIZ 비비지 EUNHA 은하 직캠 FANCAM Ver KpopHots.mp4",
+      "artist": "Eunha",
+      "youtube_video_id": "mvjE67XSFy0",
+      "privacy": "public",
+      "intro_footage_start": 171.5,
+      "intro_footage_end": 216.176,
+      "published_at": "2026-11-28T12:03:51.421188+00:00"
     }
   ],
   "opening_frames": {
@@ -164,8 +176,11 @@
     ],
     "ella": [
       19.59
+    ],
+    "eunha": [
+      17.65
     ]
   },
-  "last_render_source_start": 169.0,
-  "last_render_source_duration": 47.292
+  "last_render_source_start": 171.5,
+  "last_render_source_duration": 44.676
 }
