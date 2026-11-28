@@ -929,7 +929,9 @@ def render(src,p,hist,drive,folder):
  subtitle_filters=[]
  for i,cue in enumerate(cue_data):
   cue_file=W/f"subtitle_{i:03d}.txt"
-  cue_file.write_text(cue["text"],encoding="utf-8")
+  safe_caption=re.sub(r"[^A-Za-z0-9\s.,!?;:'()-]+"," ",str(cue["text"]))
+  safe_caption=re.sub(r"\s+"," ",safe_caption).strip()
+  cue_file.write_text(safe_caption,encoding="ascii")
   cue_start=max(1.5,float(cue["start"]));cue_end=min(length,float(cue["end"]))
   if cue_end<=cue_start: continue
   enable=f"between(t\\,{cue_start:.3f}\\,{cue_end:.3f})"
