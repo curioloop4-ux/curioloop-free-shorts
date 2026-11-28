@@ -491,7 +491,7 @@ def clean_overlay_text(value):
     kept = []
     for char in value:
         category = unicodedata.category(char)
-        if category[0] in {"L", "M", "N"} or char in " .,!?'-":
+        if category[0] in {"L", "M", "N"} or char.isspace():
             kept.append(char)
     return re.sub(r"\s+", " ", "".join(kept)).strip()
 
@@ -509,7 +509,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
         index = position + index_offset
         output = WORK / f"{source_stem}_short_{index}.mp4"
         raw_hook = clean_overlay_text(clip.get("hook", "A Must-Watch Stage Moment")) or "A Must Watch Stage Moment"
-        wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
+        wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="...")
 
         # Intro hook: centered for 2.7 seconds, then disappears.
         intro_path = WORK / f"intro_overlay_{index}.png"
