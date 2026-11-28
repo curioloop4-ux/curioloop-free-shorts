@@ -669,41 +669,6 @@ def profile(filename, target_hint=""):
   "research_queries":[target]
  }
 
-def create_background_music(path, seconds=36, sample_rate=22050):
- # Original, royalty-free ambient pop bed synthesized locally for this channel.
- # Soft major-seventh chords and sparse plucks; intentionally unobtrusive.
- progression=[
-  ([261.63,329.63,392.00,493.88], [523.25,659.25]),
-  ([220.00,261.63,329.63,392.00], [440.00,523.25]),
-  ([174.61,220.00,261.63,329.63], [349.23,440.00]),
-  ([196.00,246.94,293.66,392.00], [392.00,493.88])
- ]
- total=int(seconds*sample_rate)
- with wave.open(str(path),"wb") as wf:
-  wf.setnchannels(2); wf.setsampwidth(2); wf.setframerate(sample_rate)
-  frames=bytearray()
-  for i in range(total):
-   t=i/sample_rate
-   bar=int(t/4)%len(progression)
-   chord,plucks=progression[bar]
-   local=t%4
-   # Gentle chord pad with a slow, unobtrusive swell.
-   swell=0.72+0.28*math.sin(math.pi*min(local/4,1))
-   pad=sum(math.sin(2*math.pi*hz*t) for hz in chord)/len(chord)
-   pad+=0.18*sum(math.sin(2*math.pi*hz*2*t) for hz in chord)/len(chord)
-   # Sparse, rounded high notes add a light contemporary pop texture.
-   beat=t%1.0
-   note=plucks[int((t%4)//1)%2]
-   decay=math.exp(-beat*5.5)
-   pluck=math.sin(2*math.pi*note*beat)*decay
-   fade=min(1.0,t/1.2,max(0.0,(seconds-t)/2.0))
-   sample=(0.72*pad*swell+0.12*pluck)*0.10*fade
-   sample=max(-0.95,min(0.95,sample))
-   value=int(sample*32767)
-   frames.extend(struct.pack("<hh",value,value))
-  wf.writeframes(frames)
- print("Original background music generated:",path.name,"duration:",seconds,"seconds")
-
 def render(src,p,hist):
  intro=1.5; source_len=dur(src)
  audio=W/"voice.mp3";vtt=W/"voice.srt"
