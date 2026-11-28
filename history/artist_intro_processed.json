@@ -105,6 +105,18 @@
       "intro_footage_start": 12.0,
       "intro_footage_end": 58.668,
       "published_at": "2026-11-27T15:21:59.454483+00:00"
+    },
+    {
+      "drive_file_id": "17X9JJaMbUfGKDkBmAi9kCJfJK1rQcYo3",
+      "source_md5": "080eff0d50fe932040296b1a6b427896",
+      "source_artist_key": "kya",
+      "source_name": "KiiiKiii KYA 키키 키야 Fancam ver KpopHots.mp4",
+      "artist": "KYA",
+      "youtube_video_id": "Q5SL4T4k72A",
+      "privacy": "public",
+      "intro_footage_start": 147.865,
+      "intro_footage_end": 193.525,
+      "published_at": "2026-11-28T11:24:53.314139+00:00"
     }
   ],
   "opening_frames": {
@@ -134,8 +146,11 @@
     ],
     "jennie": [
       16.17
+    ],
+    "kya": [
+      15.48
     ]
   },
-  "last_render_source_start": 12.0,
-  "last_render_source_duration": 46.668
+  "last_render_source_start": 147.865,
+  "last_render_source_duration": 45.66
 }
