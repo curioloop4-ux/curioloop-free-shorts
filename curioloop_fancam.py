@@ -181,7 +181,7 @@ def list_source_videos(drive, folder_id):
                 "q": f"'{parent_id}' in parents and trashed = false",
                 "pageSize": 100,
                 "orderBy": "createdTime",
-                "fields": "nextPageToken,files(id,name,mimeType,createdTime,size)",
+                "fields": "nextPageToken,files(id,name,mimeType,createdTime,size,md5Checksum)",
                 "supportsAllDrives": True,
                 "includeItemsFromAllDrives": True
             }
@@ -959,6 +959,32 @@ def main():
             state["complete"] = True
 
     files = list_source_videos(drive, folder_id)
+    # A Drive original is consumed after its first successful upload in either
+    # CurioLoop format. Artist identity is deliberately not part of deduplication.
+    used_original_ids = set(source_state) | set(history.get("processed", []))
+    used_original_md5s = {
+        str(state.get("source_md5", "")).strip()
+        for state in source_state.values() if state.get("source_md5")
+    }
+    intro_history_path = ROOT / "history" / "artist_intro_processed.json"
+    if intro_history_path.exists():
+        intro_history = json.loads(intro_history_path.read_text(encoding="utf-8"))
+        for record in intro_history.get("processed", []):
+            if record.get("drive_file_id"):
+                used_original_ids.add(str(record["drive_file_id"]))
+            if record.get("source_md5"):
+                used_original_md5s.add(str(record["source_md5"]).strip())
+    rotation_path = ROOT / "history" / "curioloop_artist_rotation.json"
+    if rotation_path.exists():
+        rotation_data = json.loads(rotation_path.read_text(encoding="utf-8"))
+        used_original_ids.update(
+            str(event.get("source_id")) for event in rotation_data.get("events", [])
+            if event.get("source_id")
+        )
+    print(
+        f"Cross-format original exclusion loaded: {len(used_original_ids)} used Drive ID(s), "
+        f"{len(used_original_md5s)} content hash(es)."
+    )
     coordinated_source_id = os.getenv("FANCAMVERSE_COORDINATED_SOURCE_ID", "").strip()
     if coordinated_source_id:
         files = [item for item in files if item["id"] == coordinated_source_id]
@@ -1047,7 +1073,11 @@ def main():
     for batch_number in range(1, batch_size + 1):
         eligible = [
             item for item in files
-            if not source_state.get(item["id"], {}).get("complete", False)
+            if item["id"] not in used_original_ids
+            and not (
+                item.get("md5Checksum")
+                and item["md5Checksum"] in used_original_md5s
+            )
         ]
         if not eligible:
             print("No unused source videos remain in the current Drive inbox.")
@@ -1068,89 +1098,18 @@ def main():
             print("No unused source videos with a recognized artist/group remain.")
             break
 
-        # Rotate by ARTIST, not merely by Drive file ID. One artist's multiple
-        # source files must not crowd out other artists in the inbox.
-        used_source_ids = set(source_state) | set(history.get("processed", []))
+        # Select randomly from never-used original files only. Multiple files
+        # featuring the same artist remain eligible independently.
         artist_by_source = {
             candidate["id"]: identify_artist(candidate["name"])[0].casefold()
             for candidate in identifiable
         }
-        # Cross-format cooldown: exclude artists in the twenty most recent successful uploads.
-        rotation_path = ROOT / "history" / "curioloop_artist_rotation.json"
-        rotation_data = json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events": []}
-        recent_events = sorted(rotation_data.get("events", []), key=lambda e: str(e.get("published_at", "")), reverse=True)[:20]
-        recent_keys = {str(e.get("artist_key", "")).casefold().strip() for e in recent_events if e.get("artist_key")}
-        cooled = [c for c in identifiable if artist_by_source[c["id"]] not in recent_keys]
-        if not cooled:
-            raise RuntimeError(
-                "Upload blocked: every eligible artist is among the twenty most recent successful uploads. "
-                "Add new artist sources or wait; repeating a recent artist is not permitted."
-            )
-        identifiable = cooled
-        artist_by_source = {c["id"]: artist_by_source[c["id"]] for c in identifiable}
-        print("Recent-twenty artist cooldown enforced:", ", ".join(sorted(recent_keys)))
-        artist_cycle = list(history.get("artist_cycle", []))
-        # Cross-format cooldown: artists featured by CurioLoop artist-intro
-        # are also counted in the fancam rotation, preventing adjacent repeats.
-        intro_history_path = ROOT / "history" / "artist_intro_processed.json"
-        if intro_history_path.exists():
-            try:
-                intro_history = json.loads(intro_history_path.read_text(encoding="utf-8"))
-                for record in intro_history.get("processed", []):
-                    key = str(record.get("source_artist_key") or record.get("artist") or "").casefold().strip()
-                    if not key and record.get("source_name"):
-                        prior_artist, _, _ = identify_artist(record.get("source_name", ""))
-                        key = prior_artist.casefold() if prior_artist else ""
-                    if key and key not in artist_cycle:
-                        artist_cycle.append(key)
-            except Exception as exc:
-                print(f"Warning: could not read artist-intro rotation history: {exc}")
-        # One-time migration only. Rebuilding this list on every run would
-        # prevent the rotation cycle from ever resetting after all artists had a turn.
-        if "artist_cycle" not in history:
-            for prior_state in source_state.values():
-                if prior_state.get("used_clip_indices"):
-                    prior_name = prior_state.get("name", "")
-                    prior_artist, prior_group, _ = identify_artist(prior_name)
-                    if prior_artist and prior_artist.casefold() not in artist_cycle:
-                        artist_cycle.append(prior_artist.casefold())
-        available_artist_keys = set(artist_by_source.values())
-        unfeatured_artist_keys = available_artist_keys - set(artist_cycle)
-        if unfeatured_artist_keys:
-            selection_pool = [
-                candidate for candidate in identifiable
-                if artist_by_source[candidate["id"]] in unfeatured_artist_keys
-            ]
-            print(
-                "Artist rotation active: prioritizing artists not yet featured in this cycle:",
-                ", ".join(sorted(unfeatured_artist_keys))
-            )
-        else:
-            # Every currently available artist has had a turn; start a new cycle.
-            artist_cycle = []
-            selection_pool = identifiable
-            print("Artist rotation cycle complete; starting a new cycle across all available artists.")
-        fresh_sources = [
-            candidate for candidate in selection_pool
-            if candidate["id"] not in used_source_ids
-        ]
-        previously_used_sources = [
-            candidate for candidate in selection_pool
-            if candidate["id"] in used_source_ids
-        ]
-        random.shuffle(fresh_sources)
-        random.shuffle(previously_used_sources)
-        selection_pool = fresh_sources if fresh_sources else previously_used_sources
+        random.shuffle(identifiable)
+        item = identifiable[0]
         print(
-            f"Source rotation within artist pool: {len(fresh_sources)} never-used source(s); "
-            f"{len(previously_used_sources)} previously-used source(s) with remaining unused clips."
+            f"Original-file rotation: {len(identifiable)} unused source(s) available; "
+            "artist repetition is allowed when the Drive original is different."
         )
-        last_artist_key = history.get("last_artist_key", "")
-        alternatives = [
-            candidate for candidate in selection_pool
-            if artist_by_source[candidate["id"]] != last_artist_key
-        ]
-        item = random.choice(alternatives or selection_pool)
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
             f"Batch {batch_number}/{batch_size} | Random "
@@ -1251,17 +1210,21 @@ def main():
             verified_count += 1
 
         updated_used_indices = sorted(used_indices | {selected_index})
-        source_complete = len(updated_used_indices) >= len(clips)
+        source_complete = True
         source_state[item["id"]] = {
             "name": item["name"],
-            "next_clip": SHORTS_PER_SOURCE + 1 if source_complete else 1,
-            "complete": source_complete,
+            "source_md5": item.get("md5Checksum", ""),
+            "next_clip": SHORTS_PER_SOURCE + 1,
+            "complete": True,
             "clips": clips,
             "used_clip_indices": updated_used_indices
         }
+        used_original_ids.add(item["id"])
+        if item.get("md5Checksum"):
+            used_original_md5s.add(item["md5Checksum"])
         print(
-            f"Source progress: {len(updated_used_indices)}/{len(clips)} Shorts used; "
-            f"{'completed' if source_complete else 'will rotate back later'}."
+            "Original source consumed: one successful Short was uploaded; "
+            "this Drive file is now excluded from both CurioLoop formats."
         )
         selected_artist_key = artist_by_source[item["id"]]
         rotation_path = ROOT / "history" / "curioloop_artist_rotation.json"
