@@ -99,7 +99,8 @@ def profile(filename, target_hint=""):
  stem=Path(filename).stem
  target=(target_hint or "").strip()
  group_data=[
-  ("MEOVV",["미야오","MEOVV"],["MEOVV"],2025),
+  ("MEOVV",["미야오","MEOVV"],["MEOVV"],2024),
+  ("KiiiKiii",["키키","KiiiKiii"],["KiiiKiii"],2025),
   ("IVE",["아이브","IVE"],["IVE"],2021),
   ("aespa",["에스파","aespa"],["aespa"],2020),
   ("LE SSERAFIM",["르세라핌","LE SSERAFIM"],["LE SSERAFIM"],2022),
@@ -123,6 +124,7 @@ def profile(filename, target_hint=""):
  ]
  artist_names={
   "장원영":"Jang Wonyoung","원영":"Wonyoung","wonyoung":"Wonyoung",
+  "키야":"KYA","kya":"KYA","엘라":"Ella","ella":"Ella",
   "은하":"Eunha","eunha":"Eunha","jennie":"Jennie","권은비":"Kwon Eunbi","카리나":"Karina","닝닝":"Ningning",
   "윈터":"Winter","지젤":"Giselle","사쿠라":"Sakura","김채원":"Kim Chaewon",
   "허윤진":"Huh Yunjin","카즈하":"Kazuha","홍은채":"Hong Eunchae",
@@ -283,7 +285,7 @@ def profile(filename, target_hint=""):
       if any(x in domain for x in ("smtown.com","official","weverse.io")):document["priority"]=1
     except Exception as e:print("Profile source fetch unavailable:",url,type(e).__name__)
     profile_documents.append(document)
-    if len(profile_documents)>=13:break
+    if len(profile_documents)>=18:break
   except Exception as e:print("Profile web search unavailable:",type(e).__name__)
   time.sleep(0.6)
  # Add Korean and English Wikipedia as independent biography fallbacks. Search
@@ -407,8 +409,8 @@ def profile(filename, target_hint=""):
     if candidate in article_highlights:continue
     if re.search(r"나무위키|편집|문서|분류|각주|출처|틀:",candidate):continue
     article_highlights.append(candidate)
-    if len(article_highlights)>=12:break
-   if len(article_highlights)>=12:break
+    if len(article_highlights)>=18:break
+   if len(article_highlights)>=18:break
  # When the wiki page is blocked, recover biographical detail from independently
  # fetched public pages/snippets. Keep only substantial text tied to this artist.
  # Supplement sparse wiki sections with independently fetched profile pages.
@@ -425,6 +427,7 @@ def profile(filename, target_hint=""):
   if len(detail)<90 or not any(name.casefold() in (title+" "+detail).casefold() for name in (target,artist)):
    continue
   candidates=re.split(r"(?<=[.!?。])\s+|(?<=[다요죠함음])\s{2,}",detail)
+  added_from_document=0
   for candidate in candidates:
    candidate=plain(candidate)
    if len(candidate)<55 or len(candidate)>280:continue
@@ -434,7 +437,8 @@ def profile(filename, target_hint=""):
    if not key or key in existing_highlight_keys:continue
    article_highlights.append(candidate)
    existing_highlight_keys.add(key)
-   break
+   added_from_document+=1
+   if added_from_document>=3 or len(article_highlights)>=18:break
  translated_highlights=[]
  for detail in article_highlights:
   # English profile text can be used directly; it must not depend on the
@@ -448,7 +452,7 @@ def profile(filename, target_hint=""):
     translated="".join(part[0] for part in tr.json()[0] if part and part[0]).strip()
     if len(translated.split())>=8:translated_highlights.append(translated.rstrip(". "))
    except Exception as e:print("Biography highlight translation unavailable; retaining other English source material:",type(e).__name__)
-  if len(translated_highlights)>=10:break
+  if len(translated_highlights)>=16:break
  print("Biography highlights extracted:",len(article_highlights),"; translated:",len(translated_highlights),"from NamuWiki and independent profile pages")
  print("PROFILE RESEARCH RESULT")
  print("Artist:",artist,"| Group:",group)
