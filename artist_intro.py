@@ -984,7 +984,19 @@ def main():
   return (item["id"] in done
    or bool(item.get("md5Checksum") and item.get("md5Checksum") in done_hashes)
    or source_name_key(item["name"]) in done_names)
- print(f"Drive source pool: {len(candidates)} total; previously used originals will be fallback-only.")
+ # Treat originals already used by the fancam pipeline as previously used here too.
+ fancam_history_path=R/"history"/"curioloop_fancam_processed.json"
+ fancam_used_ids=set();fancam_used_names=set()
+ if fancam_history_path.exists():
+  fh=json.loads(fancam_history_path.read_text(encoding="utf-8"))
+  fancam_used_ids.update(fh.get("sources",{}).keys())
+  fancam_used_ids.update(fh.get("processed",[]))
+  for state in fh.get("sources",{}).values():
+   if state.get("name"):fancam_used_names.add(source_name_key(state["name"]))
+ prior_source_was_used=source_was_used
+ def source_was_used(item):
+  return prior_source_was_used(item) or item["id"] in fancam_used_ids or source_name_key(item["name"]) in fancam_used_names
+ print(f"Drive source pool: {len(candidates)} total; previously used originals across both formats are fallback-only.")
  # Only choose sources that the companion fancam pipeline can identify too.
  from curioloop_fancam import identify_artist as identify_fancam_artist
  blocked=("김채원","chaewon")
@@ -1046,6 +1058,14 @@ def main():
    except Exception as exc:
     print("Warning: could not read companion fancam artist history:",type(exc).__name__)
   combined_records=processed_records+fancam_records
+  rotation_path=R/"history"/"curioloop_artist_rotation.json"
+  rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
+  recent_events=sorted(rotation_data.get("events",[]),key=lambda e:str(e.get("published_at","")),reverse=True)[:5]
+  recent_keys={str(e.get("artist_key","")).casefold().strip() for e in recent_events if e.get("artist_key")}
+  cooled=[x for x in candidates if artist_key_by_id[x["id"]] not in recent_keys]
+  if cooled:
+   candidates=cooled
+   print("Recent-five artist cooldown active:",", ".join(sorted(recent_keys)))
   seen_artist_keys={history_artist_key(record) for record in combined_records}
   seen_artist_keys.discard("")
   fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
@@ -1111,6 +1131,12 @@ def main():
    h.setdefault("opening_frames",{}).setdefault(pending["artist"],[]).append(pending["timestamp"])
   h["processed"].append({"drive_file_id":item["id"],"source_md5":item.get("md5Checksum"),"source_artist_key":selected_artist_key,"source_name":item["name"],"artist":p["artist"],"youtube_video_id":vid,"privacy":privacy,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"published_at":datetime.now(timezone.utc).isoformat()})
   H.parent.mkdir(parents=True,exist_ok=True);H.write_text(json.dumps(h,ensure_ascii=False,indent=2),encoding="utf-8")
+  rotation_path=R/"history"/"curioloop_artist_rotation.json"
+  rotation_path.parent.mkdir(parents=True,exist_ok=True)
+  rotation_data=json.loads(rotation_path.read_text(encoding="utf-8")) if rotation_path.exists() else {"events":[]}
+  rotation_data.setdefault("events",[]).append({"artist_key":selected_artist_key,"format":"artist_intro","source_id":item["id"],"youtube_video_id":vid,"published_at":datetime.now(timezone.utc).isoformat()})
+  rotation_data["events"]=rotation_data["events"][-500:]
+  rotation_path.write_text(json.dumps(rotation_data,ensure_ascii=False,indent=2),encoding="utf-8")
   # Hand off the exact same Drive original to the companion fancam workflow.
   queue_path=R/"history"/"artist_intro_fancam_queue.json"
   queue_path.write_text(json.dumps({"drive_file_id":item["id"],"source_name":item["name"],"intro_video_id":vid,"intro_footage_start":round(rendered_source_start,3),"intro_footage_end":round(rendered_source_start+rendered_source_duration,3),"created_at":datetime.now(timezone.utc).isoformat()},ensure_ascii=False,indent=2),encoding="utf-8")
