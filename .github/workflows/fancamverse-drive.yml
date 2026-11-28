@@ -1,8 +1,14 @@
-name: FANCAMVERSE Drive Upload
+name: FANCAMVERSE Fancam Drive Upload
 
 on:
   schedule:
-    - cron: "0 0 * * *" # 7 PM US Eastern (EST) / 8 PM (EDT)
+    # Match CurioLoop fancam slots: KST 00:00, 02:00, 04:00, 10:00, 20:00.
+    - cron: "0 15 * * *"
+    - cron: "0 17 * * *"
+    - cron: "15 17 * * *" # 02:15 KST fallback for the 02:00 slot
+    - cron: "0 19 * * *"
+    - cron: "0 1 * * *"
+    - cron: "0 11 * * *"
   workflow_dispatch:
     inputs:
       output_only:
@@ -11,16 +17,16 @@ on:
         type: boolean
         default: false
       privacy_status:
-        description: "YouTube visibility when upload is enabled"
+        description: "Visibility for a manual run"
         required: true
         type: choice
         options:
-          - public
-          - unlisted
           - private
+          - unlisted
+          - public
         default: public
       source_filter:
-        description: "Optional Drive filename filters, comma-separated (e.g. 장원영,나띠,WONYOUNG,NATTY)"
+        description: "Optional manual filename filter; leave blank for automatic artist/source rotation"
         required: false
         type: string
         default: ""
@@ -28,7 +34,7 @@ on:
         description: "Number of Shorts to process in this manual run"
         required: true
         type: number
-        default: 2
+        default: 1
 
 permissions:
   contents: write
@@ -54,15 +60,15 @@ jobs:
       - name: Install FFmpeg
         run: |
           sudo apt-get update
-          sudo apt-get install -y ffmpeg
+          sudo apt-get install -y ffmpeg fonts-dejavu-core
 
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
-      - name: Validate FANCAMVERSE pipeline
-        run: python -m py_compile fancamverse.py
+      - name: Validate CurioLoop-grade FANCAMVERSE pipeline
+        run: python -m py_compile fancamverse_curioloop.py
 
-      - name: Process Google Drive inbox
+      - name: Verify FANCAMVERSE OAuth identity, then read Drive and upload
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           GEMINI_MODEL: gemini-3.8-flash
@@ -70,23 +76,33 @@ jobs:
           FANCAMVERSE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
           FANCAMVERSE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
           FANCAMVERSE_DRIVE_FOLDER_ID: ${{ secrets.FANCAMVERSE_DRIVE_FOLDER_ID }}
-          FANCAMVERSE_YOUTUBE_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
+          YOUTUBE_CLIENT_ID: ${{ secrets.FANCAMVERSE_CLIENT_ID }}
+          YOUTUBE_CLIENT_SECRET: ${{ secrets.FANCAMVERSE_CLIENT_SECRET }}
+          YOUTUBE_REFRESH_TOKEN: ${{ secrets.FANCAMVERSE_REFRESH_TOKEN }}
+          YOUTUBE_EXPECTED_CHANNEL_ID: ${{ secrets.FANCAMVERSE_YOUTUBE_CHANNEL_ID }}
+          FANCAMVERSE_CHANNEL_BRAND: FANCAMVERSE
+          FANCAMVERSE_EXCLUDE_ARTISTS: 김채원,chaewon
+          FANCAMVERSE_WORK_DIR: work_fancamverse
+          FANCAMVERSE_HISTORY_FILE: history/fancamverse_processed.json
           FANCAMVERSE_OUTPUT_ONLY: ${{ inputs.output_only || false }}
           FANCAMVERSE_SOURCE_FILTER: ${{ inputs.source_filter || '' }}
-          FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '3' }}
-          FANCAMVERSE_PRIVACY_STATUS: ${{ inputs.privacy_status || 'private' }}
-        run: python fancamverse.py
+          FANCAMVERSE_UPLOADS_PER_RUN: ${{ inputs.uploads_per_run || '1' }}
+          FANCAMVERSE_TRIGGER_EVENT: ${{ github.event_name }}
+          FANCAMVERSE_TRIGGER_SCHEDULE: ${{ github.event.schedule || '' }}
+          FANCAMVERSE_PRIVACY_STATUS: ${{ (github.event_name == 'schedule') && 'public' || inputs.privacy_status || 'private' }}
+          FANCAMVERSE_PUBLISH_TIME_KST: ${{ (github.event.schedule == '0 15 * * *' && '00:00' || (github.event.schedule == '0 17 * * *' && '02:00' || (github.event.schedule == '15 17 * * *' && '02:00' || (github.event.schedule == '0 19 * * *' && '04:00' || (github.event.schedule == '0 1 * * *' && '10:00' || (github.event.schedule == '0 11 * * *' && '20:00' || '')))))) }}
+        run: python fancamverse_curioloop.py
 
-      - name: Save rendered videos for review
+      - name: Save FANCAMVERSE preview videos
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: fancamverse-test-videos
+          name: fancamverse-fancam-test-videos
           path: work_fancamverse/*_short_*.mp4
           if-no-files-found: ignore
           retention-days: 7
 
-      - name: Persist successful upload progress
+      - name: Persist successful FANCAMVERSE upload progress
         if: always()
         run: |
           if [ -f history/fancamverse_processed.json ] && ! git diff --quiet -- history/fancamverse_processed.json; then
@@ -94,7 +110,20 @@ jobs:
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
             git add history/fancamverse_processed.json
             git commit -m "Record FANCAMVERSE processed Drive videos"
-            git push
+            pushed=false
+            for attempt in 1 2 3; do
+              git fetch origin main
+              git rebase origin/main
+              if git push origin HEAD:main; then
+                pushed=true
+                break
+              fi
+              echo "History push attempt $attempt was rejected; rebasing on the latest main."
+            done
+            if [ "$pushed" != true ]; then
+              echo "::error::FANCAMVERSE upload may have succeeded, but progress could not be persisted after three safe rebase attempts."
+              exit 1
+            fi
           else
-            echo "No successfully uploaded Drive videos to record."
+            echo "No successfully uploaded FANCAMVERSE videos to record."
           fi
