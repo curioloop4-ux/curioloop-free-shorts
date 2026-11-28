@@ -618,6 +618,47 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
 
 def identify_artist(filename):
     value = Path(filename).stem.casefold()
+
+    # Explicit aliases for frequently encountered filename formats.
+    # Match member names before group names to avoid assigning the wrong identity.
+    extra_artists = [
+        (("안유진", "an yujin", "anyujin", "yujin"), "AN YUJIN", "IVE"),
+        (("유나", "yuna"), "YUNA", "ITZY"),
+        (("지원", "jeewon", "jiwon"), "JEEWON", "KISS OF LIFE"),
+        (("미연", "miyeon"), "MIYEON", "(G)I-DLE"),
+        (("최예나", "yena", "choi yena"), "YENA", "SOLO"),
+    ]
+    for aliases, artist_name, group_name in extra_artists:
+        if any(alias in value for alias in aliases):
+            # Short Korean/English names are accepted only with contextual evidence.
+            if artist_name == "YUNA" and not any(x in value for x in ("itzy", "있지", "유나 직캠", "유나 fancam")):
+                continue
+            if artist_name == "JEEWON" and not any(x in value for x in ("kiss of life", "kiof", "키스오브라이프", "jeewon", "지원  fancam", "지원 fancam")):
+                continue
+            if artist_name == "MIYEON" and not any(x in value for x in ("g idle", "gidle", "여자 아이들", "여자아이들", "아이들", "미연")):
+                continue
+            if artist_name == "YENA" and not any(x in value for x in ("최예나", "yena", "예나")):
+                continue
+            tags = [artist_name.title(), f"{group_name} {artist_name.title()}",
+                    f"{artist_name.title()} fancam", f"{group_name} fancam",
+                    "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+                    "female idol", "Shorts"]
+            return artist_name, group_name, tags
+
+    # Group-only aliases can identify a source when the member is explicit in Korean or English.
+    group_aliases = (
+        (("ive", "아이브"), "IVE", (("안유진", "an yujin", "anyujin", "yujin"), "AN YUJIN")),
+        (("itzy", "있지"), "ITZY", (("유나", "yuna"), "YUNA")),
+        (("(g)i-dle", "gidle", "여자아이들", "여자 아이들"), "(G)I-DLE", (("미연", "miyeon"), "MIYEON")),
+        (("kiss of life", "kiof", "키스오브라이프"), "KISS OF LIFE", (("지원", "jeewon"), "JEEWON")),
+    )
+    for group_terms, group_name, (member_terms, artist_name) in group_aliases:
+        if any(term in value for term in group_terms) and any(term in value for term in member_terms):
+            tags = [artist_name.title(), f"{group_name} {artist_name.title()}",
+                    f"{artist_name.title()} fancam", f"{group_name} fancam",
+                    "K-pop", "K-pop fancam", "K-pop Shorts", "Korean idol",
+                    "female idol", "Shorts"]
+            return artist_name, group_name, tags
     # Explicit high-priority aliases for common Latin/Korean filename variants.
     if any(token in value for token in ("blackpink jennie", "jennie", "제니")):
         return "JENNIE", "BLACKPINK", [
@@ -1170,7 +1211,7 @@ def main():
         state = source_state.get(item["id"], {"next_clip": 1, "complete": False})
         print(
             f"Batch {batch_number}/{batch_size} | Random "
-            f"{'never-used' if item['id'] not in used_source_ids else 'previously-used fallback'} source: "
+            f"{'never-used' if item['id'] not in used_original_ids else 'previously-used fallback'} source: "
             f"{item['name']} ({item['id']})"
         )
 
