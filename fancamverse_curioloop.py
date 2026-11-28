@@ -866,8 +866,8 @@ def generate_metadata(filename, hook, index):
         key = tag.casefold()
         if tag and key not in seen and len(tag) <= 60 and len(",".join(clean + [tag])) <= 480:
             clean.append(tag); seen.add(key)
-    hashtags = " ".join("#" + re.sub(r"[^A-Za-z0-9]", "", tag) for tag in clean[:6])
-    description = (description + "\n\n" if description else "") + hashtags
+    # Leave descriptions empty; do not add source notes or hashtags.
+    description = ""
     upload_stamp = datetime.now(ZoneInfo("Asia/Seoul")).strftime("%m%d-%H%M%S")
     title = f"{title.replace(' #Shorts', '')} | Clip {index:02d} · {upload_stamp} #Shorts"
     return title[:100], description[:5000], clean
