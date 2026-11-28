@@ -5,6 +5,7 @@ import re
 import subprocess
 import time
 import random
+import unicodedata
 import difflib
 from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -484,9 +485,21 @@ Exactly {target_count} clips. No markdown. Hooks must not invent names, song tit
         )
     return distinct
 
+def clean_overlay_text(value):
+    """Remove emoji and decorative symbols while preserving readable letters and numbers."""
+    value = unicodedata.normalize("NFKC", str(value or ""))
+    kept = []
+    for char in value:
+        category = unicodedata.category(char)
+        if category[0] in {"L", "M", "N"} or char in " .,!?'-":
+            kept.append(char)
+    return re.sub(r"\s+", " ", "".join(kept)).strip()
+
+
 def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     outputs = []
-    fontfile = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+    display_name = clean_overlay_text(display_name)
+    fontfile = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
     # Render at 9:15. Anchor the crop at the top so excess footage is removed from the bottom.
     output_w, output_h = 1080, 1800
     print(f"Render aspect ratio for {source_stem}: 9:15 (top-aligned crop; 1080x1800)")
@@ -495,7 +508,7 @@ def render_clips(source, clips, source_stem, index_offset=0, display_name=""):
     for position, clip in enumerate(clips, 1):
         index = position + index_offset
         output = WORK / f"{source_stem}_short_{index}.mp4"
-        raw_hook = re.sub(r"\\s+", " ", str(clip.get("hook", "A Must-Watch Stage Moment"))).strip()
+        raw_hook = clean_overlay_text(clip.get("hook", "A Must-Watch Stage Moment")) or "A Must Watch Stage Moment"
         wrapped_hook = textwrap.fill(raw_hook, width=25, max_lines=2, placeholder="…")
 
         # Intro hook: centered for 2.7 seconds, then disappears.
