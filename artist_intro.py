@@ -876,9 +876,17 @@ def render(src,p,hist):
  except Exception as e:
   print("Motion scan unavailable; using centered source segment:",type(e).__name__)
   hist["last_render_source_start"]=round(start,3);hist["last_render_source_duration"]=round(footage,3)
- name=p["artist"].replace("'","").replace(":","");group=p["group"].replace("'","").replace(":","")
+ def clean_overlay_text(value):
+  value=unicodedata.normalize("NFKC",str(value or ""))
+  kept=[]
+  for char in value:
+   category=unicodedata.category(char)
+   if category[0] in {"L","M","N"} or char in " .-":
+    kept.append(char)
+  return re.sub(r"\s+"," ","".join(kept)).strip()
+ name=clean_overlay_text(p["artist"]);group=clean_overlay_text(p["group"])
  out=W/(re.sub(r"[^A-Za-z0-9_-]+","_",name).lower()+"_artist_intro.mp4")
- font="/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf";bold="/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+ font="/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc";bold="/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
  # Show all call-to-action lines together, centered, during only the final 3 seconds.
  cta=W/"cta_artist_intro.png"
  card=Image.new("RGBA",(1080,1800),(0,0,0,0));draw=ImageDraw.Draw(card)
