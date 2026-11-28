@@ -1030,7 +1030,23 @@ def main():
   print(f"Manual artist target: {target}; automatic artist rotation bypassed.")
  else:
   processed_records=h.get("processed",[])
-  seen_artist_keys={history_artist_key(record) for record in processed_records}
+  # Include the companion fancam history so both CurioLoop formats share
+  # artist-level rotation and do not repeatedly feature the same person.
+  fancam_history_path=R/"history"/"curioloop_fancam_processed.json"
+  fancam_records=[]
+  if fancam_history_path.exists():
+   try:
+    fancam_history=json.loads(fancam_history_path.read_text(encoding="utf-8"))
+    for source_state in fancam_history.get("sources",{}).values():
+     source_name=source_state.get("name","")
+     if source_name:
+      fancam_artist,_,_=identify_fancam_artist(source_name)
+      if fancam_artist:
+       fancam_records.append({"source_name":source_name,"source_artist_key":fancam_artist})
+   except Exception as exc:
+    print("Warning: could not read companion fancam artist history:",type(exc).__name__)
+  combined_records=processed_records+fancam_records
+  seen_artist_keys={history_artist_key(record) for record in combined_records}
   seen_artist_keys.discard("")
   fresh_artist_keys={artist_key_by_id[x["id"]] for x in candidates if artist_key_by_id[x["id"]] not in seen_artist_keys}
   if fresh_artist_keys:
@@ -1041,7 +1057,7 @@ def main():
   else:
    # Once every available artist has appeared, restart with the least-recently featured artist.
    latest_seen={}
-   for index,record in enumerate(processed_records):
+   for index,record in enumerate(combined_records):
     key=history_artist_key(record)
     if key:latest_seen[key]=index
    oldest_key=min({artist_key_by_id[x["id"]] for x in candidates},
