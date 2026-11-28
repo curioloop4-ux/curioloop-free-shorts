@@ -943,7 +943,7 @@ def render(src,p,hist,drive,folder):
   print("Selected background music:",music_item["name"],"Drive ID:",music_item["id"],
         "artist_match:",bool(artist_tracks),"middle_start_seconds:",round(music_start,2),
         "track_duration_seconds:",round(music_duration,2))
-  fc+=f"[4:a]atrim=start={music_start:.3f},asetpts=PTS-STARTPTS,aloop=loop=-1:size={music_loop_samples},atrim=duration={length:.3f},volume=0.045,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
+  fc+=f"[4:a]atrim=start={music_start:.3f},asetpts=PTS-STARTPTS,aloop=loop=-1:size={music_loop_samples},atrim=duration={length:.3f},volume=0.20,afade=t=in:st=0:d=1.2,afade=t=out:st={max(0,length-2):.3f}:d=2,adelay=1500|1500,apad,atrim=duration={length:.3f}[music];"
   used_music.append(music_item["id"])
   if len(used_music)>max(1,len(music_files)):del used_music[:-len(music_files)]
  else:
@@ -952,7 +952,7 @@ def render(src,p,hist,drive,folder):
  has_source_audio=any(x.get("codec_type")=="audio" for x in probe.get("streams",[]))
  mix_labels=["[voice]"]
  if has_source_audio:
-  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.20,apad,atrim=duration={length:.3f}[original];"
+  fc+=f"[1:a]atrim=start={start:.3f}:duration={footage:.3f},asetpts=PTS-STARTPTS,adelay=1500|1500,volume=0.05,apad,atrim=duration={length:.3f}[original];"
   mix_labels.append("[original]")
  if music_item:mix_labels.append("[music]")
  if len(mix_labels)>1:
