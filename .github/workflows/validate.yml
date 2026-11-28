@@ -8,6 +8,8 @@ on:
       - "discover_trending.py"
       - "artist_intro.py"
       - "curioloop_fancam.py"
+      - "fancamverse_artist_intro.py"
+      - "fancamverse_curioloop.py"
       - ".github/workflows/**"
   workflow_dispatch:
 
